@@ -30,6 +30,92 @@ var MAP_THEME_ASSETS = {
   },
 };
 
+/* ── SPACE QUESTIONS DATABASE ─────────────────────────────────── */
+var SPACE_QUESTIONS = [
+  {
+    q: "Which planet is closest to the Sun?",
+    options: ["Venus", "Mercury", "Mars", "Earth"],
+    correct: 1, // Mercury
+  },
+  {
+    q: "What is the largest planet in our solar system?",
+    options: ["Saturn", "Neptune", "Jupiter", "Uranus"],
+    correct: 2, // Jupiter
+  },
+  {
+    q: "Which planet is known as the Red Planet?",
+    options: ["Venus", "Jupiter", "Mars", "Mercury"],
+    correct: 2, // Mars
+  },
+  {
+    q: "What is the name of the galaxy that contains our Solar System?",
+    options: ["Andromeda", "Triangulum", "Whirlpool", "Milky Way"],
+    correct: 3, // Milky Way
+  },
+  {
+    q: "Which planet has the most extensive ring system?",
+    options: ["Jupiter", "Uranus", "Saturn", "Neptune"],
+    correct: 2, // Saturn
+  },
+  {
+    q: "What is the hottest planet in our solar system?",
+    options: ["Mercury", "Venus", "Mars", "Jupiter"],
+    correct: 1, // Venus
+  },
+  {
+    q: "Who was the first person to walk on the Moon?",
+    options: ["Buzz Aldrin", "Yuri Gagarin", "Neil Armstrong", "John Glenn"],
+    correct: 2, // Neil Armstrong
+  },
+  {
+    q: "What is the Great Red Spot on Jupiter?",
+    options: ["A volcano", "A massive storm", "A crater", "A lake"],
+    correct: 1, // A massive storm
+  },
+  {
+    q: "Which two planets have no moons?",
+    options: [
+      "Earth & Mars",
+      "Mercury & Venus",
+      "Jupiter & Saturn",
+      "Uranus & Neptune",
+    ],
+    correct: 1, // Mercury & Venus
+  },
+  {
+    q: "How long does light take to travel from the Sun to Earth?",
+    options: ["8 minutes", "1 hour", "1 day", "1 second"],
+    correct: 0, // 8 minutes
+  },
+  {
+    q: "What is a light-year a measure of?",
+    options: ["Time", "Distance", "Speed", "Brightness"],
+    correct: 1, // Distance
+  },
+  {
+    q: "Which dwarf planet was reclassified from a planet in 2006?",
+    options: ["Ceres", "Eris", "Pluto", "Haumea"],
+    correct: 2, // Pluto
+  },
+];
+
+function getRandomQuestion() {
+  var idx = Math.floor(Math.random() * SPACE_QUESTIONS.length);
+  return SPACE_QUESTIONS[idx];
+}
+
+function getRandomQuestions(count) {
+  var shuffled = SPACE_QUESTIONS.slice();
+  // Fisher-Yates shuffle
+  for (var i = shuffled.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = temp;
+  }
+  return shuffled.slice(0, count);
+}
+
 /* ── PHYSICS CONSTANTS ─────────────────────────────────────────── */
 var PX = 3.0; // base walk speed
 var SPR_MULT = 1.22; // sprint multiplier
@@ -243,7 +329,10 @@ function getSelectedMapTheme() {
 var CAM = { x: 0, y: 0 }; // horizontal only
 
 function isMobileViewport() {
-  return window.matchMedia && window.matchMedia("(max-width: 900px), (max-height: 520px)").matches;
+  return (
+    window.matchMedia &&
+    window.matchMedia("(max-width: 900px), (max-height: 520px)").matches
+  );
 }
 
 function getCanvasRenderScale() {
@@ -396,30 +485,55 @@ function buildMap() {
   MAP.readySpike = null;
   MAP.hammer = null;
 
-  /* ── STAGE III EXIT ── */
-  MAP.gold = null;
+  /* ── GOLDEN THREAD (Required to unlock doors) ── */
+  MAP.gold = {
+    x: 3500, // Positioned before the doors
+    y: rise2Y - 120,
+    w: 64,
+    h: 64,
+    collected: false,
+    bobTimer: 0,
+  };
 
-  /* ── SINGLE EXIT DOOR ── */
+  /* ── THREE DOORS: 2 FAKE, 1 REAL ── */
+  /* ── THREE DOORS: 2 FAKE, 1 REAL ── */
   var dW = 118,
     dH = 154;
   var doorY = FLOOR_Y - dH;
+
+  // Randomly assign which door is correct (0, 1, or 2)
+  var correctDoorIndex = Math.floor(Math.random() * 3);
+
   MAP.doors = [
     {
-      x: 72,
+      x: 1800,
       y: doorY,
       w: dW,
       h: dH,
-      correct: false,
-      label: "BACK",
-      targetStage: "stage2.html",
+      correct: correctDoorIndex === 0,
+      label: correctDoorIndex === 0 ? "EXIT" : "DOOR A",
+      answered: false,
+      question: null, // Will be set when player interacts
     },
     {
-      x: 8030,
+      x: 4500,
       y: doorY,
       w: dW,
       h: dH,
-      correct: true,
-      label: "EXIT",
+      correct: correctDoorIndex === 1,
+      label: correctDoorIndex === 1 ? "EXIT" : "DOOR B",
+      answered: false,
+      question: null,
+    },
+    {
+      x: 7200,
+      y: doorY,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 2,
+      label: correctDoorIndex === 2 ? "EXIT" : "DOOR C",
+      answered: false,
+      question: null,
     },
   ];
   MAP.doorFrameRect = null;
@@ -427,24 +541,59 @@ function buildMap() {
   MAP.decorBack = [
     { key: "cage", x: 150, y: FLOOR_Y - 276, w: 104, h: 88, alpha: 0.18 },
     { key: "web", x: 300, y: FLOOR_Y - 256, w: 132, h: 48, alpha: 0.24 },
-    { key: "vinesGreenWide", x: 520, y: FLOOR_Y - 216, w: 170, h: 56, alpha: 0.15 },
+    {
+      key: "vinesGreenWide",
+      x: 520,
+      y: FLOOR_Y - 216,
+      w: 170,
+      h: 56,
+      alpha: 0.15,
+    },
 
     { key: "web", x: 820, y: mezzY - 96, w: 126, h: 44, alpha: 0.26 },
     { key: "writing", x: 1120, y: FLOOR_Y - 178, w: 142, h: 58, alpha: 0.16 },
     { key: "vinesRed3", x: 1330, y: FLOOR_Y - 208, w: 80, h: 236, alpha: 0.22 },
 
     { key: "web", x: 2010, y: loftY - 94, w: 128, h: 46, alpha: 0.26 },
-    { key: "muralShade", x: 2230, y: FLOOR_Y - 292, w: 188, h: 146, alpha: 0.1 },
+    {
+      key: "muralShade",
+      x: 2230,
+      y: FLOOR_Y - 292,
+      w: 188,
+      h: 146,
+      alpha: 0.1,
+    },
 
     { key: "web", x: 3110, y: trenchY - 118, w: 132, h: 46, alpha: 0.26 },
     { key: "vinesGreen", x: 3350, y: lowerY - 142, w: 82, h: 96, alpha: 0.16 },
     { key: "web", x: 3770, y: rise1Y - 96, w: 138, h: 48, alpha: 0.24 },
-    { key: "vinesGreenWide", x: 4010, y: rise2Y - 156, w: 162, h: 52, alpha: 0.16 },
+    {
+      key: "vinesGreenWide",
+      x: 4010,
+      y: rise2Y - 156,
+      w: 162,
+      h: 52,
+      alpha: 0.16,
+    },
     { key: "web", x: 4350, y: rise3Y - 104, w: 132, h: 46, alpha: 0.28 },
 
-    { key: "muralLady", x: 4560, y: FLOOR_Y - 286, w: 138, h: 112, alpha: 0.12 },
+    {
+      key: "muralLady",
+      x: 4560,
+      y: FLOOR_Y - 286,
+      w: 138,
+      h: 112,
+      alpha: 0.12,
+    },
     { key: "web", x: 4720, y: mezzY - 96, w: 132, h: 46, alpha: 0.24 },
-    { key: "vinesGreenWide", x: 5060, y: FLOOR_Y - 212, w: 170, h: 56, alpha: 0.15 },
+    {
+      key: "vinesGreenWide",
+      x: 5060,
+      y: FLOOR_Y - 212,
+      w: 170,
+      h: 56,
+      alpha: 0.15,
+    },
 
     { key: "cage", x: 5590, y: rise1Y - 178, w: 104, h: 88, alpha: 0.18 },
     { key: "writing", x: 5870, y: FLOOR_Y - 188, w: 146, h: 60, alpha: 0.16 },
@@ -452,8 +601,22 @@ function buildMap() {
     { key: "vinesRed4", x: 6740, y: FLOOR_Y - 212, w: 88, h: 244, alpha: 0.22 },
     { key: "web", x: 7030, y: mezzY - 96, w: 132, h: 48, alpha: 0.28 },
 
-    { key: "muralSeeker", x: 7410, y: FLOOR_Y - 284, w: 176, h: 138, alpha: 0.12 },
-    { key: "vinesGreenWide", x: 7720, y: FLOOR_Y - 160, w: 180, h: 60, alpha: 0.18 },
+    {
+      key: "muralSeeker",
+      x: 7410,
+      y: FLOOR_Y - 284,
+      w: 176,
+      h: 138,
+      alpha: 0.12,
+    },
+    {
+      key: "vinesGreenWide",
+      x: 7720,
+      y: FLOOR_Y - 160,
+      w: 180,
+      h: 60,
+      alpha: 0.18,
+    },
     { key: "web", x: 7995, y: FLOOR_Y - 88, w: 120, h: 42, alpha: 0.22 },
   ];
 
@@ -522,35 +685,35 @@ var STEPS = [
   {
     icon: "🕸",
     title: "Stage III — Infested Climb",
-    desc: "The third chamber keeps Stage II's movement language, but now the route is guarded by a few timed spikes and roaming vermin.",
-    keys: ["Stay mobile", "Watch for rats and bats"],
+    desc: "Find the Golden Thread to unlock the mysterious doors. Beware: only one door leads to freedom!",
+    keys: ["Find the Golden Thread", "Choose wisely among 3 doors"],
     trigger: function () {
       return PL.x > 700;
     },
   },
   {
     icon: "☠",
-    title: "Hazards Stack",
-    desc: "Fewer spike traps protect the route now, but 3 mobs patrol the safest-looking ledges.",
-    keys: ["Clear ledges fast"],
+    title: "The Golden Thread",
+    desc: "The Golden Thread lies hidden in the chamber. Without it, the doors remain sealed.",
+    keys: ["Search thoroughly"],
     trigger: function () {
       return PL.x > 2400;
     },
   },
   {
     icon: "🦇",
-    title: "Roaming Threats",
-    desc: "Flying and crawling enemies force cleaner timing. Hesitation is punished harder here.",
-    keys: ["Read patrols"],
+    title: "The Three Doors",
+    desc: "Two doors lead to doom, one to salvation. Each requires answering space riddles correctly.",
+    keys: ["Answer 4/6 questions correctly", "Choose the right door"],
     trigger: function () {
       return PL.x > 5200;
     },
   },
   {
     icon: "🚪",
-    title: "Final Push",
-    desc: "The exit hall is longer and less forgiving. Cross the last hazards and reach the next gate.",
-    keys: ["Finish the chamber"],
+    title: "Final Choice",
+    desc: "Use your knowledge of the cosmos to unlock the true exit. Wrong answers cost health!",
+    keys: ["Space knowledge required", "Hearts are limited"],
     trigger: function () {
       return PL.x > 7900;
     },
@@ -639,6 +802,17 @@ function resetToStart() {
   }
   GS.hasGold = false;
   GS.activeDoorIndex = -1;
+  // Reset doors
+  if (MAP.doors) {
+    var correctDoorIndex = Math.floor(Math.random() * 3);
+    MAP.doors.forEach(function (door, i) {
+      door.correct = i === correctDoorIndex;
+      door.label =
+        i === correctDoorIndex ? "EXIT" : "DOOR " + String.fromCharCode(65 + i);
+      door.answered = false;
+      door.question = null;
+    });
+  }
   GS.dead = false;
   GS.won = false;
   GS.jumpscareActive = false;
@@ -651,6 +825,196 @@ function resetToStart() {
   spawnPlayer();
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
+}
+
+/* ── DOOR QUIZ SYSTEM (Single Question) ───────────────────────── */
+var currentQuiz = null;
+
+function startDoorQuiz(door, doorIndex) {
+  GS.paused = true;
+  currentQuiz = {
+    door: door,
+    doorIndex: doorIndex,
+    question: door.question,
+  };
+
+  buildQuizUI();
+  showQuizQuestion();
+}
+
+function buildQuizUI() {
+  var existing = document.getElementById("quiz-overlay");
+  if (existing) existing.remove();
+
+  var overlay = document.createElement("div");
+  overlay.id = "quiz-overlay";
+  overlay.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "z-index:10000",
+    "display:flex",
+    "align-items:center",
+    "justify-content:center",
+    "background:rgba(0,0,0,0.85)",
+    "font-family:Cinzel,serif",
+  ].join(";");
+
+  var container = document.createElement("div");
+  container.id = "quiz-container";
+  container.style.cssText = [
+    "background:linear-gradient(180deg,#1a0f0a 0%,#0d0705 100%)",
+    "border:2px solid #d4a843",
+    "border-radius:8px",
+    "padding:32px",
+    "max-width:560px",
+    "width:90%",
+    "color:#e8c26a",
+    "box-shadow:0 0 40px rgba(212,168,67,0.3)",
+  ].join(";");
+
+  var title = document.createElement("h2");
+  title.id = "quiz-title";
+  title.style.cssText =
+    "margin:0 0 20px 0;color:#ffd700;font-size:24px;text-align:center;";
+  title.textContent = "🔮 Oracle's Riddle";
+
+  var subtitle = document.createElement("div");
+  subtitle.style.cssText =
+    "text-align:center;margin-bottom:16px;font-size:13px;color:#a08050;";
+  subtitle.textContent = "Answer correctly to unlock the door...";
+
+  var question = document.createElement("div");
+  question.id = "quiz-question";
+  question.style.cssText =
+    "font-size:20px;margin-bottom:28px;line-height:1.4;color:#f0e6d2;text-align:center;";
+
+  var options = document.createElement("div");
+  options.id = "quiz-options";
+  options.style.cssText = "display:flex;flex-direction:column;gap:12px;";
+
+  var feedback = document.createElement("div");
+  feedback.id = "quiz-feedback";
+  feedback.style.cssText =
+    "margin-top:20px;text-align:center;font-size:18px;min-height:28px;";
+
+  container.appendChild(title);
+  container.appendChild(subtitle);
+  container.appendChild(question);
+  container.appendChild(options);
+  container.appendChild(feedback);
+  overlay.appendChild(container);
+  document.body.appendChild(overlay);
+}
+
+function showQuizQuestion() {
+  if (!currentQuiz) return;
+
+  var q = currentQuiz.question;
+
+  document.getElementById("quiz-question").textContent = q.q;
+
+  var optionsDiv = document.getElementById("quiz-options");
+  optionsDiv.innerHTML = "";
+
+  q.options.forEach(function (opt, idx) {
+    var btn = document.createElement("button");
+    btn.style.cssText = [
+      "background:linear-gradient(180deg,#2a1a10 0%,#1a0f0a 100%)",
+      "border:1px solid #8a6a3a",
+      "color:#e8c26a",
+      "padding:16px 20px",
+      "font-size:17px",
+      "cursor:pointer",
+      "border-radius:4px",
+      "font-family:Cinzel,serif",
+      "transition:all 0.2s",
+      "text-align:left",
+    ].join(";");
+
+    btn.onmouseover = function () {
+      this.style.borderColor = "#d4a843";
+      this.style.background = "linear-gradient(180deg,#3a2a1a 0%,#2a1a10 100%)";
+    };
+    btn.onmouseout = function () {
+      this.style.borderColor = "#8a6a3a";
+      this.style.background = "linear-gradient(180deg,#2a1a10 0%,#1a0f0a 100%)";
+    };
+
+    btn.textContent = String.fromCharCode(65 + idx) + ". " + opt;
+    btn.onclick = function () {
+      handleQuizAnswer(idx);
+    };
+    optionsDiv.appendChild(btn);
+  });
+
+  document.getElementById("quiz-feedback").textContent = "";
+}
+
+function handleQuizAnswer(selectedIndex) {
+  if (!currentQuiz) return;
+
+  var q = currentQuiz.question;
+  var isCorrect = selectedIndex === q.correct;
+  var feedback = document.getElementById("quiz-feedback");
+  var door = currentQuiz.door;
+
+  // Disable all buttons
+  var buttons = document
+    .getElementById("quiz-options")
+    .getElementsByTagName("button");
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].disabled = true;
+    if (i === q.correct) {
+      buttons[i].style.borderColor = "#4a8a4a";
+      buttons[i].style.background =
+        "linear-gradient(180deg,#2a4a2a 0%,#1a3a1a 100%)";
+    } else if (i === selectedIndex && !isCorrect) {
+      buttons[i].style.borderColor = "#8a2a2a";
+      buttons[i].style.background =
+        "linear-gradient(180deg,#4a1a1a 0%,#3a1010 100%)";
+    }
+  }
+
+  door.answered = true;
+
+  if (isCorrect) {
+    feedback.innerHTML =
+      '<span style="color:#4aff4a;">✓ Correct! The door unlocks...</span>';
+
+    setTimeout(function () {
+      closeQuizUI();
+
+      if (door.correct) {
+        // Right door + right answer = proceed to stage 4
+        showBadge("🌟 The path opens! Proceeding to Stage IV...");
+        setTimeout(function () {
+          window.location.href = "stage4.html";
+        }, 1500);
+      } else {
+        // Wrong door but right answer = damage, door seals
+        takeDamage("wrongDoor");
+        showBadge("✕ Right answer, but wrong door! -1 Heart");
+      }
+    }, 1200);
+  } else {
+    feedback.innerHTML =
+      '<span style="color:#ff4a4a;">✗ Wrong! The answer was: ' +
+      q.options[q.correct] +
+      "</span>";
+
+    setTimeout(function () {
+      closeQuizUI();
+      takeDamage("quizFail");
+      showBadge("✕ Wrong answer! -1 Heart");
+    }, 1500);
+  }
+}
+
+function closeQuizUI() {
+  var overlay = document.getElementById("quiz-overlay");
+  if (overlay) overlay.remove();
+  currentQuiz = null;
+  GS.paused = false;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -784,7 +1148,7 @@ function tutUpdate() {
       }
     }
   }
-  
+
   // Clamp right edge of world
   if (PL.x + PL.sw > WORLD) {
     PL.x = WORLD - PL.sw;
@@ -871,29 +1235,24 @@ function tutUpdate() {
     }
   }
 
-  /* ── GOLD THREW PICKUP ── */
+  /* ── GOLDEN THREAD PICKUP ── */
   if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
     var g = MAP.gold;
     var px6 = PL.x + PL_COX,
       py6 = PL.y + PL_COY;
+
+    // Auto-pickup on proximity (no E key needed, just walk near it)
     if (
-      JP["KeyE"] ||
-      (Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 80 &&
-        Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 80 &&
-        (JP["KeyE"] || KEYS["KeyE"]))
+      Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 70 &&
+      Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 70
     ) {
-      // Auto-pickup on proximity
-      if (
-        Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 70 &&
-        Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 70
-      ) {
-        MAP.gold.collected = true;
-        GS.hasGold = true;
-        showBadge("✨ Golden Thread collected!");
-        spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
-      }
+      MAP.gold.collected = true;
+      GS.hasGold = true;
+      showBadge("✨ Golden Thread collected! Doors are now unlocked!");
+      spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
     }
   }
+
   /* ── DOOR INTERACTION ── */
   GS.activeDoorIndex = -1;
   MAP.doors.forEach(function (door, i) {
@@ -906,17 +1265,39 @@ function tutUpdate() {
       py7 < door.y + door.h
     ) {
       GS.activeDoorIndex = i;
+
       if (JP["KeyE"]) {
-        if (door.targetStage) {
-          window.location.href = door.targetStage;
-        } else {
-          GS.won = true;
-          showScreen("screen-win");
+        // Check if player has the golden thread
+        if (!GS.hasGold) {
+          showBadge("🔒 Locked! Find the Golden Thread first!");
+          JP["KeyE"] = false;
+          return;
         }
+
+        // If door already answered correctly, proceed to stage 4
+        if (door.answered && door.correct) {
+          window.location.href = "stage4.html";
+          return;
+        }
+
+        // If door already answered wrong, don't allow retry
+        if (door.answered && !door.correct) {
+          showBadge("✕ This door is sealed!");
+          JP["KeyE"] = false;
+          return;
+        }
+
+        // Assign random question if not already assigned
+        if (!door.question) {
+          door.question = getRandomQuestion();
+        }
+
+        // Start single question quiz for this door
+        startDoorQuiz(door, i);
+        JP["KeyE"] = false;
       }
     }
   });
-  JP["KeyE"] = false;
 
   /* ── VOID DEATH (fall off bottom) ── */
   if (PL.y > TC.height + 80) {
@@ -949,15 +1330,13 @@ function tutUpdate() {
   /* ── CAMERA ── */
   var targetCamX = PL.x + PL.sw / 2 - TC.width / 2;
   var targetCamY = PL.y + PL.sh / 2 - TC.height / 2;
-  
+
   // Clamp to world bounds
   targetCamX = Math.max(0, Math.min(WORLD - TC.width, targetCamX));
   targetCamY = Math.max(0, Math.min(TC.height * 2 - TC.height, targetCamY)); // Adjust vertical bounds as needed
-  
+
   CAM.x += (targetCamX - CAM.x) * 0.12;
   CAM.y += (targetCamY - CAM.y) * 0.12;
-
-
 
   /* ── PARTICLES ── */
   updateParticles();
@@ -1020,10 +1399,11 @@ function updateMobs() {
     }
 
     if (PL.iframes > 0) return;
-    var px = PL.x + PL_COX, py = PL.y + PL_COY;
+    var px = PL.x + PL_COX,
+      py = PL.y + PL_COY;
     var my = m.type === "rat" ? m.y - m.h : m.y;
     if (px < m.x + m.w && px + PL.w > m.x && py < my + m.h && py + PL.h > my) {
-      PL.vx = (px + PL.w * 0.5 < m.x + m.w * 0.5 ? -8 : 8);
+      PL.vx = px + PL.w * 0.5 < m.x + m.w * 0.5 ? -8 : 8;
       PL.vy = -8;
       takeDamage("mob");
     }
@@ -1053,8 +1433,12 @@ function spawnImpactPtcls(x, y, count) {
       dec: 0.035 + Math.random() * 0.03,
       sz: Math.random() * (isEmber ? 4 : 3) + 2,
       col: isEmber
-        ? (Math.random() < 0.5 ? "#ffd36c" : "#ffb347")
-        : (Math.random() < 0.5 ? "#9b1f2d" : "#67202a"),
+        ? Math.random() < 0.5
+          ? "#ffd36c"
+          : "#ffb347"
+        : Math.random() < 0.5
+          ? "#9b1f2d"
+          : "#67202a",
       type: isEmber ? "ember" : "dust",
     });
   }
@@ -1076,7 +1460,9 @@ function startDeathSequence(source) {
     y: PL.y,
     vx:
       source === "hammer"
-        ? (PL.x + PL.sw / 2 < MAP.hammer.anchorX ? -2.8 : 2.8)
+        ? PL.x + PL.sw / 2 < MAP.hammer.anchorX
+          ? -2.8
+          : 2.8
         : PL.dir * 1.2,
     vy: -6.4,
     rot: source === "hammer" ? 0.18 * PL.dir : 0,
@@ -1113,7 +1499,7 @@ function updateDeathFx() {
   fx.vx *= 0.95;
   fx.rot += fx.rotV;
   fx.rotV *= 0.985;
-  fx.scale = 1 + Math.sin(Math.min(fx.t, 16) / 16 * Math.PI) * 0.07;
+  fx.scale = 1 + Math.sin((Math.min(fx.t, 16) / 16) * Math.PI) * 0.07;
   fx.glow = Math.max(0, 1 - fx.t / 22);
   fx.alpha = fx.t < 12 ? 1 : Math.max(0, 1 - (fx.t - 12) / 28);
   GS.deathFlash = Math.max(0, 1 - fx.t / 20);
@@ -1129,7 +1515,7 @@ function updateDeathFx() {
 }
 
 function wrongDoor() {
-  // Prevent re-triggering while jumpscare is active
+  // This is now handled by the quiz system, but keep for compatibility
   if (GS.jumpscareActive) return;
   GS.jumpscareActive = true;
   GS.paused = true;
@@ -1147,7 +1533,7 @@ function wrongDoor() {
     "background:#000",
     "opacity:0",
     "transition:opacity 0.05s",
-    "overflow:hidden"
+    "overflow:hidden",
   ].join(";");
 
   var img = new Image();
@@ -1159,32 +1545,31 @@ function wrongDoor() {
     "object-fit:cover",
     "transform:scale(1.08)",
     "image-rendering:pixelated",
-    "filter:brightness(1.3) contrast(1.4)"
+    "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
-  // Use SPRITE_MINO if available, otherwise a red fallback
   if (typeof SPRITE_MINO !== "undefined") {
     img.src = SPRITE_MINO;
   } else {
-    // Fallback: red screen with text
     overlay.style.background = "#cc0000";
     var txt = document.createElement("div");
     txt.textContent = "YOU CHOSE WRONG";
-    txt.style.cssText = "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
+    txt.style.cssText =
+      "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
     overlay.appendChild(txt);
   }
 
   overlay.appendChild(img);
   document.body.appendChild(overlay);
 
-  // Red flash on canvas first
   var fl = document.getElementById("wrong-flash");
   if (fl) {
     fl.classList.add("show");
-    setTimeout(function () { fl.classList.remove("show"); }, 200);
+    setTimeout(function () {
+      fl.classList.remove("show");
+    }, 200);
   }
 
-  // Screen shake
   TC.style.transition = "transform 0s";
   var shakeCount = 0;
   var shakeInterval = setInterval(function () {
@@ -1198,18 +1583,15 @@ function wrongDoor() {
     }
   }, 40);
 
-  // Slam the overlay visible
   requestAnimationFrame(function () {
     overlay.style.opacity = "1";
   });
 
-  // Animate the image: scale up for extra scare
   setTimeout(function () {
     img.style.transition = "transform 0.4s ease-out";
     img.style.transform = "scale(1.22)";
   }, 60);
 
-  // Fade out and reset after the scare
   setTimeout(function () {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
@@ -1217,9 +1599,9 @@ function wrongDoor() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
-      GS.lives = 3;
-      resetToStart();
-      showBadge("✕ Wrong door! Start again...");
+      // Don't reset everything, just damage
+      takeDamage("wrongDoor");
+      showBadge("✕ Wrong door! -1 Heart");
     }, 380);
   }, 1100);
 }
@@ -1233,8 +1615,7 @@ function tutDraw() {
   TX.clearRect(0, 0, W, H);
 
   TX.save();
-TX.translate(-CAM.x, -CAM.y);
-
+  TX.translate(-CAM.x, -CAM.y);
 
   drawBG(W, H);
   drawChamberDepth(H);
@@ -1281,7 +1662,14 @@ function drawBG(W, H) {
     TX.drawImage(SPR.mapTheme.roof, 0, 0, WORLD, H * 0.18);
     TX.restore();
   }
-  var haze = TX.createRadialGradient(CAM.x + W * 0.5, H * 0.18, 10, CAM.x + W * 0.5, H * 0.42, W * 0.7);
+  var haze = TX.createRadialGradient(
+    CAM.x + W * 0.5,
+    H * 0.18,
+    10,
+    CAM.x + W * 0.5,
+    H * 0.42,
+    W * 0.7,
+  );
   haze.addColorStop(0, "rgba(214,187,128,0.11)");
   haze.addColorStop(1, "transparent");
   TX.fillStyle = haze;
@@ -1325,10 +1713,23 @@ function drawBG(W, H) {
     var torchH = 34;
     var torchBaseY = ty - 6;
     if (torch) {
-      TX.drawImage(torch, tx - torchW * 0.5, torchBaseY - torchH, torchW, torchH);
+      TX.drawImage(
+        torch,
+        tx - torchW * 0.5,
+        torchBaseY - torchH,
+        torchW,
+        torchH,
+      );
     }
 
-    var emberGlow = TX.createRadialGradient(tx, torchBaseY - 28, 0, tx, torchBaseY - 28, 34);
+    var emberGlow = TX.createRadialGradient(
+      tx,
+      torchBaseY - 28,
+      0,
+      tx,
+      torchBaseY - 28,
+      34,
+    );
     emberGlow.addColorStop(0, "rgba(255,240,184,.48)");
     emberGlow.addColorStop(0.3, "rgba(255,170,70,.26)");
     emberGlow.addColorStop(1, "transparent");
@@ -1342,18 +1743,161 @@ function drawBG(W, H) {
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 45 - flameWobble * 0.12);
     TX.quadraticCurveTo(tx + 10, torchBaseY - 30, tx, torchBaseY - 12);
-    TX.quadraticCurveTo(tx - 12, torchBaseY - 30, tx, torchBaseY - 45 - flameWobble * 0.12);
+    TX.quadraticCurveTo(
+      tx - 12,
+      torchBaseY - 30,
+      tx,
+      torchBaseY - 45 - flameWobble * 0.12,
+    );
     TX.fill();
     TX.fillStyle = "rgba(255,241,190,.96)";
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 38 - flameWobble * 0.08);
     TX.quadraticCurveTo(tx + 5, torchBaseY - 28, tx, torchBaseY - 18);
-    TX.quadraticCurveTo(tx - 6, torchBaseY - 28, tx, torchBaseY - 38 - flameWobble * 0.08);
+    TX.quadraticCurveTo(
+      tx - 6,
+      torchBaseY - 28,
+      tx,
+      torchBaseY - 38 - flameWobble * 0.08,
+    );
     TX.fill();
     TX.restore();
   }
   TX.fillStyle = "rgba(0,0,0,.18)";
   TX.fillRect(0, H * 0.72, WORLD, H * 0.28);
+}
+
+function drawDoors() {
+  MAP.doors.forEach(function (door, i) {
+    if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
+    
+    var locked = !GS.hasGold;
+    var lit = door.correct && GS.hasGold && !door.answered;
+    var pulse = 0.7 + Math.sin(Date.now() * 0.004 + i) * 0.3;
+    
+    TX.save();
+    
+    // Shadow
+    TX.fillStyle = "rgba(0,0,0,.22)";
+    TX.beginPath();
+    TX.ellipse(door.x + door.w / 2, door.y + door.h + 10, door.w * 0.56, 10, 0, 0, Math.PI * 2);
+    TX.fill();
+    
+    // Base
+    TX.fillStyle = "rgba(32,18,18,.88)";
+    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
+    TX.fillStyle = "rgba(232,194,106,.18)";
+    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 2);
+    
+    // Glow for correct/unlocked door
+    if (lit) {
+      TX.shadowBlur = 30;
+      TX.shadowColor = "#ffd700";
+      var glowG = TX.createRadialGradient(
+        door.x + door.w / 2,
+        door.y + door.h / 2,
+        10,
+        door.x + door.w / 2,
+        door.y + door.h / 2,
+        80,
+      );
+      glowG.addColorStop(0, "rgba(255,215,0," + (0.35 * pulse) + ")");
+      glowG.addColorStop(1, "transparent");
+      TX.fillStyle = glowG;
+      TX.fillRect(door.x - 40, door.y - 20, door.w + 80, door.h + 40);
+    }
+    
+    // Door frame/image
+    var frame = SPR.decor.doorFrame;
+    if (frame && frame.complete && frame.naturalWidth) {
+      var cropX = frame.naturalWidth * 0.5;
+      var cropW = frame.naturalWidth * 0.5;
+      var cropY = frame.naturalHeight * 0.255;
+      var cropH = frame.naturalHeight * 0.745;
+      var drawY = door.y + 12;
+      var drawH = door.h - 4;
+      
+      if (locked) {
+        TX.globalAlpha = 0.5;
+      } else if (door.answered && !door.correct) {
+        TX.globalAlpha = 0.4;
+      } else {
+        TX.globalAlpha = lit ? pulse : 0.88;
+      }
+      
+      TX.drawImage(
+        frame,
+        cropX,
+        cropY,
+        cropW,
+        cropH,
+        door.x - 2,
+        drawY,
+        door.w + 4,
+        drawH,
+      );
+      TX.globalAlpha = 1;
+    } else {
+      // Fallback drawn door
+      if (locked) {
+        TX.fillStyle = "#2a1a0a";
+      } else if (door.answered && !door.correct) {
+        TX.fillStyle = "#3a1010";
+      } else {
+        TX.fillStyle = lit ? "#8a6a20" : "#3a2010";
+      }
+      
+      TX.fillRect(door.x, door.y, door.w, door.h);
+      TX.fillStyle = locked ? "#5a3818" : (lit ? "#ffd700" : "#5a3818");
+      TX.fillRect(door.x + 4, door.y + 4, door.w - 8, door.h - 8);
+      
+      if (lit) {
+        TX.fillStyle = "#ffd700";
+        TX.font = "bold 18px serif";
+        TX.textAlign = "center";
+        TX.fillText("✓", door.x + door.w / 2, door.y + door.h / 2 + 6);
+        TX.textAlign = "left";
+      }
+      
+      if (locked) {
+        TX.fillStyle = "#8a6a3a";
+        TX.font = "bold 24px serif";
+        TX.textAlign = "center";
+        TX.fillText("🔒", door.x + door.w / 2, door.y + door.h / 2 + 8);
+        TX.textAlign = "left";
+      }
+      
+      TX.strokeStyle = locked ? "#4a3020" : (lit ? "#ffd700" : "#5a3818");
+      TX.lineWidth = 3;
+      TX.strokeRect(door.x, door.y, door.w, door.h);
+    }
+    
+    // Labels
+    TX.fillStyle = locked ? "rgba(120,100,80,0.6)" : 
+                   (lit ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)");
+    TX.font = "9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText(door.label || "EXIT", door.x + door.w / 2, door.y + door.h + 14);
+    
+    if (GS.activeDoorIndex === i) {
+      if (locked) {
+        TX.fillStyle = "rgba(255,100,100,.9)";
+        TX.fillText("🔒 Need Golden Thread", door.x + door.w / 2, door.y - 8);
+      } else if (!door.answered) {
+        TX.fillStyle = "rgba(255,215,0,.95)";
+        TX.fillText("[E] ANSWER RIDDLE", door.x + door.w / 2, door.y - 8);
+      } else if (door.correct) {
+        TX.fillStyle = "rgba(100,255,100,.9)";
+        TX.fillText("✓ UNLOCKED", door.x + door.w / 2, door.y - 8);
+      } else {
+        TX.fillStyle = "rgba(255,100,100,.9)";
+        TX.fillText("✕ SEALED", door.x + door.w / 2, door.y - 8);
+      }
+    }
+    
+    TX.textAlign = "left";
+    TX.restore();
+  });
 }
 
 function drawChamberDepth(H) {
@@ -1365,7 +1909,12 @@ function drawChamberDepth(H) {
     TX.fillStyle = "rgba(10,8,14,.22)";
     TX.fillRect(zone.x, zone.y, zone.w, zone.h);
 
-    var archG = TX.createLinearGradient(zone.x, zone.y, zone.x, zone.y + zone.h);
+    var archG = TX.createLinearGradient(
+      zone.x,
+      zone.y,
+      zone.x,
+      zone.y + zone.h,
+    );
     archG.addColorStop(0, "rgba(26,18,22,.44)");
     archG.addColorStop(0.25, "rgba(10,7,12,.1)");
     archG.addColorStop(1, "rgba(0,0,0,0)");
@@ -1397,7 +1946,7 @@ function drawChamberDepth(H) {
     TX.save();
     var cg = TX.createLinearGradient(col.x, col.y, col.x + col.w, col.y);
     cg.addColorStop(0, "rgba(14,10,16," + col.alpha + ")");
-    cg.addColorStop(0.5, "rgba(42,30,34," + (col.alpha * 1.2) + ")");
+    cg.addColorStop(0.5, "rgba(42,30,34," + col.alpha * 1.2 + ")");
     cg.addColorStop(1, "rgba(12,8,12," + col.alpha + ")");
     TX.fillStyle = cg;
     TX.fillRect(col.x, col.y, col.w, col.h);
@@ -1413,7 +1962,8 @@ function drawDecorLayer(list) {
   if (!list) return;
   list.forEach(function (item) {
     var img = SPR.decor[item.key];
-    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40) return;
+    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40)
+      return;
     TX.save();
     TX.globalAlpha = item.alpha == null ? 1 : item.alpha;
     TX.drawImage(img, item.x, item.y, item.w, item.h);
@@ -1527,7 +2077,12 @@ function drawSpikeRack(x, y, w, spikeH, gap) {
     TX.closePath();
     TX.fill();
 
-    var bladeG = TX.createLinearGradient(tipX, y - spikeH, tipX, rackTop + rackHeight);
+    var bladeG = TX.createLinearGradient(
+      tipX,
+      y - spikeH,
+      tipX,
+      rackTop + rackHeight,
+    );
     bladeG.addColorStop(0, "#f3e5d5");
     bladeG.addColorStop(0.18, "#d8d1c8");
     bladeG.addColorStop(0.55, "#8a8c93");
@@ -1568,7 +2123,8 @@ function drawSpikeRack(x, y, w, spikeH, gap) {
 
 function drawPlates() {
   MAP.plates.forEach(function (plate) {
-    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20) return;
+    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20)
+      return;
 
     TX.save();
     TX.fillStyle = plate.active ? "rgba(156,104,28,.95)" : "rgba(106,74,24,.9)";
@@ -1629,7 +2185,6 @@ function drawShaft(H) {
   }
   TX.fillStyle = "rgba(0,0,0,.26)";
   TX.fillRect(sh.x + 10, sh.y + 6, sh.w - 20, sh.bottom - sh.y - 6);
-
 }
 
 function drawHammer() {
@@ -1639,7 +2194,8 @@ function drawHammer() {
   var hx = hm.anchorX + Math.sin(hm.angle) * hm.length;
   var hy2 = hm.anchorY + Math.cos(hm.angle) * hm.length;
 
-  var hmImg = SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
+  var hmImg =
+    SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
   if (hmImg && hmImg.complete && hmImg.naturalWidth) {
     TX.save();
     // Rotate one hammer asset around the pointer/ball for a genuinely steady swing.
@@ -1656,7 +2212,12 @@ function drawHammer() {
     TX.translate(hm.anchorX, hm.anchorY);
     TX.rotate(hm.angle);
     // Fallback rectangle if no sprite
-    var hg = TX.createLinearGradient(-hm.hw / 2, -hm.hh / 2, hm.hw / 2, hm.hh / 2);
+    var hg = TX.createLinearGradient(
+      -hm.hw / 2,
+      -hm.hh / 2,
+      hm.hw / 2,
+      hm.hh / 2,
+    );
     hg.addColorStop(0, "#909090");
     hg.addColorStop(0.4, "#c0c0c8");
     hg.addColorStop(1, "#484858");
@@ -1755,99 +2316,22 @@ function drawGold() {
   TX.textAlign = "left";
 }
 
-function drawDoors() {
-  MAP.doors.forEach(function (door, i) {
-    if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
-    var lit = false;
-    var pulse = 1;
+/* ── GOLDEN THREAD PICKUP ── */
+if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
+  var g = MAP.gold;
+  var px6 = PL.x + PL_COX,
+    py6 = PL.y + PL_COY;
 
-    TX.save();
-    TX.fillStyle = "rgba(0,0,0,.22)";
-    TX.beginPath();
-    TX.ellipse(door.x + door.w / 2, door.y + door.h + 10, door.w * 0.56, 10, 0, 0, Math.PI * 2);
-    TX.fill();
-    TX.fillStyle = "rgba(32,18,18,.88)";
-    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
-    TX.fillStyle = "rgba(232,194,106,.18)";
-    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 2);
-    TX.restore();
-
-    // Glow for correct door
-    if (lit) {
-      TX.save();
-      TX.shadowBlur = 30;
-      TX.shadowColor = "#ffd700";
-      var glowG = TX.createRadialGradient(
-        door.x + door.w / 2,
-        door.y + door.h / 2,
-        10,
-        door.x + door.w / 2,
-        door.y + door.h / 2,
-        80,
-      );
-      glowG.addColorStop(0, "rgba(255,215,0,.35)");
-      glowG.addColorStop(1, "transparent");
-      TX.fillStyle = glowG;
-      TX.fillRect(door.x - 40, door.y - 20, door.w + 80, door.h + 40);
-      TX.restore();
-    }
-
-    var frame = SPR.decor.doorFrame;
-    if (frame && frame.complete && frame.naturalWidth) {
-      var cropX = frame.naturalWidth * 0.5;
-      var cropW = frame.naturalWidth * 0.5;
-      var cropY = frame.naturalHeight * 0.255;
-      var cropH = frame.naturalHeight * 0.745;
-      var drawY = door.y + 12;
-      var drawH = door.h - 4;
-      TX.globalAlpha = lit ? pulse : 0.88;
-      TX.drawImage(
-        frame,
-        cropX,
-        cropY,
-        cropW,
-        cropH,
-        door.x - 2,
-        drawY,
-        door.w + 4,
-        drawH,
-      );
-      TX.globalAlpha = 1;
-    } else {
-      var img = lit ? SPR.door2 : SPR.door1;
-      if (img && img.complete && img.naturalWidth) {
-        TX.globalAlpha = lit ? pulse : 0.75;
-        TX.drawImage(img, door.x, door.y, door.w, door.h);
-        TX.globalAlpha = 1;
-      } else {
-        // Fallback drawn door
-        TX.fillStyle = lit ? "#8a6a20" : "#3a2010";
-        TX.fillRect(door.x, door.y, door.w, door.h);
-        TX.fillStyle = lit ? "#ffd700" : "#5a3818";
-        TX.fillRect(door.x + 4, door.y + 4, door.w - 8, door.h - 8);
-        if (lit) {
-          TX.fillStyle = "#ffd700";
-          TX.font = "bold 18px serif";
-          TX.textAlign = "center";
-          TX.fillText("✓", door.x + door.w / 2, door.y + door.h / 2 + 6);
-          TX.textAlign = "left";
-        }
-        TX.strokeStyle = lit ? "#ffd700" : "#5a3818";
-        TX.lineWidth = 3;
-        TX.strokeRect(door.x, door.y, door.w, door.h);
-      }
-    }
-    // Labels
-    TX.fillStyle = lit ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
-    TX.font = "9px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText(door.label || "EXIT", door.x + door.w / 2, door.y + door.h + 14);
-    if (GS.activeDoorIndex === i) {
-      TX.fillStyle = "rgba(255,215,0,.95)";
-      TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
-    }
-    TX.textAlign = "left";
-  });
+  // Auto-pickup on proximity (no E key needed, just walk near it)
+  if (
+    Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 70 &&
+    Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 70
+  ) {
+    MAP.gold.collected = true;
+    GS.hasGold = true;
+    showBadge("✨ Golden Thread collected! Doors are now unlocked!");
+    spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
+  }
 }
 
 function drawMobs() {
@@ -1875,7 +2359,12 @@ function drawMobs() {
         TX.fillStyle = "#7c6450";
         TX.fillRect(dx, 0, m.w, m.h);
       }
-    } else if (m.type === "bat" && SPR.bat && SPR.bat.complete && SPR.bat.naturalWidth) {
+    } else if (
+      m.type === "bat" &&
+      SPR.bat &&
+      SPR.bat.complete &&
+      SPR.bat.naturalWidth
+    ) {
       TX.drawImage(SPR.bat, dx, 0, m.w, m.h);
     } else {
       TX.fillStyle = m.type === "bat" ? "#5a485e" : "#7c6450";
@@ -1919,7 +2408,7 @@ function drawPlayer() {
     TX.globalAlpha = fx.alpha;
     TX.shadowBlur = 24 * fx.glow;
     TX.shadowColor = "rgba(255,180,90,.85)";
-    TX.fillStyle = "rgba(0,0,0," + (0.18 * fx.alpha) + ")";
+    TX.fillStyle = "rgba(0,0,0," + 0.18 * fx.alpha + ")";
     TX.beginPath();
     TX.ellipse(
       fx.x + PL.sw / 2,
@@ -1934,7 +2423,10 @@ function drawPlayer() {
 
     TX.translate(fx.x + PL.sw / 2, fx.y + PL.sh * 0.56);
     TX.rotate(fx.rot);
-    TX.scale((PL.dir === -1 ? -1 : 1) * fx.scale, Math.max(0.78, 1 - fx.t * 0.01));
+    TX.scale(
+      (PL.dir === -1 ? -1 : 1) * fx.scale,
+      Math.max(0.78, 1 - fx.t * 0.01),
+    );
 
     if (img && img.complete && img.naturalWidth) {
       TX.drawImage(img, -PL.sw / 2, -PL.sh * 0.56, PL.sw, PL.sh);
