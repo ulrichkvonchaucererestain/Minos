@@ -206,10 +206,6 @@ async function loadSpr() {
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
   if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
   if (typeof SPRITE_POT2 !== "undefined") SPR.pot2 = await li(SPRITE_POT2);
-  if (typeof SPRITE_SECRET_DOOR !== "undefined")
-    SPR.secretDoor = await li(SPRITE_SECRET_DOOR);
-  if (typeof SPRITE_CLUE !== "undefined") SPR.clue = await li(SPRITE_CLUE);
-  if (typeof SPRITE_INPUT !== "undefined") SPR.input = await li(SPRITE_INPUT);
   SPR.torch = await li(TORCH_ASSET);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
@@ -240,7 +236,10 @@ function getSelectedMapTheme() {
 var CAM = { x: 0, y: 0 }; // horizontal only
 
 function isMobileViewport() {
-  return window.matchMedia && window.matchMedia("(max-width: 900px), (max-height: 520px)").matches;
+  return (
+    window.matchMedia &&
+    window.matchMedia("(max-width: 900px), (max-height: 520px)").matches
+  );
 }
 
 function getCanvasRenderScale() {
@@ -336,8 +335,15 @@ function buildMap() {
   MAP.hammer = null;
 
   /* ── STAGE I EXIT (no relic gate) ── */
-  MAP.gold = null;
-
+  MAP.gold = {
+    x: 0,
+    y: 0,
+    w: 48,
+    h: 48,
+    collected: false,
+    visible: false,
+    bobTimer: 0,
+  };
   /* ── SINGLE EXIT DOOR ── */
   /* ── THREE SCATTERED DOORS ── */
   var dW = 118,
@@ -350,40 +356,57 @@ function buildMap() {
   ];
   MAP.doorFrameRect = null;
 
-  /* Lihim na Pinto */
-
-  /* The Secret Door - hidden until riddle solved */
-  /* The Secret Door - hidden until input puzzle solved */
-  var secretDoorW = 100,
-    secretDoorH = 140;
-  MAP.secretDoor = {
-    x: 20, // Near spawn/start
-    y: doorY - 20,
-    w: secretDoorW,
-    h: secretDoorH,
-    locked: true,
-    visible: false, // Hidden until "Icarus" is entered
-  };
-
-  /* ── BREAKABLE POT WITH HIDDEN GOLD ── */
+  /* ── FAKE POTS (breakable with sword) ── */
+  // Pot 1 - real pot with gold inside
   MAP.pot = {
-    x: 4820, // Place it in the lower shaft area (adjust as needed)
-    y: lowerY - 74, // Sitting on the lower platform
+    x: 4820,
+    y: lowerY - 74,
     w: 64,
     h: 74,
     broken: false,
     breaking: false,
     breakTimer: 0,
+    fake: false, // This one has the gold
   };
 
-  /* ── GOLD ITEM (hidden inside pot, drops when pot breaks) ── */
+  // Pot 2 - fake/empty pot
+  MAP.pot2 = {
+    x: 5760, // Near the jar decor
+    y: lowerY - 74,
+    w: 64,
+    h: 74,
+    broken: false,
+    breaking: false,
+    breakTimer: 0,
+    fake: true, // Fake pot - no gold, just breaks
+  };
+
+  /* ── GOLD ITEM (hidden inside real pot, drops when pot breaks) ── */
   MAP.gold = {
-    x: 0, // Set when pot breaks
+    x: 0,
     y: 0,
     w: 48,
     h: 48,
     collected: false,
-    visible: false, // Hidden until pot breaks
+    visible: false,
+    bobTimer: 0,
+  };
+
+  /* ── SWORD (spawns in random location) ── */
+  var swordPlatforms = [
+    MAP.platforms[0], // Start platform
+    MAP.platforms[2], // First floor section
+    MAP.platforms[5], // Mid floor
+    MAP.platforms[6], // Mid floor 2
+    MAP.platforms[10], // Lower shaft area
+  ];
+  var sp = swordPlatforms[Math.floor(Math.random() * swordPlatforms.length)];
+  MAP.sword = {
+    x: sp.x + 40 + Math.floor(Math.random() * (sp.w - 80)),
+    y: sp.y - 40,
+    w: 48,
+    h: 48,
+    collected: false,
     bobTimer: 0,
   };
 
@@ -533,42 +556,6 @@ function buildMap() {
     x: 96,
     y: FLOOR_Y - PL.h - PL_COY,
   };
-
-  /* ── INTERACTIVE BANNER (Disguise) ── */
-  MAP.banner = {
-    x: 136, // Same x as decor banner
-    y: FLOOR_Y - 324,
-    w: 170,
-    h: 270,
-    used: false,
-    active: true,
-  };
-
-  /* ── HIDDEN INPUT PUZZLE ── */
-  MAP.inputPuzzle = {
-    x: 400, // Near spawn area but slightly hidden
-    y: FLOOR_Y - 120,
-    w: 48,
-    h: 48,
-    activated: false,
-    solved: false,
-  };
-
-  var paperPlatforms = [
-    MAP.platforms[2],
-    MAP.platforms[5],
-    MAP.platforms[6],
-    MAP.platforms[10],
-  ];
-  var rp = paperPlatforms[Math.floor(Math.random() * paperPlatforms.length)];
-  MAP.cluePaper = {
-    x: rp.x + 40 + Math.floor(Math.random() * (rp.w - 80)),
-    y: rp.y - 28,
-    w: 28,
-    h: 28,
-    collected: false,
-    bobTimer: 0,
-  };
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -578,6 +565,7 @@ var GS = {
   lives: 3,
   hasGold: false,
   hasPaper: false,
+  hasSword: false, // ADD THIS
   startTime: 0,
   timerSecs: 0,
   step: 0, // tutorial step index
@@ -595,13 +583,6 @@ var GS = {
   deathFlash: 0,
   badgeTimer: null,
   stepCardTimer: null,
-  disguiseActive: false,
-  disguiseTimer: 0,
-  riddleSolved: false,
-  inputActive: false,
-  inputAnswer: "",
-  inputSolved: false,
-  inputTrigger: null,
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -682,27 +663,10 @@ async function tutInit() {
   tutResize();
   window.addEventListener("resize", tutResize);
   buildHUD();
-  setupPaperHUD();
   await loadSpr();
   spawnPlayer();
   GS.startTime = Date.now();
   GS.loopId = requestAnimationFrame(tutLoop);
-}
-
-function setupPaperHUD() {
-  var slot = document.getElementById("hud-paper-slot");
-  var overlay = document.getElementById("clue-overlay");
-  var clueImg = document.getElementById("clue-img");
-  if (!slot || !overlay) return;
-
-  slot.addEventListener("mousedown", function (e) {
-    if (e.button !== 0) return;
-    if (typeof SPRITE_CLUE !== "undefined") clueImg.src = SPRITE_CLUE;
-    overlay.style.display = "flex";
-  });
-  document.addEventListener("mouseup", function () {
-    overlay.style.display = "none";
-  });
 }
 
 function tutResize() {
@@ -753,8 +717,8 @@ function resetToStart() {
     MAP.hammer.hitCooldown = 0;
   }
   GS.hasGold = false;
+  GS.hasSword = false;
   GS.hasPaper = false;
-  if (MAP.cluePaper) MAP.cluePaper.collected = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -770,32 +734,18 @@ function resetToStart() {
   hideScreen("screen-wrong");
   GS.quizActive = false;
 
-  if (MAP.secretDoor) {
-    MAP.secretDoor.locked = true;
+  if (MAP.pot) {
+    MAP.pot.broken = false;
+    MAP.pot.breaking = false;
+    MAP.pot.breakTimer = 0;
   }
-
-  GS.disguiseActive = false;
-  GS.disguiseTimer = 0;
-  GS.riddleSolved = false;
-  if (MAP.banner) {
-    MAP.banner.used = false;
-    MAP.banner.active = true;
+  if (MAP.pot2) {
+    MAP.pot2.broken = false;
+    MAP.pot2.breaking = false;
+    MAP.pot2.breakTimer = 0;
   }
-  if (MAP.secretDoor) {
-    MAP.secretDoor.visible = false;
-    MAP.secretDoor.locked = true;
-  }
-
-  GS.inputActive = false;
-  GS.inputAnswer = "";
-  GS.inputSolved = false;
-  if (MAP.inputPuzzle) {
-    MAP.inputPuzzle.activated = false;
-    MAP.inputPuzzle.solved = false;
-  }
-  if (MAP.secretDoor) {
-    MAP.secretDoor.visible = false;
-    MAP.secretDoor.locked = true;
+  if (MAP.sword) {
+    MAP.sword.collected = false;
   }
 }
 
@@ -894,82 +844,51 @@ function tutUpdate() {
   }
 
   /* ── Pag Sira ng Paso ── */
-  if (MAP.pot && !MAP.pot.broken) {
-    var pot = MAP.pot;
+  // Check both pots
+  [MAP.pot, MAP.pot2].forEach(function (pot, idx) {
+    if (!pot || pot.broken) return;
+
     var pxPot = PL.x + PL_COX;
     var pyPot = PL.y + PL_COY;
-    // Check if player is near pot and presses E
-    var nearPot =
-      Math.abs(pxPot + PL.w / 2 - (pot.x + pot.w / 2)) < 60 &&
-      Math.abs(pyPot + PL.h / 2 - (pot.y + pot.h / 2)) < 80;
-    if ((JP["KeyE"] || KEYS["KeyE"]) && nearPot) {
-      MAP.pot.breaking = true;
+    var potCX = pot.x + pot.w / 2;
+    var potCY = pot.y + pot.h / 2;
+    var plCX = pxPot + PL.w / 2;
+    var plCY = pyPot + PL.h / 2;
+    var distToPot = Math.hypot(plCX - potCX, plCY - potCY);
+
+    // Auto-break if player has sword and is close enough (sword reach)
+    var canBreak = GS.hasSword && distToPot < 70;
+    // Or break with E if it's the real pot (backward compat for gold pot)
+    var canBreakWithE =
+      !pot.fake && (JP["KeyE"] || KEYS["KeyE"]) && distToPot < 80;
+
+    if (canBreak || canBreakWithE) {
+      pot.breaking = true;
     }
+
     if (pot.breaking) {
       pot.breakTimer++;
-      // Shake effect
       pot.shakeX = (Math.random() - 0.5) * 4;
       pot.shakeY = (Math.random() - 0.5) * 4;
       if (pot.breakTimer > 20) {
         pot.broken = true;
         pot.shakeX = 0;
         pot.shakeY = 0;
-        // Drop gold
-        MAP.gold.x = pot.x + pot.w / 2 - 24;
-        MAP.gold.y = pot.y + 10;
-        MAP.gold.visible = true;
         spawnImpactPtcls(pot.x + pot.w / 2, pot.y + pot.h / 2, 12);
-        showBadge("🏺 The vessel shatters! Something glimmers inside...");
+
+        if (!pot.fake) {
+          // Real pot drops gold
+          MAP.gold.x = pot.x + pot.w / 2 - 24;
+          MAP.gold.y = pot.y + 10;
+          MAP.gold.visible = true;
+          showBadge("🏺 The vessel shatters! Something glimmers inside...");
+        } else {
+          // Fake pot - just breaks, nothing inside
+          showBadge("🏺 The vessel shatters... empty.");
+        }
       }
     }
-  }
-
-  /* ── Banner ── */
-  if (MAP.banner && MAP.banner.active && !MAP.banner.used) {
-    var bn = MAP.banner;
-    var pxBn = PL.x + PL_COX;
-    var pyBn = PL.y + PL_COY;
-    var nearBanner =
-      Math.abs(pxBn + PL.w / 2 - (bn.x + bn.w / 2)) < 80 &&
-      Math.abs(pyBn + PL.h / 2 - (bn.y + bn.h / 2)) < 100;
-
-    if (nearBanner && (JP["KeyE"] || KEYS["KeyE"])) {
-      MAP.banner.used = true;
-      GS.disguiseActive = true;
-      GS.disguiseTimer = 600; // 10 seconds at 60fps (or use frame count)
-      PL.sw = 80; // Keep sprite size but visually hidden
-      showBadge("🎭 You hide beneath the banner... The Minos cannot see you.");
-      spawnImpactPtcls(bn.x + bn.w / 2, bn.y + bn.h / 2, 8);
-    }
-  }
-
-  /* ── HIDDEN INPUT PUZZLE ── */
-  if (MAP.inputPuzzle && !MAP.inputPuzzle.solved && !GS.inputActive) {
-    var ip = MAP.inputPuzzle;
-    var pxIp = PL.x + PL_COX;
-    var pyIp = PL.y + PL_COY;
-    var nearInput =
-      Math.abs(pxIp + PL.w / 2 - (ip.x + ip.w / 2)) < 60 &&
-      Math.abs(pyIp + PL.h / 2 - (ip.y + ip.h / 2)) < 80;
-
-    if (nearInput && (JP["KeyE"] || KEYS["KeyE"])) {
-      GS.inputActive = true;
-      GS.paused = true;
-      GS.inputAnswer = "";
-      showInputPuzzle();
-    }
-  }
-
-  /* ── DISGUISE TIMER ── */
-  if (GS.disguiseActive) {
-    GS.disguiseTimer--;
-    // Player is invisible/invulnerable while disguised
-    PL.iframes = 2;
-    if (GS.disguiseTimer <= 0) {
-      GS.disguiseActive = false;
-      showBadge("🎭 The banner falls apart... You are exposed!");
-    }
-  }
+  });
 
   // Platform collision
   PL.grounded = false;
@@ -1111,20 +1030,19 @@ function tutUpdate() {
     }
   }
 
-  //Yung PAPEL!!
-
-  if (MAP.cluePaper && !MAP.cluePaper.collected) {
-    var cp = MAP.cluePaper;
-    var cpx = PL.x + PL_COX;
-    var cpy = PL.y + PL_COY;
-    var nearPaper =
-      Math.abs(cpx + PL.w / 2 - (cp.x + cp.w / 2)) < 60 &&
-      Math.abs(cpy + PL.h / 2 - (cp.y + cp.h / 2)) < 80;
-    if (nearPaper && (JP["KeyE"] || KEYS["KeyE"])) {
-      cp.collected = true;
-      GS.hasPaper = true;
-      showBadge("📜 A weathered note... inspect it in your inventory.");
-      spawnImpactPtcls(cp.x + cp.w / 2, cp.y + cp.h / 2, 6);
+  /* ── SWORD PICKUP ── */
+  if (MAP.sword && !MAP.sword.collected && !GS.hasSword) {
+    var sw = MAP.sword;
+    var pxSw = PL.x + PL_COX;
+    var pySw = PL.y + PL_COY;
+    var nearSword =
+      Math.abs(pxSw + PL.w / 2 - (sw.x + sw.w / 2)) < 60 &&
+      Math.abs(pySw + PL.h / 2 - (sw.y + sw.h / 2)) < 80;
+    if (nearSword && (JP["KeyE"] || KEYS["KeyE"])) {
+      MAP.sword.collected = true;
+      GS.hasSword = true;
+      showBadge("⚔️ Rusted Blade acquired! You can now break clay vessels.");
+      spawnGoldPtcls(sw.x + sw.w / 2, sw.y + sw.h / 2);
     }
   }
 
@@ -1155,27 +1073,6 @@ function tutUpdate() {
       }
     }
   });
-  JP["KeyE"] = false;
-
-  /* ── SECRET DOOR (Hidden until riddle solved) ── */
-  /* ── SECRET DOOR ── */
-  if (MAP.secretDoor && MAP.secretDoor.visible) {
-    var sd = MAP.secretDoor;
-    var px8 = PL.x + PL_COX;
-    var py8 = PL.y + PL_COY;
-    var nearSecret =
-      px8 < sd.x + sd.w + 20 &&
-      px8 + PL.w > sd.x - 20 &&
-      py8 + PL.h > sd.y &&
-      py8 < sd.y + sd.h;
-
-    if (nearSecret && (JP["KeyE"] || KEYS["KeyE"])) {
-      if (!sd.locked) {
-        GS.won = true;
-        showScreen("screen-win");
-      }
-    }
-  }
 
   /* ── VOID DEATH (fall off bottom) ── */
   if (PL.y > TC.height + 80) {
@@ -1229,6 +1126,8 @@ function tutUpdate() {
       String(s3 % 60).padStart(2, "0");
   }
 
+  JP["KeyE"] = false;
+
   // Camera follow
   updateHUD();
 }
@@ -1258,7 +1157,7 @@ function updateParticles() {
     var pt = GS.ptcls[i];
     pt.x += pt.vx;
     pt.y += pt.vy;
-    pt.vy += pt.type === "ember" ? -0.04 : 0.05;
+    pt.vy += pt.type === "ember" ? -0.04 : pt.type === "dash" ? 0 : 0.05;
     pt.life -= pt.dec;
     if (pt.life <= 0) GS.ptcls.splice(i, 1);
   }
@@ -1596,313 +1495,6 @@ function showIcarusQuiz() {
   document.body.appendChild(overlay);
 }
 
-function showRiddle() {
-  if (GS.quizActive) return;
-  GS.quizActive = true;
-  GS.paused = true;
-
-  var overlay = document.createElement("div");
-  overlay.id = "riddle-overlay";
-  overlay.style.cssText = [
-    "position:fixed",
-    "inset:0",
-    "z-index:9998",
-    "display:flex",
-    "align-items:center",
-    "justify-content:center",
-    "background:rgba(5,3,5,.94)",
-    "font-family:'Cinzel',serif",
-    "color:#d4b896",
-  ].join(";");
-
-  var panel = document.createElement("div");
-  panel.style.cssText = [
-    "background:linear-gradient(180deg,rgba(85,57,28,.18),transparent 100%),#120e1a",
-    "border:3px solid #8a6a20",
-    "box-shadow:4px 4px 0 #8a6a20,0 24px 64px rgba(0,0,0,.42),inset 0 0 40px rgba(0,0,0,.8)",
-    "padding:38px 48px",
-    "max-width:520px",
-    "width:90%",
-    "text-align:center",
-    "position:relative",
-  ].join(";");
-
-  var riddle = {
-    q: "I have cities, but no houses live there. I have mountains, but no trees grow there. I have water, but no fish swim there. I have roads, but no cars drive there. What am I?",
-    options: ["A dream", "A map", "A painting", "A shadow"],
-    correct: 1, // A map
-  };
-
-  panel.innerHTML =
-    '<div style="font-size:2.2rem;margin-bottom:10px;">🗺</div>' +
-    '<div style="font-size:1.1rem;color:#f0c060;text-shadow:0 0 20px rgba(212,168,67,.5);margin-bottom:22px;letter-spacing:1px;">' +
-    "The Riddle of the Labyrinth" +
-    "</div>" +
-    '<div style="width:100%;height:2px;margin:0 0 20px;background:linear-gradient(90deg,transparent,#8a6a20,#d4a843,#8a6a20,transparent);"></div>' +
-    '<p style="font-size:.78rem;color:#d4b896;line-height:1.9;margin-bottom:22px;text-align:left;font-style:italic;">' +
-    '"' +
-    riddle.q +
-    '"' +
-    "</p>";
-
-  riddle.options.forEach(function (opt, idx) {
-    var btn = document.createElement("button");
-    btn.textContent = opt;
-    btn.style.cssText = [
-      "display:block",
-      "width:100%",
-      "background:linear-gradient(180deg,#3a2010,#2a1408)",
-      "border:2px solid #d4a843",
-      "border-bottom:4px solid #1a0a04",
-      "border-right:4px solid #1a0a04",
-      "color:#f0c060",
-      "padding:11px 28px",
-      "margin:8px auto",
-      "cursor:pointer",
-      "font-family:'Cinzel',serif",
-      "font-size:.78rem",
-      "letter-spacing:1px",
-      "text-transform:uppercase",
-      "transition:all .1s",
-    ].join(";");
-    btn.onmouseover = function () {
-      this.style.background = "#4a2a10";
-      this.style.borderColor = "#f0c060";
-      this.style.textShadow = "0 0 18px rgba(212,168,67,.6)";
-      this.style.transform = "translate(-2px,-2px)";
-    };
-    btn.onmouseout = function () {
-      this.style.background = "linear-gradient(180deg,#3a2010,#2a1408)";
-      this.style.borderColor = "#d4a843";
-      this.style.textShadow = "none";
-      this.style.transform = "translate(0,0)";
-    };
-    btn.onmousedown = function () {
-      this.style.transform = "translate(1px,1px)";
-    };
-    btn.onclick = function () {
-      if (idx === riddle.correct) {
-        // Correct - reveal secret door permanently
-        overlay.style.opacity = "0";
-        overlay.style.transition = "opacity .4s";
-        setTimeout(function () {
-          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-          GS.quizActive = false;
-          GS.paused = false;
-          GS.riddleSolved = true;
-          MAP.secretDoor.locked = false;
-          MAP.secretDoor.visible = true;
-          showBadge(
-            "🗝 The secret path is revealed! The door materializes from shadow...",
-          );
-        }, 400);
-      } else {
-        // Wrong - door stays hidden
-        overlay.style.opacity = "0";
-        overlay.style.transition = "opacity .3s";
-        setTimeout(function () {
-          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-          GS.quizActive = false;
-          GS.paused = false;
-          showBadge(
-            "✕ The shadows reject your answer... The door remains hidden.",
-          );
-        }, 300);
-      }
-    };
-    panel.appendChild(btn);
-  });
-
-  overlay.appendChild(panel);
-  document.body.appendChild(overlay);
-}
-
-function showInputPuzzle() {
-  if (GS.quizActive) return;
-  GS.quizActive = true; // Reuse quiz lock to prevent multiple overlays
-
-  var overlay = document.createElement("div");
-  overlay.id = "input-puzzle-overlay";
-  overlay.style.cssText = [
-    "position:fixed",
-    "inset:0",
-    "z-index:9998",
-    "display:flex",
-    "align-items:center",
-    "justify-content:center",
-    "background:rgba(5,3,5,.94)",
-    "font-family:'Cinzel',serif",
-    "color:#d4b896",
-  ].join(";");
-
-  var panel = document.createElement("div");
-  panel.style.cssText = [
-    "background:linear-gradient(180deg,rgba(85,57,28,.18),transparent 100%),#120e1a",
-    "border:3px solid #8a6a20",
-    "box-shadow:4px 4px 0 #8a6a20,0 24px 64px rgba(0,0,0,.42),inset 0 0 40px rgba(0,0,0,.8)",
-    "padding:38px 48px",
-    "max-width:480px",
-    "width:90%",
-    "text-align:center",
-    "position:relative",
-  ].join(";");
-
-  panel.innerHTML =
-    '<div style="font-size:2.2rem;margin-bottom:10px;">⌨</div>' +
-    '<div style="font-size:1.1rem;color:#f0c060;text-shadow:0 0 20px rgba(212,168,67,.5);margin-bottom:22px;letter-spacing:1px;">' +
-    "Whisper the Name" +
-    "</div>" +
-    '<div style="width:100%;height:2px;margin:0 0 20px;background:linear-gradient(90deg,transparent,#8a6a20,#d4a843,#8a6a20,transparent);"></div>' +
-    '<p style="font-size:.78rem;color:#d4b896;line-height:1.9;margin-bottom:22px;">' +
-    "A hidden mechanism awaits the correct word. Type carefully..." +
-    "</p>" +
-    '<div id="input-display" style="background:#0a0608;border:2px solid #5a3a20;padding:12px 20px;margin-bottom:22px;font-size:1.2rem;color:#d4a843;letter-spacing:4px;min-height:24px;">' +
-    "</div>";
-
-  var inputDisplay = panel.querySelector("#input-display");
-
-  // Submit button
-  var submitBtn = document.createElement("button");
-  submitBtn.textContent = "SUBMIT";
-  submitBtn.style.cssText = [
-    "display:inline-block",
-    "background:linear-gradient(180deg,#3a2010,#2a1408)",
-    "border:2px solid #d4a843",
-    "border-bottom:4px solid #1a0a04",
-    "border-right:4px solid #1a0a04",
-    "color:#f0c060",
-    "padding:11px 36px",
-    "margin:8px",
-    "cursor:pointer",
-    "font-family:'Cinzel',serif",
-    "font-size:.78rem",
-    "letter-spacing:2px",
-    "text-transform:uppercase",
-    "transition:all .1s",
-  ].join(";");
-
-  submitBtn.onmouseover = function () {
-    this.style.background = "#4a2a10";
-    this.style.borderColor = "#f0c060";
-    this.style.textShadow = "0 0 18px rgba(212,168,67,.6)";
-    this.style.transform = "translate(-2px,-2px)";
-  };
-  submitBtn.onmouseout = function () {
-    this.style.background = "linear-gradient(180deg,#3a2010,#2a1408)";
-    this.style.borderColor = "#d4a843";
-    this.style.textShadow = "none";
-    this.style.transform = "translate(0,0)";
-  };
-  submitBtn.onmousedown = function () {
-    this.style.transform = "translate(1px,1px)";
-  };
-  submitBtn.onclick = function () {
-    checkInputAnswer(overlay, inputDisplay.textContent);
-  };
-
-  // Close button
-  var closeBtn = document.createElement("button");
-  closeBtn.textContent = "CLOSE";
-  closeBtn.style.cssText = submitBtn.style.cssText;
-  closeBtn.onclick = function () {
-    overlay.style.opacity = "0";
-    overlay.style.transition = "opacity .3s";
-    setTimeout(function () {
-      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      GS.quizActive = false;
-      GS.inputActive = false;
-      GS.paused = false;
-    }, 300);
-  };
-
-  panel.appendChild(submitBtn);
-  panel.appendChild(closeBtn);
-  overlay.appendChild(panel);
-  document.body.appendChild(overlay);
-
-  // Keyboard input handler
-  var keyHandler = function (e) {
-    if (!GS.inputActive) {
-      document.removeEventListener("keydown", keyHandler);
-      return;
-    }
-    e.preventDefault();
-
-    if (e.code === "Enter") {
-      checkInputAnswer(overlay, inputDisplay.textContent);
-      document.removeEventListener("keydown", keyHandler);
-    } else if (e.code === "Backspace") {
-      inputDisplay.textContent = inputDisplay.textContent.slice(0, -1);
-    } else if (e.code === "Escape") {
-      overlay.style.opacity = "0";
-      overlay.style.transition = "opacity .3s";
-      setTimeout(function () {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-        GS.quizActive = false;
-        GS.inputActive = false;
-        GS.paused = false;
-      }, 300);
-      document.removeEventListener("keydown", keyHandler);
-    } else if (e.key.length === 1 && e.key.match(/[a-zA-Z]/)) {
-      if (inputDisplay.textContent.length < 12) {
-        inputDisplay.textContent += e.key.toUpperCase();
-      }
-    }
-  };
-
-  document.addEventListener("keydown", keyHandler);
-}
-
-function checkInputAnswer(overlay, answer) {
-  var correct = "ICARUS";
-  var userAnswer = (answer || "").toUpperCase().trim();
-
-  if (userAnswer === correct) {
-    // Correct - reveal secret door
-    overlay.style.opacity = "0";
-    overlay.style.transition = "opacity .4s";
-    setTimeout(function () {
-      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      GS.quizActive = false;
-      GS.inputActive = false;
-      GS.paused = false;
-      GS.inputSolved = true;
-      MAP.inputPuzzle.solved = true;
-      MAP.secretDoor.visible = true;
-      MAP.secretDoor.locked = false;
-      showBadge(
-        "🗝 The name echoes through stone... A secret door materializes!",
-      );
-      spawnGoldPtcls(
-        MAP.secretDoor.x + MAP.secretDoor.w / 2,
-        MAP.secretDoor.y + MAP.secretDoor.h / 2,
-      );
-    }, 400);
-  } else {
-    // Wrong - shake effect
-    var panel = overlay.querySelector("div");
-    panel.style.transform = "translateX(-10px)";
-    setTimeout(function () {
-      panel.style.transform = "translateX(10px)";
-    }, 50);
-    setTimeout(function () {
-      panel.style.transform = "translateX(-10px)";
-    }, 100);
-    setTimeout(function () {
-      panel.style.transform = "translateX(10px)";
-    }, 150);
-    setTimeout(function () {
-      panel.style.transform = "translateX(0)";
-    }, 200);
-
-    inputDisplay.textContent = "";
-    inputDisplay.style.borderColor = "#cc2222";
-    setTimeout(function () {
-      inputDisplay.style.borderColor = "#5a3a20";
-    }, 500);
-  }
-}
-
 /* ═══════════════════════════════════════════════════════════════════
    DRAW
 ═══════════════════════════════════════════════════════════════════ */
@@ -1925,15 +1517,12 @@ function tutDraw() {
   drawShaft(H);
   drawHammer();
   drawGold();
-  drawCluePaper();
   drawDoors();
-  drawInputPuzzle();
-  drawSecretDoor();
   drawDecorLayer(MAP.decorFront);
-  drawBannerInteraction();
   drawParticles();
   drawPlayer();
   drawPot();
+  drawSword();
 
   TX.restore();
 
@@ -2137,26 +1726,6 @@ function drawDecorLayer(list) {
     TX.drawImage(img, item.x, item.y, item.w, item.h);
     TX.restore();
   });
-}
-
-function drawBannerInteraction() {
-  if (!MAP.banner || !MAP.banner.active || MAP.banner.used) return;
-  var bn = MAP.banner;
-  if (bn.x + bn.w < CAM.x - 40 || bn.x > CAM.x + TC.width + 40) return;
-
-  var pxBn = PL.x + PL_COX;
-  var pyBn = PL.y + PL_COY;
-  var nearBanner =
-    Math.abs(pxBn + PL.w / 2 - (bn.x + bn.w / 2)) < 80 &&
-    Math.abs(pyBn + PL.h / 2 - (bn.y + bn.h / 2)) < 100;
-
-  if (nearBanner) {
-    TX.fillStyle = "rgba(255,215,0,.9)";
-    TX.font = "bold 10px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText("[E] Hide in banner", bn.x + bn.w / 2, bn.y - 8);
-    TX.textAlign = "left";
-  }
 }
 
 function drawPlatforms() {
@@ -2504,92 +2073,6 @@ function drawGold() {
   TX.textAlign = "left";
 }
 
-function drawCluePaper() {
-  if (!MAP.cluePaper || MAP.cluePaper.collected) return;
-  var cp = MAP.cluePaper;
-  if (cp.x + cp.w < CAM.x - 40 || cp.x > CAM.x + TC.width + 40) return;
-
-  cp.bobTimer = (cp.bobTimer || 0) + 0.04;
-  var bob = Math.sin(cp.bobTimer) * 3;
-  var px = cp.x;
-  var py = cp.y + bob;
-  var w = cp.w,
-    h = cp.h;
-
-  TX.save();
-
-  TX.fillStyle = "rgba(0,0,0,0.25)";
-  TX.beginPath();
-  TX.ellipse(px + w / 2, py + h + 4, w * 0.5, 5, 0, 0, Math.PI * 2);
-  TX.fill();
-
-  TX.fillStyle = "#e8dfc0";
-  TX.beginPath();
-  TX.moveTo(px + 6, py);
-  TX.lineTo(px + w, py);
-  TX.lineTo(px + w, py + h);
-  TX.lineTo(px, py + h);
-  TX.lineTo(px, py + 6);
-  TX.closePath();
-  TX.fill();
-
-  TX.fillStyle = "#c8ba90";
-  TX.beginPath();
-  TX.moveTo(px, py + 6);
-  TX.lineTo(px + 6, py);
-  TX.lineTo(px + 6, py + 6);
-  TX.closePath();
-  TX.fill();
-
-  TX.strokeStyle = "rgba(80,60,30,0.3)";
-  TX.lineWidth = 1;
-  for (var li2 = 1; li2 <= 3; li2++) {
-    TX.beginPath();
-    TX.moveTo(px + 4, py + li2 * (h / 4.5));
-    TX.lineTo(px + w - 3, py + li2 * (h / 4.5));
-    TX.stroke();
-  }
-
-  TX.strokeStyle = "rgba(100,80,40,0.5)";
-  TX.lineWidth = 1;
-  TX.beginPath();
-  TX.moveTo(px + 6, py);
-  TX.lineTo(px + w, py);
-  TX.lineTo(px + w, py + h);
-  TX.lineTo(px, py + h);
-  TX.lineTo(px, py + 6);
-  TX.closePath();
-  TX.stroke();
-
-  var gl = TX.createRadialGradient(
-    px + w / 2,
-    py + h / 2,
-    2,
-    px + w / 2,
-    py + h / 2,
-    28,
-  );
-  gl.addColorStop(0, "rgba(232,220,160,0.25)");
-  gl.addColorStop(1, "transparent");
-  TX.fillStyle = gl;
-  TX.fillRect(px - 10, py - 10, w + 20, h + 20);
-
-  var cpx2 = PL.x + PL_COX;
-  var cpy2 = PL.y + PL_COY;
-  var nearPaper2 =
-    Math.abs(cpx2 + PL.w / 2 - (cp.x + cp.w / 2)) < 60 &&
-    Math.abs(cpy2 + PL.h / 2 - (cp.y + cp.h / 2)) < 80;
-  if (nearPaper2) {
-    TX.fillStyle = "rgba(255,215,0,.9)";
-    TX.font = "bold 10px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText("[E] Pick up", cp.x + cp.w / 2, cp.y + bob - 8);
-    TX.textAlign = "left";
-  }
-
-  TX.restore();
-}
-
 function drawDoors() {
   MAP.doors.forEach(function (door, i) {
     if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
@@ -2699,198 +2182,136 @@ function drawDoors() {
   });
 }
 
-function drawSecretDoor() {
-  if (!MAP.secretDoor || !MAP.secretDoor.visible) return;
-  var sd = MAP.secretDoor;
+function drawSword() {
+  if (!MAP.sword || MAP.sword.collected) return;
+  var sw = MAP.sword;
+  if (sw.x < CAM.x - 60 || sw.x > CAM.x + TC.width + 60) return;
+  if (!PL) return;
 
-  if (sd.x + sd.w < CAM.x - 20 || sd.x > CAM.x + TC.width + 20) return;
+  sw.bobTimer = (sw.bobTimer || 0) + 0.05;
+  var bob = Math.sin(sw.bobTimer) * 5;
+  var sx = sw.x + sw.w / 2;
+  var sy = sw.y + bob;
+
+  // Glow effect
+  var gl = TX.createRadialGradient(sx, sy, 2, sx, sy, 35);
+  gl.addColorStop(0, "rgba(180,180,200,0.3)");
+  gl.addColorStop(1, "transparent");
+  TX.fillStyle = gl;
+  TX.fillRect(sx - 40, sy - 40, 80, 80);
+
+  // Draw sword (fallback since no sprite - using drawn shape)
   TX.save();
+  TX.translate(sx, sy);
+  TX.rotate(Math.PI / 4); // 45 degree angle
 
-  // Shadow
-  TX.fillStyle = "rgba(0,0,0,.22)";
+  // Blade
+  TX.fillStyle = "#c0c0c0";
+  TX.fillRect(-3, -18, 6, 28);
+  TX.fillStyle = "#e8e8e8";
+  TX.fillRect(-1, -18, 2, 26);
+
+  // Guard
+  TX.fillStyle = "#8a6a20";
+  TX.fillRect(-8, 8, 16, 3);
+
+  // Hilt
+  TX.fillStyle = "#5a3a10";
+  TX.fillRect(-2, 11, 4, 10);
+
+  // Pommel
+  TX.fillStyle = "#8a6a20";
   TX.beginPath();
-  TX.ellipse(
-    sd.x + sd.w / 2,
-    sd.y + sd.h + 10,
-    sd.w * 0.56,
-    10,
-    0,
-    0,
-    Math.PI * 2,
-  );
+  TX.arc(0, 22, 3, 0, Math.PI * 2);
   TX.fill();
 
-  // Dark mysterious frame
-  TX.fillStyle = "#2a1a0a";
-  TX.fillRect(sd.x - 8, sd.y - 8, sd.w + 16, sd.h + 16);
-
-  // Door body - darker than normal doors
-  TX.fillStyle = "#1a0a04";
-  TX.fillRect(sd.x, sd.y, sd.w, sd.h);
-
-  // Subtle rune marks
-  TX.fillStyle = "rgba(212,168,67,0.3)";
-  TX.font = "10px Cinzel,serif";
-  TX.textAlign = "center";
-  TX.fillText("?", sd.x + sd.w / 2, sd.y + sd.h / 2 + 5);
-
-  // Lock indicator
-  TX.fillStyle = "rgba(255,100,100,0.6)";
-  TX.font = "bold 14px serif";
-  TX.fillText("🔒", sd.x + sd.w / 2, sd.y + 25);
-
-  // Interaction prompt when near
-  var px = PL.x + PL_COX;
-  var py = PL.y + PL_COY;
-  var nearSecret =
-    px < sd.x + sd.w + 20 &&
-    px + PL.w > sd.x - 20 &&
-    py + PL.h > sd.y &&
-    py < sd.y + sd.h;
-
-  if (nearSecret) {
-    TX.fillStyle = "rgba(212,168,67,.7)";
-    TX.font = "bold 10px Cinzel,serif";
-    TX.fillText("[E] Inspect", sd.x + sd.w / 2, sd.y - 12);
-  }
-
-  TX.restore();
-}
-
-function drawInputPuzzle() {
-  if (!MAP.inputPuzzle || MAP.inputPuzzle.solved) return;
-  var ip = MAP.inputPuzzle;
-  if (ip.x + ip.w < CAM.x - 40 || ip.x > CAM.x + TC.width + 40) return;
-
-  var bob = Math.sin(Date.now() * 0.003) * 3;
-
-  TX.save();
-
-  // Draw the input sprite if loaded
-  if (SPR.input && SPR.input.complete && SPR.input.naturalWidth) {
-    TX.globalAlpha = 0.7 + Math.sin(Date.now() * 0.005) * 0.3;
-    TX.drawImage(SPR.input, ip.x, ip.y + bob, ip.w, ip.h);
-  } else {
-    // Fallback: mysterious glowing rune
-    TX.globalAlpha = 0.6 + Math.sin(Date.now() * 0.005) * 0.4;
-    var glow = TX.createRadialGradient(
-      ip.x + ip.w / 2,
-      ip.y + ip.h / 2 + bob,
-      0,
-      ip.x + ip.w / 2,
-      ip.y + ip.h / 2 + bob,
-      ip.w,
-    );
-    glow.addColorStop(0, "rgba(212,168,67,0.8)");
-    glow.addColorStop(1, "transparent");
-    TX.fillStyle = glow;
-    TX.fillRect(ip.x - 10, ip.y - 10 + bob, ip.w + 20, ip.h + 20);
-
-    TX.fillStyle = "rgba(212,168,67,0.9)";
-    TX.font = "bold 16px serif";
-    TX.textAlign = "center";
-    TX.fillText("?", ip.x + ip.w / 2, ip.y + ip.h / 2 + 6 + bob);
-  }
-
   TX.restore();
 
-  // Interaction hint
-  var pxIp = PL.x + PL_COX;
-  var pyIp = PL.y + PL_COY;
-  var nearInput =
-    Math.abs(pxIp + PL.w / 2 - (ip.x + ip.w / 2)) < 60 &&
-    Math.abs(pyIp + PL.h / 2 - (ip.y + ip.h / 2)) < 80;
+  // Interaction prompt
+  var pxSw = PL.x + PL_COX;
+  var pySw = PL.y + PL_COY;
+  var nearSword =
+    Math.abs(pxSw + PL.w / 2 - sx) < 60 && Math.abs(pySw + PL.h / 2 - sy) < 80;
 
-  if (nearInput) {
-    TX.fillStyle = "rgba(255,215,0,.9)";
+  if (nearSword) {
+    TX.fillStyle = "rgba(200,200,220,0.9)";
     TX.font = "bold 10px Cinzel,serif";
     TX.textAlign = "center";
-    TX.fillText("[E] Inspect", ip.x + ip.w / 2, ip.y + bob - 8);
+    TX.fillText("[E] Take sword", sx, sw.y + bob - 12);
     TX.textAlign = "left";
   }
 }
 
 function drawPot() {
-  if (!MAP.pot) return;
-  var pot = MAP.pot;
-  if (pot.x + pot.w < CAM.x - 40 || pot.x > CAM.x + TC.width + 40) return;
+  // Draw both pots
+  [MAP.pot, MAP.pot2].forEach(function (pot, idx) {
+    if (!pot) return;
+    if (pot.x + pot.w < CAM.x - 40 || pot.x > CAM.x + TC.width + 40) return;
 
-  var px = pot.x + (pot.shakeX || 0);
-  var py = pot.y + (pot.shakeY || 0);
+    var px = pot.x + (pot.shakeX || 0);
+    var py = pot.y + (pot.shakeY || 0);
 
-  if (pot.broken) {
-    // Draw broken pot shards (using pot2 if available, or fallback)
-    if (SPR.pot2 && SPR.pot2.complete && SPR.pot2.naturalWidth) {
-      TX.save();
-      TX.globalAlpha = 0.7;
-      TX.drawImage(SPR.pot2, px, py + 20, pot.w, pot.h * 0.6);
-      TX.restore();
-    } else {
-      // Fallback broken pot
-      TX.fillStyle = "rgba(140,100,60,.5)";
-      TX.fillRect(px + 8, py + 40, pot.w - 16, 20);
-      TX.fillStyle = "rgba(160,120,70,.4)";
-      TX.fillRect(px + 4, py + 50, 20, 10);
-      TX.fillRect(px + pot.w - 24, py + 45, 20, 12);
+    if (pot.broken) {
+      // Draw broken pot shards
+      if (SPR.pot2 && SPR.pot2.complete && SPR.pot2.naturalWidth) {
+        TX.save();
+        TX.globalAlpha = 0.7;
+        TX.drawImage(SPR.pot2, px, py + 20, pot.w, pot.h * 0.6);
+        TX.restore();
+      } else {
+        TX.fillStyle = "rgba(140,100,60,.5)";
+        TX.fillRect(px + 8, py + 40, pot.w - 16, 20);
+        TX.fillStyle = "rgba(160,120,70,.4)";
+        TX.fillRect(px + 4, py + 50, 20, 10);
+        TX.fillRect(px + pot.w - 24, py + 45, 20, 12);
+      }
+      return;
     }
-    return;
-  }
 
-  // Draw intact pot
-  var potImg = pot.breaking && SPR.pot2 ? SPR.pot2 : SPR.pot;
-  if (potImg && potImg.complete && potImg.naturalWidth) {
-    TX.drawImage(potImg, px, py, pot.w, pot.h);
-  } else {
-    // Fallback clay pot
-    var pg = TX.createLinearGradient(px, py, px + pot.w, py + pot.h);
-    pg.addColorStop(0, "#8a5a2a");
-    pg.addColorStop(0.5, "#a07040");
-    pg.addColorStop(1, "#6a4020");
-    TX.fillStyle = pg;
-    TX.beginPath();
-    TX.moveTo(px + pot.w * 0.3, py);
-    TX.quadraticCurveTo(
-      px,
-      py + pot.h * 0.3,
-      px + pot.w * 0.2,
-      py + pot.h * 0.7,
-    );
-    TX.quadraticCurveTo(
-      px + pot.w * 0.1,
-      py + pot.h,
-      px + pot.w * 0.5,
-      py + pot.h,
-    );
-    TX.quadraticCurveTo(
-      px + pot.w * 0.9,
-      py + pot.h,
-      px + pot.w * 0.8,
-      py + pot.h * 0.7,
-    );
-    TX.quadraticCurveTo(px + pot.w, py + pot.h * 0.3, px + pot.w * 0.7, py);
-    TX.closePath();
-    TX.fill();
-    TX.strokeStyle = "#5a3010";
-    TX.lineWidth = 2;
-    TX.stroke();
-    // Pot rim
-    TX.fillStyle = "#7a5028";
-    TX.fillRect(px + pot.w * 0.25, py, pot.w * 0.5, 8);
-  }
+    // Draw intact pot
+    var potImg = pot.breaking && SPR.pot2 ? SPR.pot2 : SPR.pot;
+    if (potImg && potImg.complete && potImg.naturalWidth) {
+      TX.drawImage(potImg, px, py, pot.w, pot.h);
+    } else {
+      // Fallback clay pot
+      var pg = TX.createLinearGradient(px, py, px + pot.w, py + pot.h);
+      pg.addColorStop(0, "#8a5a2a");
+      pg.addColorStop(0.5, "#a07040");
+      pg.addColorStop(1, "#6a4020");
+      TX.fillStyle = pg;
+      TX.beginPath();
+      TX.moveTo(px + pot.w * 0.3, py);
+      TX.quadraticCurveTo(
+        px,
+        py + pot.h * 0.3,
+        px + pot.w * 0.2,
+        py + pot.h * 0.7,
+      );
+      TX.quadraticCurveTo(
+        px + pot.w * 0.1,
+        py + pot.h,
+        px + pot.w * 0.5,
+        py + pot.h,
+      );
+      TX.quadraticCurveTo(
+        px + pot.w * 0.9,
+        py + pot.h,
+        px + pot.w * 0.8,
+        py + pot.h * 0.7,
+      );
+      TX.quadraticCurveTo(px + pot.w, py + pot.h * 0.3, px + pot.w * 0.7, py);
+      TX.closePath();
+      TX.fill();
+      TX.strokeStyle = "#5a3010";
+      TX.lineWidth = 2;
+      TX.stroke();
+      TX.fillStyle = "#7a5028";
+      TX.fillRect(px + pot.w * 0.25, py, pot.w * 0.5, 8);
+    }
 
-  // Interaction hint
-  var pxPot = PL.x + PL_COX;
-  var pyPot = PL.y + PL_COY;
-  var nearPot =
-    Math.abs(pxPot + PL.w / 2 - (pot.x + pot.w / 2)) < 80 &&
-    Math.abs(pyPot + PL.h / 2 - (pot.y + pot.h / 2)) < 100;
-  if (nearPot && !pot.breaking) {
-    TX.fillStyle = "rgba(255,215,0,.9)";
-    TX.font = "bold 10px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText("[E] Break", pot.x + pot.w / 2, pot.y - 8);
-    TX.textAlign = "left";
-  }
+    // REMOVED: No [E] Break prompt on pots anymore
+    // Sword auto-breaks when close
+  });
 }
 
 function drawParticles() {
@@ -2921,11 +2342,6 @@ function drawPlayer() {
     return; // flicker
 
   TX.save();
-
-  if (GS.disguiseActive) {
-    TX.globalAlpha = 0.15; // Nearly invisible
-    TX.filter = "sepia(0.8) brightness(0.6)"; // Banner-like coloring
-  }
 
   if (GS.deathFx) {
     var fx = GS.deathFx;
@@ -2963,14 +2379,6 @@ function drawPlayer() {
       TX.fillRect(-PL.sw / 2 + 8, -PL.sh * 0.56 + 22, PL.sw - 16, 6);
     }
 
-    if (GS.disguiseActive) {
-      TX.globalAlpha = 1;
-      TX.filter = "none";
-      // Draw banner overlay on player
-      TX.fillStyle = "rgba(139,90,43,0.6)";
-      TX.fillRect(PL.x + 10, PL.y + 10, PL.sw - 20, PL.sh - 20);
-    }
-
     TX.restore();
     return;
   }
@@ -2978,7 +2386,7 @@ function drawPlayer() {
   if (PL.dashing) {
     TX.globalAlpha = 0.55 + Math.random() * 0.3;
     TX.shadowBlur = 18;
-    TX.shadowColor = "#44aaff";
+    TX.shadowColor = "rgba(212,168,67,.42)";
   }
   // Shadow ellipse
   TX.fillStyle = "rgba(0,0,0,.3)";
@@ -3022,6 +2430,15 @@ function drawPlayer() {
     TX.font = "18px serif";
     TX.textAlign = "center";
     TX.fillText("🪙", PL.x + PL.sw / 2, PL.y - 6);
+    TX.textAlign = "left";
+  }
+
+  // Sword indicator when equipped
+  if (GS.hasSword) {
+    TX.globalAlpha = 1;
+    TX.font = "16px serif";
+    TX.textAlign = "center";
+    TX.fillText("⚔️", PL.x + PL.sw / 2 + 20, PL.y - 6);
     TX.textAlign = "left";
   }
   TX.restore();
@@ -3091,7 +2508,7 @@ function spawnDashPtcl() {
       life: 1,
       dec: 0.09 + Math.random() * 0.06,
       sz: Math.random() * 5 + 3,
-      col: "#44aaff",
+      col: Math.random() < 0.5 ? "#d4a843" : "#8a5a28",
       type: "dash",
     });
 }
@@ -3130,8 +2547,11 @@ function buildHUD() {
 function updateHUD() {
   var hb = document.getElementById("hud-hearts");
   if (!hb) return;
-  var paperSlot = document.getElementById("hud-paper-slot");
-  if (paperSlot) paperSlot.style.display = GS.hasPaper ? "flex" : "none";
+
+  // ADD sword slot:
+  var swordSlot = document.getElementById("hud-sword-slot");
+  if (swordSlot) swordSlot.style.display = GS.hasSword ? "flex" : "none";
+
   hb.innerHTML = "";
   for (var i = 0; i < 3; i++) {
     var full = i < GS.lives;
@@ -3161,16 +2581,6 @@ function showBadge(msg) {
 
 /* ── SCREENS ────────────────────────────────────────────────────── */
 function showScreen(id) {
-  if (id === "screen-win" && !window.__minosStageSaved) {
-    window.__minosStageSaved = true;
-    import("../progress-service.js")
-      .then(function (service) {
-        return service.markStageComplete(1);
-      })
-      .catch(function (error) {
-        console.warn("Firebase stage progress save failed.", error);
-      });
-  }
   var el = document.getElementById(id);
   if (el) el.classList.remove("hidden");
 }
