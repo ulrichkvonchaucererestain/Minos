@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Labyrinth of Minos - Stage I</title>
+    <meta name="theme-color" content="#050308" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Minos" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest?v=mobile-20260428-4" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="stage1.css?v=mobile-20260428-4" />
+    <link rel="stylesheet" href="../mobile-controls.css?v=mobile-20260428-4" />
+  </head>
+  <body>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+    <div id="wrong-flash"></div>
+
+    <canvas id="tutCanvas"></canvas>
+
+    <div id="hud-top">
+      <div id="hud-top-left">
+        <a id="tutorial-menu-btn" href="../index.html">Back Menu</a>
+        <div class="hud-box">
+          <div class="hud-lbl">Icarus</div>
+          <div class="hud-hearts" id="hud-hearts"></div>
+        </div>
+      </div>
+      <div class="hud-box" style="text-align: right; min-width: 110px">
+        <div class="hud-lbl">Time</div>
+        <div id="hud-timer">00:00</div>
+      </div>
+    </div>
+
+    <div id="hud-bottom">
+      <div id="ctrl-hint">
+        [D] Walk &nbsp;&middot;&nbsp; [A] Back &nbsp;&middot;&nbsp; [W/Space]
+        Jump &nbsp;&middot;&nbsp; [F] Dash &nbsp;&middot;&nbsp; [Shift] Sprint
+        &nbsp;&middot;&nbsp; [E] Pick Up &nbsp;&middot;&nbsp; [P] Pause
+      </div>
+    </div>
+
+    <div id="stam-wrap">
+      STAMINA
+      <div id="stam-track">
+        <div id="stam-fill" style="width: 100%"></div>
+      </div>
+      <span id="dash-ready"></span>
+    </div>
+
+    <div id="screen-pause" class="overlay-screen hidden">
+      <div class="panel">
+        <div class="p-icon">||</div>
+        <div class="p-title">Stage Paused</div>
+        <div class="p-divider"></div>
+        <button
+          class="btn"
+          onclick="
+            document.getElementById('screen-pause').classList.add('hidden');
+            GS.paused = false;
+          "
+        >
+          Resume
+        </button>
+        <button class="btn" onclick="resetToStart()">Restart Stage I</button>
+        <button
+          class="btn btn-danger"
+          onclick="window.location.href = '../index.html'"
+        >
+          Main Menu
+        </button>
+      </div>
+    </div>
+
+    <div id="screen-win" class="overlay-screen hidden">
+      <div class="panel">
+        <div class="p-icon">WIN</div>
+        <div class="p-title">Stage I Complete!</div>
+        <div class="p-divider"></div>
+        <p class="p-desc">
+          <strong style="color: #f0c060"
+            >You crossed the Threshold Court.</strong
+          ><br /><br />
+          The first chamber demanded clean movement, sharper reads, and faster
+          recovery than the training hall.<br />
+          The maze opens deeper now.<br /><br />
+          <span style="color: #d4a843">Stage II awaits...</span>
+        </p>
+        <button
+          class="btn"
+          style="
+            background: linear-gradient(180deg, #1a3a10, #0e2208);
+            border-color: #4a9030;
+            color: #88dd60;
+          "
+          onclick="window.location.href = 'stage2.html'"
+        >
+          Begin Stage II
+        </button>
+        <button
+          class="btn"
+          onclick="
+            resetToStart();
+            document.getElementById('screen-win').classList.add('hidden');
+          "
+        >
+          Play Again
+        </button>
+      </div>
+    </div>
+
+    <div id="screen-dead" class="overlay-screen hidden">
+      <div class="panel">
+        <div class="p-icon">X</div>
+        <div class="p-title">You Fell!</div>
+        <div class="p-divider"></div>
+        <p class="p-desc" style="text-align: center">
+          Respawning at the chamber entrance...
+        </p>
+      </div>
+    </div>
+
+    <div
+      id="hud-paper-slot"
+      style="
+        position: fixed;
+        bottom: 24px;
+        left: 24px;
+        width: 48px;
+        height: 56px;
+        background: rgba(10, 6, 12, 0.7);
+        border: 2px solid #8a6a20;
+        border-radius: 4px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        user-select: none;
+        z-index: 900;
+      "
+      title="Hold to read"
+    >
+      <svg width="30" height="36" viewBox="0 0 30 36">
+        <polygon
+          points="7,0 30,0 30,36 0,36 0,7"
+          fill="#e8dfc0"
+          stroke="#8a6a20"
+          stroke-width="1.5"
+        />
+        <polygon
+          points="0,7 7,0 7,7"
+          fill="#c8ba90"
+          stroke="#8a6a20"
+          stroke-width="1"
+        />
+        <line
+          x1="5"
+          y1="13"
+          x2="25"
+          y2="13"
+          stroke="rgba(80,60,30,0.4)"
+          stroke-width="1"
+        />
+        <line
+          x1="5"
+          y1="18"
+          x2="25"
+          y2="18"
+          stroke="rgba(80,60,30,0.4)"
+          stroke-width="1"
+        />
+        <line
+          x1="5"
+          y1="23"
+          x2="25"
+          y2="23"
+          stroke="rgba(80,60,30,0.4)"
+          stroke-width="1"
+        />
+        <line
+          x1="5"
+          y1="28"
+          x2="20"
+          y2="28"
+          stroke="rgba(80,60,30,0.4)"
+          stroke-width="1"
+        />
+      </svg>
+    </div>
+
+    <div
+      id="clue-overlay"
+      style="
+        position: fixed;
+        inset: 0;
+        z-index: 9000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(5, 3, 8, 0.88);
+      "
+    >
+      <div
+        style="
+          background: #1a1008;
+          border: 3px solid #8a6a20;
+          box-shadow:
+            4px 4px 0 #8a6a20,
+            0 24px 64px rgba(0, 0, 0, 0.6);
+          padding: 24px;
+          max-width: 520px;
+          width: 90%;
+          text-align: center;
+        "
+      >
+        <div
+          style="
+            font-family: &quot;Cinzel&quot;, serif;
+            color: #d4a843;
+            font-size: 0.8rem;
+            margin-bottom: 12px;
+            letter-spacing: 2px;
+          "
+        >
+          — FOUND NOTE —
+        </div>
+        <img
+          id="clue-img"
+          src=""
+          style="
+            max-width: 100%;
+            image-rendering: pixelated;
+            border: 2px solid #5a3a10;
+          "
+        />
+        <div
+          style="
+            font-family: &quot;Cinzel&quot;, serif;
+            color: rgba(212, 168, 67, 0.5);
+            font-size: 0.65rem;
+            margin-top: 12px;
+          "
+        >
+          Release to close
+        </div>
+      </div>
+    </div>
+
+    <script src="../sprite.js"></script>
+    <script src="../jumpsprite.js"></script>
+    <script src="stage1.js?v=mobile-20260428-4"></script>
+    <script src="../map-sprite/door.js"></script>
+    <script src="../map-sprite/drops.js"></script>
+    <script src="../map-sprite/hammer.js"></script>
+    <script src="../map-sprite/mino.js"></script>
+    <script src="../map-sprite/spikes.js"></script>
+    <script src="../stages/pot-sprite.js"></script>
+    <script src="../stages/clue.js"></script>
+    <script src="../stages/secret-door.js"></script>
+    <script src="../mobile-controls.js?v=mobile-20260428-4"></script>
+    
+
+    <script>
+      window.addEventListener("load", function () {
+        tutInit();
+      });
+
+      window.addEventListener("keydown", function (e) {
+        if (e.code === "KeyP" || e.code === "Escape") {
+          if (typeof GS === "undefined") return;
+          GS.paused = !GS.paused;
+          var ps = document.getElementById("screen-pause");
+          if (GS.paused) {
+            ps.classList.remove("hidden");
+          } else {
+            ps.classList.add("hidden");
+          }
+        }
+      });
+    </script>
+
+    <script src="edu-items.js"></script>
+  </body>
+</html>

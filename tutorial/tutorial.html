@@ -1,0 +1,175 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Labyrinth of Minos — Training Hall</title>
+  <meta name="theme-color" content="#050308">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Minos">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest?v=mobile-20260428-4">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tutorial.css?v=mobile-20260428-4">
+  <link rel="stylesheet" href="../mobile-controls.css?v=mobile-20260428-4">
+</head>
+<body>
+
+<!-- SCANLINES -->
+<div id="scanlines"></div>
+
+<!-- VIGNETTE -->
+<div id="vignette"></div>
+
+<!-- WRONG DOOR FLASH -->
+<div id="wrong-flash"></div>
+
+<!-- CANVAS -->
+<canvas id="tutCanvas"></canvas>
+
+<!-- ══ TOP HUD ══ -->
+<div id="hud-top">
+  <div id="hud-top-left">
+    <a id="tutorial-menu-btn" href="../index.html">↩ Menu</a>
+    <div class="hud-box">
+      <div class="hud-lbl">Icarus</div>
+      <div class="hud-hearts" id="hud-hearts"></div>
+    </div>
+  </div>
+  <div class="hud-box" style="text-align:right; min-width:110px;">
+    <div class="hud-lbl">⏱ Time</div>
+    <div id="hud-timer">00:00</div>
+  </div>
+</div>
+
+<!-- ══ BOTTOM HUD ══ -->
+<div id="hud-bottom">
+  <div id="ctrl-hint">
+    [D] Walk &nbsp;·&nbsp; [A] Back &nbsp;·&nbsp; [W/Space] Jump &nbsp;·&nbsp; [F] Dash &nbsp;·&nbsp; [Shift] Sprint &nbsp;·&nbsp; [E] Pick Up &nbsp;·&nbsp; [P] Pause
+  </div>
+</div>
+
+<!-- ══ STAMINA BAR ══ -->
+<div id="stam-wrap">
+  STAMINA
+  <div id="stam-track">
+    <div id="stam-fill" style="width:100%"></div>
+  </div>
+  <span id="dash-ready"></span>
+</div>
+
+<!-- ══ INVENTORY ══ -->
+<div id="inventory-wrap">
+  <div class="inventory-title">Inventory <span id="inventory-count">(0/5)</span></div>
+  <div id="inventory-ui" aria-label="Inventory slots">
+    <div class="inventory-slot"></div>
+    <div class="inventory-slot"></div>
+    <div class="inventory-slot"></div>
+    <div class="inventory-slot"></div>
+    <div class="inventory-slot"></div>
+  </div>
+</div>
+
+<!-- ══ PROGRESS BAR ══ -->
+<div id="progress-bar">
+  <div id="progress-fill" style="width:0%"></div>
+</div>
+
+<!-- ══ STEP CARD ══ -->
+<div id="step-card">
+  <div id="step-title">TRAINING HALL</div>
+  <div id="step-desc">Follow the controls shown for your device and escape the labyrinth.</div>
+  <div id="step-keys">
+    <span class="key-chip">Walk</span>
+    <span class="key-chip">Jump</span>
+  </div>
+</div>
+
+<!-- ══ BADGE ══ -->
+<div id="badge"></div>
+
+<!-- ══ PAUSE SCREEN ══ -->
+<div id="screen-pause" class="overlay-screen hidden">
+  <div class="panel">
+    <div class="p-icon">⏸</div>
+    <div class="p-title">— Paused —</div>
+    <div class="p-divider"></div>
+    <button class="btn" onclick="document.getElementById('screen-pause').classList.add('hidden'); GS.paused=false;">
+      ▶ &nbsp; Resume
+    </button>
+    <button class="btn" onclick="resetToStart();">
+      ↺ &nbsp; Restart Tutorial
+    </button>
+    <button class="btn btn-danger" onclick="window.location.href='../index.html';">
+      ⏹ &nbsp; Main Menu
+    </button>
+  </div>
+</div>
+
+<!-- ══ WIN SCREEN ══ -->
+<div id="screen-win" class="overlay-screen hidden">
+  <div class="panel">
+    <div class="p-title">Training Complete!</div>
+    <div class="p-divider"></div>
+    <p class="p-desc">
+      <strong style="color:#f0c060;">You passed through the correct door!</strong><br><br>
+      You have mastered every skill needed for the Labyrinth:<br>
+      § Jump over obstacles &amp; spike traps<br>
+      § Read proximity traps before they rise<br>
+      § <strong>Dash</strong> through tight spike corridors<br>
+      § Survive the swinging hammer<br>
+      § Collect items and use them at doors<br><br>
+      <span style="color:#d4a843;">The real Labyrinth awaits...</span>
+    </p>
+    <button class="btn" style="background:linear-gradient(180deg,#1a3a10,#0e2208);border-color:#4a9030;color:#88dd60;"
+      onclick="completeTutorialAndGo();">
+      &nbsp; Begin Stage I
+    </button>
+    <button class="btn" onclick="resetToStart(); document.getElementById('screen-win').classList.add('hidden');">
+      ↺ &nbsp; Play Again
+    </button>
+  </div>
+</div>
+
+<!-- ══ DEAD SCREEN ══ -->
+<div id="screen-dead" class="overlay-screen hidden">
+  <div class="panel">
+    <div class="p-title">You Fell!</div>
+    <div class="p-divider"></div>
+    <p class="p-desc" style="text-align:center;">Respawning at the start...</p>
+  </div>
+</div>
+
+<!-- ══ SCRIPTS ══ -->
+<!-- sprite.js defines SPRITE_DOOR1/2, SPRITE_HAMMER/2-5, SPRITE_GOLD etc. -->
+<script src="../sprite.js"></script>
+<script src="../jumpsprite.js"></script>
+<script src="tutorial.js?v=mobile-20260428-4"></script>
+<script src="../map-sprite/door.js"></script>
+<script src="../map-sprite/drops.js"></script>
+<script src="../map-sprite/hammer.js"></script>
+<script src="../map-sprite/mino.js"></script>
+<script src="../map-sprite/spikes.js"></script>
+<script src="../mobile-controls.js?v=mobile-20260428-4"></script>
+
+<script>
+/* ── PAGE CONTROLLER ── */
+window.addEventListener('load', function(){
+  tutInit();
+});
+
+/* ── PAUSE ── */
+window.addEventListener('keydown', function(e){
+  if(e.code==='KeyP' || e.code==='Escape'){
+    if(typeof GS === 'undefined') return;
+    GS.paused = !GS.paused;
+    var ps = document.getElementById('screen-pause');
+    if(GS.paused){ ps.classList.remove('hidden'); }
+    else          { ps.classList.add('hidden');    }
+  }
+});
+</script>
+
+</body>
+</html>

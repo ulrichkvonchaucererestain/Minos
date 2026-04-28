@@ -1,0 +1,77 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Labyrinth of Minos</title>
+    <meta name="theme-color" content="#050308" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Minos" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest?v=mobile-20260428-3" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;700;800&family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <nav class="top-menu" aria-label="Account menu">
+        <button class="ghost-btn auth-menu-btn" id="login-btn" type="button">Log In</button>
+        <button class="ghost-btn auth-menu-btn" id="signup-btn" type="button">Create Account</button>
+      </nav>
+      <header class="hero-panel">
+        <div class="hero-copy">
+          <h1>Labyrinth of Minos</h1>
+          <p class="hero-text">Enter the buried maze beneath Knossos, survive its ritual traps, and climb from the training halls to the throne of the beast.</p>
+          <div class="hero-actions">
+            <button class="primary-btn" id="continue-btn" type="button">Continue Journey</button>
+            <button class="ghost-btn" id="tutorial-btn" type="button">Replay Tutorial</button>
+            <button class="ghost-btn" id="map-maker-btn" type="button">Map Maker</button>
+          </div>
+        </div>
+        <div class="hero-art">
+          <div class="hero-emblem"></div>
+          <div class="hero-crest">Eight Trials. One Thread.</div>
+        </div>
+      </header>
+      <div class="stage-modal hidden" id="stage-modal" aria-hidden="true">
+        <div class="stage-modal-backdrop" id="stage-modal-backdrop"></div>
+        <section class="stage-modal-panel" role="dialog" aria-modal="true" aria-labelledby="stage-modal-title">
+          <div class="stage-modal-head">
+            <div>
+              <p class="section-kicker">Choose Your Trial</p>
+              <h2 id="stage-modal-title">The Nine Chambers</h2>
+              <p class="stage-modal-note" id="progress-note">Complete the Training Hall to unlock Stage I and begin the full descent.</p>
+            </div>
+            <div class="stage-modal-actions">
+              <button class="reset-btn" id="reset-progress-btn" type="button">Reset Progress</button>
+              <button class="close-btn" id="close-stage-modal-btn" type="button">Close</button>
+            </div>
+          </div>
+          <div class="stage-grid" id="stage-grid"></div>
+        </section>
+      </div>
+      <div class="account-modal hidden" id="account-modal" aria-hidden="true">
+        <div class="stage-modal-backdrop" id="account-modal-backdrop"></div>
+        <section class="account-modal-panel" role="dialog" aria-modal="true" aria-labelledby="account-modal-title">
+          <div class="stage-modal-head">
+            <div>
+              <p class="section-kicker">Player Account</p>
+              <h2 id="account-modal-title">Account Information</h2>
+            </div>
+            <button class="close-btn" id="close-account-modal-btn" type="button">Close</button>
+          </div>
+          <div class="account-info-grid">
+            <div class="account-info-row"><span>Name</span><strong id="account-name-value">-</strong></div>
+            <div class="account-info-row"><span>Email</span><strong id="account-email-value">-</strong></div>
+            <div class="account-info-row"><span>Status</span><strong id="account-status-value">-</strong></div>
+            <div class="account-info-row"><span>Progress</span><strong id="account-progress-value">-</strong></div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>

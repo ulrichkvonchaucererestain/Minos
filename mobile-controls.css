@@ -1,0 +1,395 @@
+#mobile-controls,
+#rotate-device {
+  display: none;
+}
+
+html.mobile-controls-enabled,
+html.mobile-controls-enabled body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+html.mobile-controls-enabled canvas {
+  touch-action: none;
+}
+
+html.game-controls-ready #mobile-controls {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: block;
+  pointer-events: none;
+  font-family: "Cinzel", serif;
+}
+
+#mobile-fullscreen-btn {
+  position: absolute;
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  pointer-events: auto;
+  min-height: 34px;
+  padding: 0 16px;
+  border: 1px solid rgba(212, 168, 67, 0.72);
+  border-radius: 999px;
+  background: rgba(8, 5, 12, 0.72);
+  color: #f2d789;
+  font-family: "Cinzel", serif;
+  font-size: 0.58rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.36);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-control-pad {
+  position: absolute;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-move-pad {
+  left: max(16px, env(safe-area-inset-left));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  width: 154px;
+  height: 154px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(212, 168, 67, 0.22);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(48, 27, 18, 0.5), rgba(8, 5, 12, 0.2) 62%),
+    rgba(8, 5, 12, 0.28);
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.34);
+  touch-action: none;
+}
+
+.mobile-joystick::before,
+.mobile-joystick::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 2px;
+  background: rgba(242, 215, 137, 0.22);
+}
+
+.mobile-joystick::before {
+  left: 22px;
+}
+
+.mobile-joystick::after {
+  right: 22px;
+}
+
+.mobile-joystick-knob {
+  position: relative;
+  z-index: 1;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(212, 168, 67, 0.86);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 24%, rgba(255, 232, 168, 0.24), transparent 34%),
+    linear-gradient(180deg, rgba(108, 70, 30, 0.94), rgba(28, 15, 16, 0.96));
+  color: #f2d789;
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 231, 168, 0.22);
+  transition: transform 0.08s ease-out;
+  will-change: transform;
+}
+
+.mobile-joystick.is-active .mobile-joystick-knob {
+  transition: none;
+  border-color: rgba(255, 226, 143, 0.98);
+}
+
+.mobile-joystick-arrows {
+  font-size: 0.84rem;
+  letter-spacing: 6px;
+  transform: translateX(3px);
+}
+
+.mobile-action-pad {
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: 190px;
+  height: 154px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  align-items: center;
+  justify-items: center;
+}
+
+.mobile-control-btn {
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgba(212, 168, 67, 0.82);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 24%, rgba(255, 228, 156, 0.2), transparent 32%),
+    linear-gradient(180deg, rgba(92, 60, 27, 0.9), rgba(22, 12, 15, 0.94));
+  color: #f2d789;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 231, 168, 0.2);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+}
+
+.mobile-control-main {
+  display: block;
+  font-size: 0.58rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.mobile-control-arrow .mobile-control-main {
+  font-size: 1.45rem;
+}
+
+.mobile-control-primary {
+  width: 70px;
+  height: 70px;
+  background:
+    radial-gradient(circle at 36% 24%, rgba(255, 232, 168, 0.24), transparent 34%),
+    linear-gradient(180deg, rgba(135, 86, 36, 0.96), rgba(66, 36, 18, 0.96));
+}
+
+.mobile-control-small .mobile-control-main {
+  font-size: 1rem;
+}
+
+.mobile-control-btn.is-pressed {
+  transform: translateY(2px) scale(0.96);
+  border-color: rgba(255, 226, 143, 0.98);
+  background:
+    radial-gradient(circle at 36% 24%, rgba(255, 239, 186, 0.26), transparent 34%),
+    linear-gradient(180deg, rgba(153, 100, 45, 0.98), rgba(91, 49, 23, 0.98));
+}
+
+.action-top {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.action-left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.action-right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.action-bottom {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+html:not(.mobile-controls-enabled) .mobile-control-pad {
+  display: none !important;
+}
+
+html.mobile-controls-enabled #ctrl-hint {
+  display: none !important;
+}
+
+@media (orientation: portrait) {
+  html.mobile-controls-enabled #rotate-device {
+    position: fixed;
+    inset: 0;
+    z-index: 15000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background:
+      radial-gradient(circle at center, rgba(60, 34, 24, 0.96), rgba(5, 3, 8, 0.98) 58%),
+      #050308;
+    color: #f5ead6;
+    text-align: center;
+    font-family: "Cinzel", serif;
+  }
+
+  .rotate-device-panel {
+    max-width: 360px;
+    border: 1px solid rgba(212, 168, 67, 0.62);
+    background: rgba(15, 8, 12, 0.82);
+    padding: 28px 24px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  }
+
+  .rotate-device-title {
+    color: #f2d789;
+    font-size: 1.05rem;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .rotate-device-copy {
+    color: rgba(245, 234, 214, 0.75);
+    font-size: 0.95rem;
+    line-height: 1.65;
+  }
+
+  html.mobile-controls-enabled #mobile-controls {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) {
+  html.mobile-controls-enabled #hud-top {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+  }
+
+  html.mobile-controls-enabled #hud-top-left {
+    gap: 8px;
+  }
+
+  html.mobile-controls-enabled .hud-box,
+  html.mobile-controls-enabled #tutorial-menu-btn {
+    min-height: 0;
+    padding: 8px 12px;
+  }
+
+  html.mobile-controls-enabled .hud-lbl {
+    font-size: 0.52rem;
+    letter-spacing: 2.5px;
+  }
+
+  html.mobile-controls-enabled #hud-timer {
+    font-size: 1.08rem;
+  }
+
+  html.mobile-controls-enabled #step-card {
+    top: max(72px, calc(env(safe-area-inset-top) + 58px));
+    left: max(14px, env(safe-area-inset-left));
+    right: auto;
+    transform: none;
+    width: min(350px, 38vw);
+    min-width: 0;
+    max-width: none;
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  html.mobile-controls-enabled #step-card.hidden-card {
+    transform: translateY(-8px);
+  }
+
+  html.mobile-controls-enabled #step-card.quiet-card {
+    transform: none;
+  }
+
+  html.mobile-controls-enabled #step-title {
+    font-size: 0.62rem;
+    margin-bottom: 5px;
+  }
+
+  html.mobile-controls-enabled #step-desc {
+    font-size: 0.5rem;
+    line-height: 1.5;
+    max-height: 46px;
+  }
+
+  html.mobile-controls-enabled #step-keys {
+    gap: 5px;
+    margin-top: 7px;
+    max-height: 34px;
+  }
+
+  html.mobile-controls-enabled .key-chip {
+    font-size: 0.46rem;
+    padding: 4px 8px;
+  }
+
+  html.mobile-controls-enabled #stam-wrap {
+    left: 50%;
+    right: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: min(240px, 32vw);
+    z-index: 1800;
+  }
+
+  html.mobile-controls-enabled #inventory-wrap {
+    left: 50% !important;
+    bottom: max(82px, calc(env(safe-area-inset-bottom) + 76px)) !important;
+    transform: translateX(-50%) scale(0.78);
+    transform-origin: bottom center;
+    z-index: 1700 !important;
+  }
+
+  html.mobile-controls-enabled #hud-paper-slot {
+    bottom: max(84px, calc(env(safe-area-inset-bottom) + 82px)) !important;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 430px) {
+  #mobile-fullscreen-btn {
+    min-height: 30px;
+    font-size: 0.5rem;
+  }
+
+  .mobile-move-pad {
+    width: 126px;
+    height: 126px;
+  }
+
+  .mobile-joystick-knob {
+    width: 60px;
+    height: 60px;
+  }
+
+  .mobile-action-pad {
+    width: 164px;
+    height: 126px;
+  }
+
+  .mobile-control-btn {
+    width: 48px;
+    height: 48px;
+  }
+
+  .mobile-control-primary {
+    width: 58px;
+    height: 58px;
+  }
+
+  .mobile-control-main {
+    font-size: 0.5rem;
+  }
+
+  html.mobile-controls-enabled #stam-wrap {
+    display: none;
+  }
+
+  html.mobile-controls-enabled #step-card {
+    top: 64px;
+    width: min(310px, 34vw);
+    padding: 8px 10px;
+  }
+
+  html.mobile-controls-enabled #step-desc {
+    max-height: 38px;
+  }
+}

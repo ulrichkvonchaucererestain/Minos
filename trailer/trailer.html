@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Labyrinth of Minos — Trailer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="trailer.css">
+  <style>
+    :root {
+      --gold:        #d4a843;
+      --gold-bright: #f0c060;
+      --gold-dark:   #8a6a20;
+      --text-parch:  #d4b896;
+      --brown-dark:  #2a1a0e;
+      --brown-mid:   #4a2e1a;
+      --crimson:     #cc2222;
+      --muted:       #9a8070;
+    }
+  </style>
+</head>
+<body class="cinematic">
+
+<!-- SCANLINES -->
+<div id="scanlines"></div>
+
+<!-- CINEMATIC LETTERBOX BARS -->
+<div id="cinema-top"></div>
+<div id="cinema-bot"></div>
+
+<!-- VIGNETTE -->
+<div id="vignette"></div>
+
+<!-- FLASH -->
+<div id="flash-overlay"></div>
+
+<!-- CANVAS -->
+<canvas id="trailerCanvas"></canvas>
+
+<!-- ══════════════ TITLE CARD ══════════════ -->
+<div id="title-card">
+  <div class="tc-logo">🏛️</div>
+  <div class="tc-title">LABYRINTH OF MINOS</div>
+  <div class="tc-sub">8 STAGES &nbsp;·&nbsp; 3 SECTIONS &nbsp;·&nbsp; INFINITE PATHS</div>
+  <div class="tc-start">— Press any key or click to begin —</div>
+</div>
+
+<!-- ══════════════ FEATURE CAPTION ══════════════ -->
+<div id="feature-caption">
+  <div class="fc-tag">LABYRINTH OF MINOS</div>
+  <div class="fc-title">Enter if You Dare</div>
+  <div class="fc-desc">8 Stages · 3 Sections · Infinite Paths</div>
+</div>
+
+<!-- ══════════════ ZONE LABEL ══════════════ -->
+<div id="zone-label"></div>
+
+<!-- ══════════════ TRAILER PROGRESS BAR ══════════════ -->
+<div id="trailer-progress">
+  <div id="trailer-progress-fill" style="width:0%"></div>
+</div>
+
+<!-- ══════════════ CONTROLS HINT ══════════════ -->
+<div id="ctrl-hint">
+  [P] Play Mode &nbsp;·&nbsp; [ESC] Cinematic &nbsp;·&nbsp; [WASD/Space/F/Shift] Move
+</div>
+
+<!-- ══════════════ PLAY MODE HUD ══════════════ -->
+<div id="play-hud">
+  <div class="ph-panel">
+    <div class="ph-label">⚔ Hero</div>
+    <div id="ph-health"></div>
+  </div>
+  <div class="ph-panel" style="text-align:right">
+    <div class="ph-label">⏱ Time</div>
+    <div id="ph-timer">00:00</div>
+  </div>
+</div>
+
+<!-- STAMINA BAR (play mode) -->
+<div id="ph-stambar">
+  STAMINA
+  <div id="ph-stam-track">
+    <div id="ph-stam-fill" style="width:100%"></div>
+  </div>
+  DASH [F]
+</div>
+
+<!-- ══════════════ SCRIPTS ══════════════ -->
+<!--
+  trailer.html is self-contained — it copies the STAGE_THEMES from
+  script.js inline below so it has no dependency on the main game.
+  trailer.js contains the full standalone engine.
+-->
+<script>
+/* ── Inline STAGE_THEMES (mirrored from script.js) ── */
+var STAGE_THEMES = [
+  {name:'Entry Halls',    color:'#7a4a2a', accentColor:'#d4a843'},
+  {name:'Pit Corridors',  color:'#2a3a7a', accentColor:'#4a8aff'},
+  {name:'Stone Halls',    color:'#3a2a4a', accentColor:'#aa66dd'},
+  {name:'Cliff Paths',    color:'#2a5a3a', accentColor:'#44cc88'},
+  {name:'Ancient Ruins',  color:'#5a3a2a', accentColor:'#ff8844'},
+  {name:'Forge Depths',   color:'#5a2a2a', accentColor:'#ff4444'},
+  {name:'Sanctum',        color:'#2a4a5a', accentColor:'#44ccff'},
+  {name:'Throne of Minos',color:'#3a2a1a', accentColor:'#ffd700'}
+];
+/* WORLD_W stub (trailer uses TRAILER_W internally, but needs the global) */
+var WORLD_W = 10000;
+var si = 0;  /* used by boulder speed formula */
+
+/* Character sprite data from sprite.js - will be loaded by ../sprite.js */
+</script>
+
+<script src="../sprite.js"></script>
+<script src="trailer.js"></script>
+
+<script>
+/* ── PAGE CONTROLLER ────────────────────────────────── */
+
+var _titleDismissed = false;
+
+function dismissTitle(){
+  if(_titleDismissed) return;
+  _titleDismissed = true;
+
+  var card = document.getElementById('title-card');
+  card.classList.add('fade-out');
+  setTimeout(function(){ card.classList.add('gone'); }, 1300);
+
+  // Start cinematic mode
+  trailerInit();
+  document.body.classList.add('cinematic');
+
+  // Show first caption after a moment
+  setTimeout(function(){
+    var cap = document.getElementById('feature-caption');
+    if(cap) cap.classList.add('show');
+    setTimeout(function(){
+      if(cap) cap.classList.remove('show');
+    }, 3500);
+  }, 1200);
+}
+
+/* Any key or click dismisses the title card */
+document.addEventListener('keydown', function(e){
+  if(!_titleDismissed){
+    dismissTitle();
+    return;
+  }
+});
+document.addEventListener('click', function(){
+  if(!_titleDismissed){ dismissTitle(); return; }
+  // Click anywhere in cinematic = enter play mode
+  if(typeof TR !== 'undefined' && TR.mode === 'cinematic'){
+    enterPlayMode();
+  }
+});
+
+/* Resize */
+window.addEventListener('resize', function(){
+  if(typeof trailerResize === 'function') trailerResize();
+  // Re-anchor hammers
+  if(typeof TR !== 'undefined' && TR.hammers && TR.hammers.length > 0){
+    var H = window.innerHeight;
+    TR.hammers[0].anchorY = H * 0.55;
+    if(TR.hammers[1]) TR.hammers[1].anchorY = H * 0.50;
+    if(TR.hammers[2]) TR.hammers[2].anchorY = H * 0.52;
+  }
+});
+
+/* Back to main menu link */
+document.addEventListener('keydown', function(e){
+  if(e.code === 'KeyM'){
+    window.location.href = 'index.html';
+  }
+});
+</script>
+
+<!-- Back to menu button (bottom-left, always visible) -->
+<a href="index.html" style="
+  position:fixed; bottom:14px; left:20px; z-index:130;
+  font-family:'Cinzel',serif; font-size:.55rem;
+  color:rgba(212,168,67,.35); letter-spacing:2px; text-decoration:none;
+  text-transform:uppercase; transition:color .2s;
+" onmouseover="this.style.color='rgba(212,168,67,.8)'"
+   onmouseout="this.style.color='rgba(212,168,67,.35)'">
+  ← Main Menu
+</a>
+
+</body>
+</html>

@@ -1,0 +1,335 @@
+:root {
+  --bg-night: #09070d;
+  --panel: rgba(30, 22, 23, 0.96);
+  --gold: #c9a55d;
+  --gold-bright: #f0d08a;
+  --ember: #d76c2c;
+  --wine: #6a2220;
+  --ivory: #f2ead9;
+  --mist: rgba(242, 234, 217, 0.7);
+  --line: rgba(201, 165, 93, 0.22);
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(9, 7, 13, 0.96), rgba(9, 7, 13, 0.88)),
+    radial-gradient(circle at top, rgba(183, 96, 33, 0.22), transparent 42%),
+    var(--bg-night);
+  color: var(--ivory);
+  font-family: "Cormorant Garamond", serif;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(rgba(0, 0, 0, 0.12) 50%, transparent 50%);
+  background-size: 100% 4px;
+  opacity: 0.08;
+}
+
+.auth-shell {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.back-link {
+  position: fixed;
+  top: 28px;
+  left: 32px;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  background: rgba(22, 16, 19, 0.85);
+  color: var(--gold-bright);
+  font-family: "Cinzel", serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.back-link:hover {
+  transform: translateY(-2px);
+  border-color: rgba(240, 208, 138, 0.55);
+}
+
+.auth-card {
+  position: relative;
+  width: min(100%, 460px);
+  padding: 34px 36px 36px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(34, 25, 27, 0.94), rgba(13, 10, 15, 0.96));
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255, 243, 214, 0.025),
+    0 0 34px rgba(201, 165, 93, 0.12);
+  backdrop-filter: blur(8px);
+}
+
+.auth-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 86% 14%, rgba(201, 165, 93, 0.1), transparent 22%);
+  opacity: 0.2;
+}
+
+.section-kicker,
+label,
+.btn-primary,
+.google-btn,
+.toggle-link,
+.divider,
+h1 {
+  font-family: "Cinzel", serif;
+}
+
+.section-kicker {
+  position: relative;
+  z-index: 1;
+  margin: 0 0 8px;
+  color: var(--gold);
+  font-size: 0.76rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+h1 {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: var(--ivory);
+  font-size: clamp(2rem, 8vw, 3rem);
+  line-height: 0.98;
+}
+
+.auth-note,
+.text-center {
+  position: relative;
+  z-index: 1;
+  color: var(--mist);
+}
+
+.auth-note {
+  margin: 12px 0 26px;
+  font-size: 1.08rem;
+  line-height: 1.45;
+}
+
+form,
+.divider,
+.google-btn,
+.text-center {
+  position: relative;
+  z-index: 1;
+}
+
+.input-group {
+  margin-bottom: 18px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--gold);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+input {
+  width: 100%;
+  border: 1px solid rgba(201, 165, 93, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ivory);
+  font: inherit;
+  font-size: 1.05rem;
+  padding: 13px 14px;
+  outline: none;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+input:focus {
+  border-color: rgba(240, 208, 138, 0.58);
+  background: rgba(201, 165, 93, 0.06);
+}
+
+.btn-primary,
+.google-btn {
+  width: 100%;
+  min-height: 50px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.btn-primary {
+  margin-top: 8px;
+  background: linear-gradient(180deg, rgba(201, 165, 93, 0.24), rgba(90, 56, 29, 0.8));
+  color: var(--ivory);
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(22, 16, 19, 0.85);
+  color: var(--gold-bright);
+}
+
+.btn-primary:hover,
+.google-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(240, 208, 138, 0.55);
+}
+
+.google-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  color: rgba(242, 234, 217, 0.36);
+  font-size: 0.76rem;
+  letter-spacing: 0.18em;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid rgba(201, 165, 93, 0.18);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.auth-switch {
+  position: relative;
+  z-index: 1;
+  margin: 28px 0 0;
+  color: var(--mist);
+  text-align: center;
+}
+
+.auth-switch a,
+.link-button {
+  color: var(--gold-bright);
+  cursor: pointer;
+  font-family: "Cinzel", serif;
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.link-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.auth-switch a:hover,
+.link-button:hover {
+  color: var(--ember);
+}
+
+.mt-8 {
+  margin-top: 28px;
+}
+
+.mt-2 {
+  margin-top: 10px;
+}
+
+.opacity-60 {
+  color: rgba(242, 234, 217, 0.6);
+}
+
+.toggle-link {
+  color: var(--gold-bright);
+  cursor: pointer;
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.toggle-link:hover {
+  color: var(--ember);
+}
+
+.hidden {
+  display: none;
+}
+
+#message-box {
+  position: fixed;
+  z-index: 10;
+  top: 22px;
+  left: 50%;
+  display: none;
+  max-width: min(90vw, 520px);
+  transform: translateX(-50%);
+  padding: 14px 18px;
+  border: 1px solid rgba(240, 208, 138, 0.48);
+  background: rgba(19, 14, 20, 0.96);
+  color: var(--gold-bright);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.35);
+  font-family: "Cinzel", serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .auth-shell {
+    align-items: flex-start;
+    padding: 82px 18px 24px;
+  }
+
+  .back-link {
+    top: 18px;
+    left: 18px;
+    right: 18px;
+    text-align: center;
+  }
+
+  .auth-card {
+    padding: 26px 20px 28px;
+    border-radius: 14px;
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Labyrinth of Minos",
+  "short_name": "Minos",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050308",
+  "theme_color": "#050308",
+  "description": "A mythic platform trial through the Labyrinth of Minos."
+}

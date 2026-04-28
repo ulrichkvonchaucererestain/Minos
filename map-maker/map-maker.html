@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Map Maker - Admin & Community</title>
+    <link rel="stylesheet" href="map-maker.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Mode Selector -->
+        <div id="mode-selector" class="mode-selector">
+            <h1>🎮 MAP MAKER</h1>
+            <div class="mode-buttons">
+                <button class="mode-btn admin-mode" onclick="app.setMode('admin')">
+                    <span class="icon">🔒</span>
+                    <span class="label">ADMIN (Developers)</span>
+                    <span class="desc">Official stages 1-9, full assets, randomization</span>
+                </button>
+                <button class="mode-btn community-mode" onclick="app.setMode('community')">
+                    <span class="icon">🌐</span>
+                    <span class="label">COMMUNITY</span>
+                    <span class="desc">Public levels, server database upload</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Admin Interface -->
+        <div id="admin-interface" class="interface hidden">
+            <header class="admin-header">
+                <h2>🔒 ADMIN MAP MAKER</h2>
+                <div class="stage-selector">
+                    <label>Target Stage:</label>
+                    <select id="admin-stage-select">
+                        <option value="1">Stage 1 - Tutorial</option>
+                        <option value="2">Stage 2 - Forest</option>
+                        <option value="3">Stage 3 - Caves</option>
+                        <option value="4">Stage 4 - Castle</option>
+                        <option value="5">Stage 5 - Dungeon</option>
+                        <option value="6">Stage 6 - Sewers</option>
+                        <option value="7">Stage 7 - Tower</option>
+                        <option value="8">Stage 8 - Hell</option>
+                        <option value="9">Stage 9 - Final</option>
+                    </select>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="app.randomizeMap()">🎲 Randomize</button>
+                    <button class="btn btn-primary" onclick="app.exportAdminMap()">💾 Export to Stage</button>
+                    <button class="btn btn-warning" onclick="app.exportAllStages()">📦 Export All Stages</button>
+                    <button class="btn btn-danger" onclick="app.backToMenu()">← Back</button>
+                </div>
+            </header>
+
+            <div class="workspace">
+                <!-- Left Sidebar: Asset Palette -->
+                <aside class="sidebar left-sidebar">
+                    <div class="palette-section">
+                        <h3>🧱 Platforms</h3>
+                        <div class="asset-grid">
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="grass" title="Grass Platform">
+                                <div class="preview grass"></div>
+                                <span>Grass</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="stone" title="Stone Platform">
+                                <div class="preview stone"></div>
+                                <span>Stone</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="wood" title="Wood Platform">
+                                <div class="preview wood"></div>
+                                <span>Wood</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="metal" title="Metal Platform">
+                                <div class="preview metal"></div>
+                                <span>Metal</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="ice" title="Ice Platform">
+                                <div class="preview ice"></div>
+                                <span>Ice</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="moving" title="Moving Platform">
+                                <div class="preview moving"></div>
+                                <span>Moving</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="crumbling" title="Crumbling Platform">
+                                <div class="preview crumbling"></div>
+                                <span>Crumble</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="bounce" title="Bounce Platform">
+                                <div class="preview bounce"></div>
+                                <span>Bounce</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="palette-section">
+                        <h3>⚠️ Traps</h3>
+                        <div class="asset-grid">
+                            <div class="asset-item" draggable="true" data-type="trap" data-subtype="spikes" title="Spikes">
+                                <div class="preview spikes"></div>
+                                <span>Spikes</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="trap" data-subtype="saw" title="Saw Blade">
+                                <div class="preview saw"></div>
+                                <span>Saw</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="trap" data-subtype="lava" title="Lava Pit">
+                                <div class="preview lava"></div>
+                                <span>Lava</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="trap" data-subtype="arrow" title="Arrow Trap">
+                                <div class="preview arrow"></div>
+                                <span>Arrow</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="trap" data-subtype="poison" title="Poison Gas">
+                                <div class="preview poison"></div>
+                                <span>Poison</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="trap" data-subtype="electric" title="Electric Field">
+                                <div class="preview electric"></div>
+                                <span>Electric</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="palette-section">
+                        <h3>🚪 Doors</h3>
+                        <div class="asset-grid">
+                            <div class="asset-item" draggable="true" data-type="door" data-subtype="exit" title="Exit Door">
+                                <div class="preview door-exit"></div>
+                                <span>Exit</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="door" data-subtype="locked" title="Locked Door">
+                                <div class="preview door-locked"></div>
+                                <span>Locked</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="door" data-subtype="secret" title="Secret Door">
+                                <div class="preview door-secret"></div>
+                                <span>Secret</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="door" data-subtype="trap" title="Trap Door (Bad)">
+                                <div class="preview door-trap"></div>
+                                <span>Trap</span>
+                            </div>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Center: Canvas -->
+                <main class="canvas-area">
+                    <div class="canvas-header">
+                        <span class="coords">X: <span id="coord-x">0</span> Y: <span id="coord-y">0</span></span>
+                        <span class="grid-size">Grid: <span id="grid-size">32px</span></span>
+                        <div class="tools">
+                            <button class="tool-btn active" data-tool="brush" title="Brush (B)">🖌️</button>
+                            <button class="tool-btn" data-tool="eraser" title="Eraser (E)">🧹</button>
+                            <button class="tool-btn" data-tool="fill" title="Fill (F)">🪣</button>
+                            <button class="tool-btn" data-tool="select" title="Select (S)">🔲</button>
+                            <button class="tool-btn" data-tool="move" title="Move (M)">✋</button>
+                        </div>
+                        <div class="zoom-controls">
+                            <button onclick="app.zoom(-0.1)">-</button>
+                            <span id="zoom-level">100%</span>
+                            <button onclick="app.zoom(0.1)">+</button>
+                        </div>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="map-canvas" width="800" height="600"></canvas>
+                        <div id="grid-overlay" class="grid-overlay"></div>
+                    </div>
+                    <div class="canvas-footer">
+                        <span id="object-count">Objects: 0</span>
+                        <span id="map-size">Size: 25x19 tiles</span>
+                    </div>
+                </main>
+
+                <!-- Right Sidebar: Properties & Layers -->
+                <aside class="sidebar right-sidebar">
+                    <div class="panel">
+                        <h3>📋 Layers</h3>
+                        <div class="layer-list">
+                            <div class="layer-item active" data-layer="background">
+                                <span class="visibility">👁️</span>
+                                <span>Background</span>
+                            </div>
+                            <div class="layer-item active" data-layer="platforms">
+                                <span class="visibility">👁️</span>
+                                <span>Platforms</span>
+                            </div>
+                            <div class="layer-item active" data-layer="traps">
+                                <span class="visibility">👁️</span>
+                                <span>Traps</span>
+                            </div>
+                            <div class="layer-item active" data-layer="entities">
+                                <span class="visibility">👁️</span>
+                                <span>Entities</span>
+                            </div>
+                            <div class="layer-item active" data-layer="foreground">
+                                <span class="visibility">👁️</span>
+                                <span>Foreground</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h3>🎯 Spawns & Mobs</h3>
+                        <div class="asset-grid small">
+                            <div class="asset-item" draggable="true" data-type="spawn" data-subtype="player" title="Player Spawn">
+                                <div class="preview spawn-player"></div>
+                                <span>Player</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="spawn" data-subtype="checkpoint" title="Checkpoint">
+                                <div class="preview spawn-checkpoint"></div>
+                                <span>Save</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="mob" data-subtype="slime" title="Slime">
+                                <div class="preview mob-slime"></div>
+                                <span>Slime</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="mob" data-subtype="goblin" title="Goblin">
+                                <div class="preview mob-goblin"></div>
+                                <span>Goblin</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="mob" data-subtype="skeleton" title="Skeleton">
+                                <div class="preview mob-skeleton"></div>
+                                <span>Skeleton</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="mob" data-subtype="bat" title="Bat">
+                                <div class="preview mob-bat"></div>
+                                <span>Bat</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="mob" data-subtype="boss" title="Boss">
+                                <div class="preview mob-boss"></div>
+                                <span>Boss</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h3>💎 Items</h3>
+                        <div class="asset-grid small">
+                            <div class="asset-item" draggable="true" data-type="item" data-subtype="coin" title="Coin">
+                                <div class="preview item-coin"></div>
+                                <span>Coin</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="item" data-subtype="gem" title="Gem">
+                                <div class="preview item-gem"></div>
+                                <span>Gem</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="item" data-subtype="key" title="Key">
+                                <div class="preview item-key"></div>
+                                <span>Key</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="item" data-subtype="potion" title="Potion">
+                                <div class="preview item-potion"></div>
+                                <span>Potion</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="item" data-subtype="chest" title="Chest">
+                                <div class="preview item-chest"></div>
+                                <span>Chest</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="item" data-subtype="powerup" title="Power Up">
+                                <div class="preview item-powerup"></div>
+                                <span>Power</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel" id="properties-panel">
+                        <h3>⚙️ Properties</h3>
+                        <div id="selected-properties">
+                            <p class="empty-state">Select an object to edit properties</p>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+
+            <!-- Randomization Settings -->
+            <div class="randomization-panel">
+                <h3>🎲 Randomization Algorithm</h3>
+                <div class="rand-settings">
+                    <label>
+                        <input type="checkbox" id="rand-platforms" checked>
+                        Randomize Platform Positions
+                    </label>
+                    <label>
+                        <input type="checkbox" id="rand-traps" checked>
+                        Randomize Trap Placement
+                    </label>
+                    <label>
+                        <input type="checkbox" id="rand-items" checked>
+                        Randomize Item Spawns
+                    </label>
+                    <label>
+                        <input type="checkbox" id="rand-mobs" checked>
+                        Randomize Mob Spawns
+                    </label>
+                    <label>
+                        <input type="checkbox" id="rand-seed" checked>
+                        Use Seed: <input type="text" id="rand-seed-value" placeholder="random">
+                    </label>
+                    <div class="slider-group">
+                        <label>Difficulty Variance: <span id="diff-val">50%</span></label>
+                        <input type="range" id="difficulty-var" min="0" max="100" value="50">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Community Interface -->
+        <div id="community-interface" class="interface hidden">
+            <header class="community-header">
+                <h2>🌐 COMMUNITY MAP MAKER</h2>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" onclick="app.newMap()">📝 New</button>
+                    <button class="btn btn-secondary" onclick="app.loadMap()">📂 Load</button>
+                    <button class="btn btn-primary" onclick="app.saveToServer()">☁️ Upload to Server</button>
+                    <button class="btn btn-danger" onclick="app.backToMenu()">← Back</button>
+                </div>
+            </header>
+
+            <div class="workspace community-workspace">
+                <aside class="sidebar community-sidebar">
+                    <div class="palette-section">
+                        <h3>Basic Assets</h3>
+                        <div class="asset-grid">
+                            <div class="asset-item" draggable="true" data-type="platform" data-subtype="grass">
+                                <div class="preview grass"></div>
+                                <span>Platform</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="trap" data-subtype="spikes">
+                                <div class="preview spikes"></div>
+                                <span>Spikes</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="door" data-subtype="exit">
+                                <div class="preview door-exit"></div>
+                                <span>Exit</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="item" data-subtype="coin">
+                                <div class="preview item-coin"></div>
+                                <span>Coin</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="spawn" data-subtype="player">
+                                <div class="preview spawn-player"></div>
+                                <span>Start</span>
+                            </div>
+                            <div class="asset-item" draggable="true" data-type="mob" data-subtype="slime">
+                                <div class="preview mob-slime"></div>
+                                <span>Enemy</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <h3>Level Info</h3>
+                        <input type="text" id="level-name" placeholder="Level Name">
+                        <textarea id="level-desc" placeholder="Description"></textarea>
+                        <select id="level-difficulty">
+                            <option value="easy">Easy</option>
+                            <option value="medium">Medium</option>
+                            <option value="hard">Hard</option>
+                            <option value="expert">Expert</option>
+                        </select>
+                        <input type="text" id="author-name" placeholder="Your Name">
+                    </div>
+                </aside>
+
+                <main class="canvas-area">
+                    <div class="canvas-header">
+                        <span>Community Level Editor</span>
+                        <div class="tools">
+                            <button class="tool-btn active" data-tool="brush">🖌️</button>
+                            <button class="tool-btn" data-tool="eraser">🧹</button>
+                        </div>
+                    </div>
+                    <div class="canvas-wrapper">
+                        <canvas id="community-canvas" width="800" height="600"></canvas>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- Export Modal -->
+        <div id="export-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>📦 Export Stage Data</h3>
+                <div class="export-preview">
+                    <pre id="export-json"></pre>
+                </div>
+                <div class="export-actions">
+                    <button class="btn btn-secondary" onclick="app.copyToClipboard()">📋 Copy JSON</button>
+                    <button class="btn btn-primary" onclick="app.downloadStage()">💾 Download</button>
+                    <button class="btn btn-danger" onclick="app.closeModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/Minos-main/map-maker/map-maker.js"></script>
+</body>
+</html>'''
