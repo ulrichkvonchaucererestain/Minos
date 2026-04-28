@@ -37,8 +37,8 @@ var JUMP_V = -13.5;
 var GRAV = 0.58;
 var FRIC = 0.8;
 var DASH_COST = 28,
-  DASH_SPD = 18,
-  DASH_DUR = 16,
+  DASH_SPD = 15,
+  DASH_DUR = 13,
   DASH_CD = 52;
 var STAM_MAX = 100,
   STAM_DRAIN = 0.55,
@@ -242,14 +242,6 @@ function getSelectedMapTheme() {
 /* ── CAMERA ─────────────────────────────────────────────────────── */
 var CAM = { x: 0, y: 0 }; // horizontal only
 
-function isMobileViewport() {
-  return window.matchMedia && window.matchMedia("(max-width: 900px), (max-height: 520px)").matches;
-}
-
-function getCanvasRenderScale() {
-  return isMobileViewport() ? 1.14 : 1;
-}
-
 /* ── KEYS ─────────────────────────────────────────────────────────── */
 var KEYS = {},
   JP = {};
@@ -344,24 +336,78 @@ function buildMap() {
 
   MAP.mobs = [
     {
-      type: "rat", x: 960, startX: 960, y: loftY, w: 56, h: 32,
-      minX: 945, maxX: 1065, vx: 1.2, tick: 0, dead: false, hitCooldown: 0,
+      type: "rat",
+      x: 960,
+      startX: 960,
+      y: loftY,
+      w: 56,
+      h: 32,
+      minX: 945,
+      maxX: 1065,
+      vx: 1.2,
+      tick: 0,
+      dead: false,
+      hitCooldown: 0,
     },
     {
-      type: "bat", x: 2745, startX: 2745, y: mezzY - 128, baseY: mezzY - 128, w: 72, h: 42,
-      minX: 2720, maxX: 2895, vx: 1.45, bob: 0, tick: 0, dead: false, hitCooldown: 0,
+      type: "bat",
+      x: 2745,
+      startX: 2745,
+      y: mezzY - 128,
+      baseY: mezzY - 128,
+      w: 72,
+      h: 42,
+      minX: 2720,
+      maxX: 2895,
+      vx: 1.45,
+      bob: 0,
+      tick: 0,
+      dead: false,
+      hitCooldown: 0,
     },
     {
-      type: "rat", x: 3910, startX: 3910, y: loftY, w: 56, h: 32,
-      minX: 3890, maxX: 4015, vx: -1.25, tick: 0, dead: false, hitCooldown: 0,
+      type: "rat",
+      x: 3910,
+      startX: 3910,
+      y: loftY,
+      w: 56,
+      h: 32,
+      minX: 3890,
+      maxX: 4015,
+      vx: -1.25,
+      tick: 0,
+      dead: false,
+      hitCooldown: 0,
     },
     {
-      type: "bat", x: 5290, startX: 5290, y: mezzY - 130, baseY: mezzY - 130, w: 72, h: 42,
-      minX: 5250, maxX: 5415, vx: 1.55, bob: 0, tick: 0, dead: false, hitCooldown: 0,
+      type: "bat",
+      x: 5290,
+      startX: 5290,
+      y: mezzY - 130,
+      baseY: mezzY - 130,
+      w: 72,
+      h: 42,
+      minX: 5250,
+      maxX: 5415,
+      vx: 1.55,
+      bob: 0,
+      tick: 0,
+      dead: false,
+      hitCooldown: 0,
     },
     {
-      type: "rat", x: 6310, startX: 6310, y: mezzY, w: 56, h: 32,
-      minX: 6295, maxX: 6405, vx: 1.25, tick: 0, dead: false, hitCooldown: 0,
+      type: "rat",
+      x: 6310,
+      startX: 6310,
+      y: mezzY,
+      w: 56,
+      h: 32,
+      minX: 6295,
+      maxX: 6405,
+      vx: 1.25,
+      tick: 0,
+      dead: false,
+      hitCooldown: 0,
     },
   ];
 
@@ -377,29 +423,50 @@ function buildMap() {
   MAP.hammer = null;
 
   /* ── STAGE III EXIT ── */
-  MAP.gold = null;
+  MAP.gold = {
+    x: 4230,
+    y: FLOOR_Y - 80,
+    w: 60,
+    h: 60,
+    collected: false,
+    bobTimer: 0,
+  };
 
-  /* ── SINGLE EXIT DOOR ── */
+  // NEW — 3 doors scattered in the map
   var dW = 118,
     dH = 154;
   var doorY = FLOOR_Y - dH;
+
+  // Randomly pick which door index (0-2) is correct each buildMap call
+  // We store it so it stays consistent until resetToStart
+  if (typeof MAP._correctDoorIdx === "undefined") {
+    MAP._correctDoorIdx = Math.floor(Math.random() * 3);
+  }
+
   MAP.doors = [
     {
-      x: 72,
-      y: doorY,
+      x: 2420, // scattered — near platform at x:2380
+      y: FLOOR_Y - dH,
       w: dW,
       h: dH,
-      correct: false,
-      label: "BACK",
-      targetStage: "stage4.html",
+      correct: MAP._correctDoorIdx === 0,
+      label: "DOOR I",
     },
     {
-      x: 8030,
-      y: doorY,
+      x: 5590, // scattered — near platform at x:5550
+      y: FLOOR_Y - dH,
       w: dW,
       h: dH,
-      correct: true,
-      label: "EXIT",
+      correct: MAP._correctDoorIdx === 1,
+      label: "DOOR II",
+    },
+    {
+      x: 7850, // scattered — end of last long platform (x:6590 + 1260)
+      y: FLOOR_Y - dH,
+      w: dW,
+      h: dH,
+      correct: MAP._correctDoorIdx === 2,
+      label: "DOOR III",
     },
   ];
   MAP.doorFrameRect = null;
@@ -415,21 +482,49 @@ function buildMap() {
 
     { key: "web", x: 1935, y: rise1Y - 94, w: 126, h: 44, alpha: 0.24 },
     { key: "web", x: 2160, y: rise2Y - 98, w: 128, h: 46, alpha: 0.25 },
-    { key: "muralShade", x: 2450, y: FLOOR_Y - 290, w: 184, h: 144, alpha: 0.1 },
+    {
+      key: "muralShade",
+      x: 2450,
+      y: FLOOR_Y - 290,
+      w: 184,
+      h: 144,
+      alpha: 0.1,
+    },
 
     { key: "web", x: 3315, y: lowerY - 116, w: 130, h: 46, alpha: 0.24 },
-    { key: "vinesGreenWide", x: 3600, y: FLOOR_Y - 214, w: 170, h: 56, alpha: 0.15 },
+    {
+      key: "vinesGreenWide",
+      x: 3600,
+      y: FLOOR_Y - 214,
+      w: 170,
+      h: 56,
+      alpha: 0.15,
+    },
     { key: "web", x: 3910, y: loftY - 96, w: 128, h: 46, alpha: 0.26 },
 
     { key: "banner", x: 4240, y: FLOOR_Y - 306, w: 84, h: 164, alpha: 0.12 },
     { key: "web", x: 4540, y: rise1Y - 96, w: 128, h: 46, alpha: 0.24 },
     { key: "web", x: 5030, y: rise3Y - 102, w: 132, h: 46, alpha: 0.28 },
 
-    { key: "muralSeeker", x: 5600, y: FLOOR_Y - 286, w: 176, h: 138, alpha: 0.11 },
+    {
+      key: "muralSeeker",
+      x: 5600,
+      y: FLOOR_Y - 286,
+      w: 176,
+      h: 138,
+      alpha: 0.11,
+    },
     { key: "web", x: 5985, y: loftY - 96, w: 130, h: 46, alpha: 0.26 },
     { key: "vinesRed3", x: 6310, y: FLOOR_Y - 208, w: 82, h: 236, alpha: 0.22 },
 
-    { key: "vinesGreenWide", x: 7020, y: FLOOR_Y - 160, w: 180, h: 60, alpha: 0.18 },
+    {
+      key: "vinesGreenWide",
+      x: 7020,
+      y: FLOOR_Y - 160,
+      w: 180,
+      h: 60,
+      alpha: 0.18,
+    },
     { key: "web", x: 7950, y: FLOOR_Y - 88, w: 120, h: 42, alpha: 0.22 },
   ];
 
@@ -476,7 +571,7 @@ var GS = {
   hasGold: false,
   startTime: 0,
   timerSecs: 0,
-  step: 0, // tutorial step index
+  step: 0,
   paused: false,
   dead: false,
   won: false,
@@ -490,6 +585,13 @@ var GS = {
   deathFlash: 0,
   badgeTimer: null,
   stepCardTimer: null,
+
+  // ── NEW: Quiz state ──
+  quizActive: false,
+  quizDoor: null, // which door index triggered the quiz
+  quizQuestions: [], // array of {q, options, answer}
+  quizCurrent: 0, // current question index
+  quizEl: null, // DOM element reference
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -550,11 +652,8 @@ async function tutInit() {
 }
 
 function tutResize() {
-  var canvasScale = getCanvasRenderScale();
-  TC.width = Math.round(window.innerWidth * canvasScale);
-  TC.height = Math.round(window.innerHeight * canvasScale);
-  TC.style.width = "100vw";
-  TC.style.height = "100vh";
+  TC.width = window.innerWidth;
+  TC.height = window.innerHeight;
   TC.getContext("2d").imageSmoothingEnabled = false;
   buildMap();
   spawnPlayer();
@@ -596,6 +695,13 @@ function spawnPlayer() {
 }
 
 function resetToStart() {
+  // Re-randomize doors
+  MAP._correctDoorIdx = Math.floor(Math.random() * 3);
+  if (MAP.doors && MAP.doors.length === 3) {
+    MAP.doors[0].correct = MAP._correctDoorIdx === 0;
+    MAP.doors[1].correct = MAP._correctDoorIdx === 1;
+    MAP.doors[2].correct = MAP._correctDoorIdx === 2;
+  }
   // Reset all traps
   MAP.spikes.forEach(function (s) {
     s.active = false;
@@ -614,7 +720,13 @@ function resetToStart() {
       m.tick = 0;
     });
   }
+  // Re-randomize which door is correct
+  MAP._correctDoorIdx = Math.floor(Math.random() * 3);
+  MAP.doors[0].correct = MAP._correctDoorIdx === 0;
+  MAP.doors[1].correct = MAP._correctDoorIdx === 1;
+  MAP.doors[2].correct = MAP._correctDoorIdx === 2;
   GS.hasGold = false;
+  if (MAP.gold) MAP.gold.collected = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -629,6 +741,281 @@ function resetToStart() {
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MATH QUIZ SYSTEM
+═══════════════════════════════════════════════════════════════════ */
+
+// Question bank — mix of arithmetic operations and percentage history
+var QUIZ_BANK = [
+  // Basic arithmetic
+  function () {
+    var a = Math.floor(Math.random() * 50) + 10,
+      b = Math.floor(Math.random() * 50) + 10;
+    return {
+      q: "What is " + a + " + " + b + "?",
+      answer: a + b,
+      options: shuffle([a + b, a + b + 5, a + b - 3, a + b + 10]),
+    };
+  },
+  function () {
+    var a = Math.floor(Math.random() * 80) + 20,
+      b = Math.floor(Math.random() * a);
+    return {
+      q: "What is " + a + " - " + b + "?",
+      answer: a - b,
+      options: shuffle([a - b, a - b + 4, a - b - 4, a - b + 7]),
+    };
+  },
+  function () {
+    var a = Math.floor(Math.random() * 12) + 2,
+      b = Math.floor(Math.random() * 12) + 2;
+    return {
+      q: "What is " + a + " × " + b + "?",
+      answer: a * b,
+      options: shuffle([a * b, a * b + a, a * b - b, a * b + 2]),
+    };
+  },
+  function () {
+    var b = Math.floor(Math.random() * 10) + 2,
+      a = b * (Math.floor(Math.random() * 10) + 2);
+    return {
+      q: "What is " + a + " ÷ " + b + "?",
+      answer: a / b,
+      options: shuffle([a / b, a / b + 1, a / b - 1, a / b + 2]),
+    };
+  },
+  function () {
+    var a = Math.floor(Math.random() * 20) + 5,
+      b = Math.floor(Math.random() * 20) + 5;
+    return {
+      q: "What is " + a + "² + " + b + "? (a squared plus b)",
+      answer: a * a + b,
+      options: shuffle([a * a + b, a * a + b + 5, a * a - b, a * a + b - 2]),
+    };
+  },
+  // Percentage questions
+  function () {
+    var pct = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
+    var whole = Math.floor(Math.random() * 16 + 4) * 10;
+    return {
+      q: "What is " + pct + "% of " + whole + "?",
+      answer: (pct * whole) / 100,
+      options: shuffle([
+        (pct * whole) / 100,
+        (pct * whole) / 100 + 5,
+        (pct * whole) / 100 - 5,
+        ((pct * whole) / 100) * 2,
+      ]),
+    };
+  },
+  function () {
+    var part = Math.floor(Math.random() * 40) + 10,
+      whole = part + Math.floor(Math.random() * 60) + 10;
+    var pct = Math.round((part / whole) * 100);
+    return {
+      q:
+        "What percentage is " +
+        part +
+        " of " +
+        whole +
+        "? (round to nearest %)",
+      answer: pct,
+      options: shuffle([pct, pct + 5, pct - 5, pct + 10]),
+    };
+  },
+  function () {
+    var orig = (Math.floor(Math.random() * 8) + 2) * 10;
+    var pct = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
+    var result = orig + (orig * pct) / 100;
+    return {
+      q: "A price of " + orig + " increases by " + pct + "%. New price?",
+      answer: result,
+      options: shuffle([result, result + pct, result - pct / 2, orig]),
+    };
+  },
+  function () {
+    var orig = (Math.floor(Math.random() * 8) + 2) * 10;
+    var pct = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
+    var result = orig - (orig * pct) / 100;
+    return {
+      q: "A price of " + orig + " decreases by " + pct + "%. New price?",
+      answer: result,
+      options: shuffle([result, result + pct, result - pct, orig]),
+    };
+  },
+  // History of Percentage
+  function () {
+    return {
+      q: "The word 'percent' comes from which Latin phrase?",
+      answer: "per centum",
+      options: shuffle([
+        "per centum",
+        "pro mille",
+        "per annum",
+        "centus primus",
+      ]),
+    };
+  },
+  function () {
+    return {
+      q: "The '%' symbol first appeared in widespread use around which century?",
+      answer: "15th",
+      options: shuffle(["15th", "12th", "17th", "10th"]),
+    };
+  },
+  function () {
+    return {
+      q: "100% means the whole — what does 200% represent?",
+      answer: "Twice the whole",
+      options: shuffle([
+        "Twice the whole",
+        "Half the whole",
+        "The same",
+        "200 units",
+      ]),
+    };
+  },
+];
+
+function shuffle(arr) {
+  var a = arr.slice();
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = a[i];
+    a[i] = a[j];
+    a[j] = t;
+  }
+  return a;
+}
+
+function buildQuiz() {
+  // Pick 6 unique random questions from the bank
+  var indices = [];
+  while (indices.length < 6) {
+    var n = Math.floor(Math.random() * QUIZ_BANK.length);
+    if (indices.indexOf(n) === -1) indices.push(n);
+  }
+  return indices.map(function (i) {
+    return QUIZ_BANK[i]();
+  });
+}
+
+function openQuiz(doorIndex) {
+  GS.quizActive = true;
+  GS.quizDoor = doorIndex;
+  GS.quizQuestions = buildQuiz();
+  GS.quizCurrent = 0;
+  GS.paused = true;
+  renderQuizUI();
+}
+
+function renderQuizUI() {
+  // Remove old quiz if exists
+  closeQuizUI();
+
+  var q = GS.quizQuestions[GS.quizCurrent];
+  var overlay = document.createElement("div");
+  overlay.id = "quiz-overlay";
+  overlay.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "z-index:8000",
+    "display:flex",
+    "flex-direction:column",
+    "align-items:center",
+    "justify-content:center",
+    "background:rgba(0,0,0,0.82)",
+    "font-family:Cinzel,serif",
+  ].join(";");
+
+  var progress = GS.quizCurrent + 1 + " / " + GS.quizQuestions.length;
+  var door = MAP.doors[GS.quizDoor];
+
+  overlay.innerHTML = [
+    '<div style="background:#1a0f0a;border:2px solid #c8a23a;border-radius:10px;',
+    'padding:36px 44px;max-width:520px;width:90%;text-align:center;box-shadow:0 0 60px rgba(200,162,58,0.18)">',
+    '<div style="color:#c8a23a;font-size:13px;letter-spacing:2px;margin-bottom:8px;">',
+    "📜 " + (door ? door.label : "DOOR") + " — RIDDLE OF THE PASSAGE</div>",
+    '<div style="color:#f0e0b0;font-size:12px;margin-bottom:18px;">Question ' +
+      progress +
+      "</div>",
+    '<div style="color:#fff;font-size:20px;font-weight:bold;margin-bottom:28px;line-height:1.4;">',
+    q.q + "</div>",
+    '<div id="quiz-options" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
+    q.options
+      .map(function (opt, oi) {
+        return (
+          '<button onclick="quizAnswer(' +
+          JSON.stringify(opt) +
+          ')" style="' +
+          "background:#2a1a10;border:1.5px solid #7a5a20;color:#f0d890;" +
+          "padding:12px 8px;border-radius:6px;font-family:Cinzel,serif;font-size:14px;" +
+          'cursor:pointer;transition:background 0.15s;" ' +
+          "onmouseover=\"this.style.background='#3a2a18'\" " +
+          "onmouseout=\"this.style.background='#2a1a10'\">" +
+          opt +
+          "</button>"
+        );
+      })
+      .join(""),
+    "</div>",
+    '<div style="color:#7a5a20;font-size:11px;margin-top:18px;">',
+    "⚠ Wrong answer costs 1 ❤</div>",
+    "</div>",
+  ].join("");
+
+  document.body.appendChild(overlay);
+  GS.quizEl = overlay;
+}
+
+function closeQuizUI() {
+  var old = document.getElementById("quiz-overlay");
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+  GS.quizEl = null;
+}
+
+window.quizAnswer = function (chosen) {
+  if (!GS.quizActive) return;
+  var q = GS.quizQuestions[GS.quizCurrent];
+  var correct = String(chosen) === String(q.answer);
+
+  if (!correct) {
+    // Wrong answer → lose 1 heart, close quiz, resume game
+    closeQuizUI();
+    GS.quizActive = false;
+    GS.paused = false;
+    GS.lives = Math.max(0, GS.lives - 1);
+    updateHUD();
+    spawnImpactPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.55, 10);
+    if (GS.lives <= 0) {
+      startDeathSequence("quiz");
+    } else {
+      showBadge("✕ Wrong! -1 ❤  Try the door again.");
+    }
+    return;
+  }
+
+  // Correct!
+  GS.quizCurrent++;
+  if (GS.quizCurrent >= GS.quizQuestions.length) {
+    // All 6 answered correctly → advance
+    closeQuizUI();
+    GS.quizActive = false;
+    GS.paused = false;
+    var door = MAP.doors[GS.quizDoor];
+    if (door && door.correct) {
+      // Correct door — advance to next stage
+      window.location.href = "stage6.html";
+    } else {
+      // Fake door — jumpscare even after answering all correctly
+      wrongDoor();
+    }
+  } else {
+    // Next question
+    renderQuizUI();
+  }
+};
 
 /* ═══════════════════════════════════════════════════════════════════
    UPDATE
@@ -761,7 +1148,7 @@ function tutUpdate() {
       }
     }
   }
-  
+
   // Clamp right edge of world
   if (PL.x + PL.sw > WORLD) {
     PL.x = WORLD - PL.sw;
@@ -872,28 +1259,36 @@ function tutUpdate() {
     }
   }
   /* ── DOOR INTERACTION ── */
-  GS.activeDoorIndex = -1;
-  MAP.doors.forEach(function (door, i) {
-    var px7 = PL.x + PL_COX,
-      py7 = PL.y + PL_COY;
-    if (
-      px7 < door.x + door.w + 10 &&
-      px7 + PL.w > door.x - 10 &&
-      py7 + PL.h > door.y &&
-      py7 < door.y + door.h
-    ) {
-      GS.activeDoorIndex = i;
-      if (JP["KeyE"]) {
-        if (door.targetStage) {
-          window.location.href = door.targetStage;
-        } else {
-          GS.won = true;
-          showScreen("screen-win");
+  // NEW — Gold-gated door interaction with quiz
+  /* ── DOOR INTERACTION ── */
+  if (!GS.quizActive) {
+    GS.activeDoorIndex = -1;
+    MAP.doors.forEach(function (door, i) {
+      var px7 = PL.x + PL_COX,
+        py7 = PL.y + PL_COY;
+      if (
+        px7 < door.x + door.w + 10 &&
+        px7 + PL.w > door.x - 10 &&
+        py7 + PL.h > door.y &&
+        py7 < door.y + door.h
+      ) {
+        GS.activeDoorIndex = i;
+        if (JP["KeyE"]) {
+          if (!GS.hasGold) {
+            // No gold — show hint, do nothing
+            showBadge("🪙 Find the Golden Thread to open the doors!");
+          } else {
+            // Has gold — open quiz (fake or real, quiz runs either way)
+            openQuiz(i);
+            // If it's a fake door and they get all answers right, jumpscare
+            // (handled inside quizAnswer win condition — see below)
+            door._quizIsCorrect = door.correct; // stash for quizAnswer
+          }
         }
       }
-    }
-  });
-  JP["KeyE"] = false;
+    });
+    JP["KeyE"] = false;
+  }
 
   /* ── VOID DEATH (fall off bottom) ── */
   if (PL.y > TC.height + 80) {
@@ -926,15 +1321,13 @@ function tutUpdate() {
   /* ── CAMERA ── */
   var targetCamX = PL.x + PL.sw / 2 - TC.width / 2;
   var targetCamY = PL.y + PL.sh / 2 - TC.height / 2;
-  
+
   // Clamp to world bounds
   targetCamX = Math.max(0, Math.min(WORLD - TC.width, targetCamX));
   targetCamY = Math.max(0, Math.min(TC.height * 2 - TC.height, targetCamY)); // Adjust vertical bounds as needed
-  
+
   CAM.x += (targetCamX - CAM.x) * 0.12;
   CAM.y += (targetCamY - CAM.y) * 0.12;
-
-
 
   /* ── PARTICLES ── */
   updateParticles();
@@ -997,10 +1390,11 @@ function updateMobs() {
     }
 
     if (PL.iframes > 0) return;
-    var px = PL.x + PL_COX, py = PL.y + PL_COY;
+    var px = PL.x + PL_COX,
+      py = PL.y + PL_COY;
     var my = m.type === "rat" ? m.y - m.h : m.y;
     if (px < m.x + m.w && px + PL.w > m.x && py < my + m.h && py + PL.h > my) {
-      PL.vx = (px + PL.w * 0.5 < m.x + m.w * 0.5 ? -8 : 8);
+      PL.vx = px + PL.w * 0.5 < m.x + m.w * 0.5 ? -8 : 8;
       PL.vy = -8;
       takeDamage("mob");
     }
@@ -1030,8 +1424,12 @@ function spawnImpactPtcls(x, y, count) {
       dec: 0.035 + Math.random() * 0.03,
       sz: Math.random() * (isEmber ? 4 : 3) + 2,
       col: isEmber
-        ? (Math.random() < 0.5 ? "#ffd36c" : "#ffb347")
-        : (Math.random() < 0.5 ? "#9b1f2d" : "#67202a"),
+        ? Math.random() < 0.5
+          ? "#ffd36c"
+          : "#ffb347"
+        : Math.random() < 0.5
+          ? "#9b1f2d"
+          : "#67202a",
       type: isEmber ? "ember" : "dust",
     });
   }
@@ -1053,7 +1451,9 @@ function startDeathSequence(source) {
     y: PL.y,
     vx:
       source === "hammer"
-        ? (PL.x + PL.sw / 2 < MAP.hammer.anchorX ? -2.8 : 2.8)
+        ? PL.x + PL.sw / 2 < MAP.hammer.anchorX
+          ? -2.8
+          : 2.8
         : PL.dir * 1.2,
     vy: -6.4,
     rot: source === "hammer" ? 0.18 * PL.dir : 0,
@@ -1090,7 +1490,7 @@ function updateDeathFx() {
   fx.vx *= 0.95;
   fx.rot += fx.rotV;
   fx.rotV *= 0.985;
-  fx.scale = 1 + Math.sin(Math.min(fx.t, 16) / 16 * Math.PI) * 0.07;
+  fx.scale = 1 + Math.sin((Math.min(fx.t, 16) / 16) * Math.PI) * 0.07;
   fx.glow = Math.max(0, 1 - fx.t / 22);
   fx.alpha = fx.t < 12 ? 1 : Math.max(0, 1 - (fx.t - 12) / 28);
   GS.deathFlash = Math.max(0, 1 - fx.t / 20);
@@ -1124,7 +1524,7 @@ function wrongDoor() {
     "background:#000",
     "opacity:0",
     "transition:opacity 0.05s",
-    "overflow:hidden"
+    "overflow:hidden",
   ].join(";");
 
   var img = new Image();
@@ -1136,7 +1536,7 @@ function wrongDoor() {
     "object-fit:cover",
     "transform:scale(1.08)",
     "image-rendering:pixelated",
-    "filter:brightness(1.3) contrast(1.4)"
+    "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
   // Use SPRITE_MINO if available, otherwise a red fallback
@@ -1147,7 +1547,8 @@ function wrongDoor() {
     overlay.style.background = "#cc0000";
     var txt = document.createElement("div");
     txt.textContent = "YOU CHOSE WRONG";
-    txt.style.cssText = "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
+    txt.style.cssText =
+      "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
     overlay.appendChild(txt);
   }
 
@@ -1158,7 +1559,9 @@ function wrongDoor() {
   var fl = document.getElementById("wrong-flash");
   if (fl) {
     fl.classList.add("show");
-    setTimeout(function () { fl.classList.remove("show"); }, 200);
+    setTimeout(function () {
+      fl.classList.remove("show");
+    }, 200);
   }
 
   // Screen shake
@@ -1210,8 +1613,7 @@ function tutDraw() {
   TX.clearRect(0, 0, W, H);
 
   TX.save();
-TX.translate(-CAM.x, -CAM.y);
-
+  TX.translate(-CAM.x, -CAM.y);
 
   drawBG(W, H);
   drawChamberDepth(H);
@@ -1258,7 +1660,14 @@ function drawBG(W, H) {
     TX.drawImage(SPR.mapTheme.roof, 0, 0, WORLD, H * 0.18);
     TX.restore();
   }
-  var haze = TX.createRadialGradient(CAM.x + W * 0.5, H * 0.18, 10, CAM.x + W * 0.5, H * 0.42, W * 0.7);
+  var haze = TX.createRadialGradient(
+    CAM.x + W * 0.5,
+    H * 0.18,
+    10,
+    CAM.x + W * 0.5,
+    H * 0.42,
+    W * 0.7,
+  );
   haze.addColorStop(0, "rgba(214,187,128,0.11)");
   haze.addColorStop(1, "transparent");
   TX.fillStyle = haze;
@@ -1302,10 +1711,23 @@ function drawBG(W, H) {
     var torchH = 34;
     var torchBaseY = ty - 6;
     if (torch) {
-      TX.drawImage(torch, tx - torchW * 0.5, torchBaseY - torchH, torchW, torchH);
+      TX.drawImage(
+        torch,
+        tx - torchW * 0.5,
+        torchBaseY - torchH,
+        torchW,
+        torchH,
+      );
     }
 
-    var emberGlow = TX.createRadialGradient(tx, torchBaseY - 28, 0, tx, torchBaseY - 28, 34);
+    var emberGlow = TX.createRadialGradient(
+      tx,
+      torchBaseY - 28,
+      0,
+      tx,
+      torchBaseY - 28,
+      34,
+    );
     emberGlow.addColorStop(0, "rgba(255,240,184,.48)");
     emberGlow.addColorStop(0.3, "rgba(255,170,70,.26)");
     emberGlow.addColorStop(1, "transparent");
@@ -1319,13 +1741,23 @@ function drawBG(W, H) {
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 45 - flameWobble * 0.12);
     TX.quadraticCurveTo(tx + 10, torchBaseY - 30, tx, torchBaseY - 12);
-    TX.quadraticCurveTo(tx - 12, torchBaseY - 30, tx, torchBaseY - 45 - flameWobble * 0.12);
+    TX.quadraticCurveTo(
+      tx - 12,
+      torchBaseY - 30,
+      tx,
+      torchBaseY - 45 - flameWobble * 0.12,
+    );
     TX.fill();
     TX.fillStyle = "rgba(255,241,190,.96)";
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 38 - flameWobble * 0.08);
     TX.quadraticCurveTo(tx + 5, torchBaseY - 28, tx, torchBaseY - 18);
-    TX.quadraticCurveTo(tx - 6, torchBaseY - 28, tx, torchBaseY - 38 - flameWobble * 0.08);
+    TX.quadraticCurveTo(
+      tx - 6,
+      torchBaseY - 28,
+      tx,
+      torchBaseY - 38 - flameWobble * 0.08,
+    );
     TX.fill();
     TX.restore();
   }
@@ -1342,7 +1774,12 @@ function drawChamberDepth(H) {
     TX.fillStyle = "rgba(10,8,14,.22)";
     TX.fillRect(zone.x, zone.y, zone.w, zone.h);
 
-    var archG = TX.createLinearGradient(zone.x, zone.y, zone.x, zone.y + zone.h);
+    var archG = TX.createLinearGradient(
+      zone.x,
+      zone.y,
+      zone.x,
+      zone.y + zone.h,
+    );
     archG.addColorStop(0, "rgba(26,18,22,.44)");
     archG.addColorStop(0.25, "rgba(10,7,12,.1)");
     archG.addColorStop(1, "rgba(0,0,0,0)");
@@ -1374,7 +1811,7 @@ function drawChamberDepth(H) {
     TX.save();
     var cg = TX.createLinearGradient(col.x, col.y, col.x + col.w, col.y);
     cg.addColorStop(0, "rgba(14,10,16," + col.alpha + ")");
-    cg.addColorStop(0.5, "rgba(42,30,34," + (col.alpha * 1.2) + ")");
+    cg.addColorStop(0.5, "rgba(42,30,34," + col.alpha * 1.2 + ")");
     cg.addColorStop(1, "rgba(12,8,12," + col.alpha + ")");
     TX.fillStyle = cg;
     TX.fillRect(col.x, col.y, col.w, col.h);
@@ -1390,7 +1827,8 @@ function drawDecorLayer(list) {
   if (!list) return;
   list.forEach(function (item) {
     var img = SPR.decor[item.key];
-    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40) return;
+    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40)
+      return;
     TX.save();
     TX.globalAlpha = item.alpha == null ? 1 : item.alpha;
     TX.drawImage(img, item.x, item.y, item.w, item.h);
@@ -1504,7 +1942,12 @@ function drawSpikeRack(x, y, w, spikeH, gap) {
     TX.closePath();
     TX.fill();
 
-    var bladeG = TX.createLinearGradient(tipX, y - spikeH, tipX, rackTop + rackHeight);
+    var bladeG = TX.createLinearGradient(
+      tipX,
+      y - spikeH,
+      tipX,
+      rackTop + rackHeight,
+    );
     bladeG.addColorStop(0, "#f3e5d5");
     bladeG.addColorStop(0.18, "#d8d1c8");
     bladeG.addColorStop(0.55, "#8a8c93");
@@ -1545,7 +1988,8 @@ function drawSpikeRack(x, y, w, spikeH, gap) {
 
 function drawPlates() {
   MAP.plates.forEach(function (plate) {
-    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20) return;
+    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20)
+      return;
 
     TX.save();
     TX.fillStyle = plate.active ? "rgba(156,104,28,.95)" : "rgba(106,74,24,.9)";
@@ -1606,7 +2050,6 @@ function drawShaft(H) {
   }
   TX.fillStyle = "rgba(0,0,0,.26)";
   TX.fillRect(sh.x + 10, sh.y + 6, sh.w - 20, sh.bottom - sh.y - 6);
-
 }
 
 function drawHammer() {
@@ -1616,7 +2059,8 @@ function drawHammer() {
   var hx = hm.anchorX + Math.sin(hm.angle) * hm.length;
   var hy2 = hm.anchorY + Math.cos(hm.angle) * hm.length;
 
-  var hmImg = SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
+  var hmImg =
+    SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
   if (hmImg && hmImg.complete && hmImg.naturalWidth) {
     TX.save();
     // Rotate one hammer asset around the pointer/ball for a genuinely steady swing.
@@ -1633,7 +2077,12 @@ function drawHammer() {
     TX.translate(hm.anchorX, hm.anchorY);
     TX.rotate(hm.angle);
     // Fallback rectangle if no sprite
-    var hg = TX.createLinearGradient(-hm.hw / 2, -hm.hh / 2, hm.hw / 2, hm.hh / 2);
+    var hg = TX.createLinearGradient(
+      -hm.hw / 2,
+      -hm.hh / 2,
+      hm.hw / 2,
+      hm.hh / 2,
+    );
     hg.addColorStop(0, "#909090");
     hg.addColorStop(0.4, "#c0c0c8");
     hg.addColorStop(1, "#484858");
@@ -1741,7 +2190,15 @@ function drawDoors() {
     TX.save();
     TX.fillStyle = "rgba(0,0,0,.22)";
     TX.beginPath();
-    TX.ellipse(door.x + door.w / 2, door.y + door.h + 10, door.w * 0.56, 10, 0, 0, Math.PI * 2);
+    TX.ellipse(
+      door.x + door.w / 2,
+      door.y + door.h + 10,
+      door.w * 0.56,
+      10,
+      0,
+      0,
+      Math.PI * 2,
+    );
     TX.fill();
     TX.fillStyle = "rgba(32,18,18,.88)";
     TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
@@ -1815,13 +2272,15 @@ function drawDoors() {
       }
     }
     // Labels
-    TX.fillStyle = lit ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
-    TX.font = "9px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText(door.label || "EXIT", door.x + door.w / 2, door.y + door.h + 14);
     if (GS.activeDoorIndex === i) {
-      TX.fillStyle = "rgba(255,215,0,.95)";
-      TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
+      if (!GS.hasGold) {
+        TX.fillStyle = "rgba(255,180,40,.95)";
+        TX.fillText("🪙 Need Gold Thread", door.x + door.w / 2, door.y - 20);
+        TX.fillText("to unlock!", door.x + door.w / 2, door.y - 8);
+      } else {
+        TX.fillStyle = "rgba(255,215,0,.95)";
+        TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
+      }
     }
     TX.textAlign = "left";
   });
@@ -1852,7 +2311,12 @@ function drawMobs() {
         TX.fillStyle = "#7c6450";
         TX.fillRect(dx, 0, m.w, m.h);
       }
-    } else if (m.type === "bat" && SPR.bat && SPR.bat.complete && SPR.bat.naturalWidth) {
+    } else if (
+      m.type === "bat" &&
+      SPR.bat &&
+      SPR.bat.complete &&
+      SPR.bat.naturalWidth
+    ) {
       TX.drawImage(SPR.bat, dx, 0, m.w, m.h);
     } else {
       TX.fillStyle = m.type === "bat" ? "#5a485e" : "#7c6450";
@@ -1896,7 +2360,7 @@ function drawPlayer() {
     TX.globalAlpha = fx.alpha;
     TX.shadowBlur = 24 * fx.glow;
     TX.shadowColor = "rgba(255,180,90,.85)";
-    TX.fillStyle = "rgba(0,0,0," + (0.18 * fx.alpha) + ")";
+    TX.fillStyle = "rgba(0,0,0," + 0.18 * fx.alpha + ")";
     TX.beginPath();
     TX.ellipse(
       fx.x + PL.sw / 2,
@@ -1911,7 +2375,10 @@ function drawPlayer() {
 
     TX.translate(fx.x + PL.sw / 2, fx.y + PL.sh * 0.56);
     TX.rotate(fx.rot);
-    TX.scale((PL.dir === -1 ? -1 : 1) * fx.scale, Math.max(0.78, 1 - fx.t * 0.01));
+    TX.scale(
+      (PL.dir === -1 ? -1 : 1) * fx.scale,
+      Math.max(0.78, 1 - fx.t * 0.01),
+    );
 
     if (img && img.complete && img.naturalWidth) {
       TX.drawImage(img, -PL.sw / 2, -PL.sh * 0.56, PL.sw, PL.sh);
@@ -2112,16 +2579,6 @@ function showBadge(msg) {
 
 /* ── SCREENS ────────────────────────────────────────────────────── */
 function showScreen(id) {
-  if (id === "screen-win" && !window.__minosStageSaved) {
-    window.__minosStageSaved = true;
-    import("../progress-service.js")
-      .then(function (service) {
-        return service.markStageComplete(5);
-      })
-      .catch(function (error) {
-        console.warn("Firebase stage progress save failed.", error);
-      });
-  }
   var el = document.getElementById(id);
   if (el) el.classList.remove("hidden");
 }
