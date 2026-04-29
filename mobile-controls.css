@@ -400,21 +400,44 @@ html.mobile-controls-enabled #ctrl-hint {
     right: auto;
     bottom: max(8px, env(safe-area-inset-bottom));
     transform: translateX(-50%);
-    width: min(210px, 26vw);
-    padding: 5px 8px;
-    gap: 6px;
-    font-size: 0.45rem;
-    opacity: 0.86;
+    display: grid;
+    grid-template-columns: auto minmax(72px, 1fr) auto;
+    align-items: center;
+    width: clamp(168px, 24vw, 230px);
+    min-height: 28px;
+    padding: 5px 9px;
+    gap: 7px;
+    border-color: rgba(212, 168, 67, 0.34);
+    background:
+      linear-gradient(180deg, rgba(48, 30, 18, 0.72), rgba(7, 4, 10, 0.84)),
+      rgba(8, 5, 12, 0.82);
+    box-shadow:
+      0 10px 24px rgba(0, 0, 0, 0.34),
+      inset 0 0 0 1px rgba(255, 243, 214, 0.04);
+    color: rgba(242, 215, 137, 0.9);
+    font-size: 0.42rem;
+    letter-spacing: 1.5px;
+    opacity: 0.94;
     z-index: 1800;
   }
 
   html.mobile-controls-enabled #stam-track {
-    width: clamp(80px, 12vw, 120px);
+    width: auto;
+    min-width: 72px;
     height: 6px;
+    border-color: rgba(212, 168, 67, 0.26);
+    background: rgba(0, 0, 0, 0.58);
+  }
+
+  html.mobile-controls-enabled #stam-fill {
+    background: linear-gradient(90deg, #7b4d2a, #d4a843, #f2d789);
   }
 
   html.mobile-controls-enabled #dash-ready {
-    font-size: 0.42rem;
+    min-width: 32px;
+    color: rgba(128, 205, 255, 0.86);
+    font-size: 0.38rem;
+    letter-spacing: 0.8px;
   }
 
   html.mobile-controls-enabled #inventory-wrap {
@@ -474,7 +497,24 @@ html.mobile-controls-enabled #ctrl-hint {
   }
 
   html.mobile-controls-enabled #stam-wrap {
-    display: none;
+    bottom: max(5px, env(safe-area-inset-bottom));
+    width: clamp(138px, 22vw, 176px);
+    min-height: 22px;
+    padding: 3px 6px;
+    gap: 5px;
+    font-size: 0.34rem;
+    letter-spacing: 1.1px;
+    opacity: 0.9;
+  }
+
+  html.mobile-controls-enabled #stam-track {
+    min-width: 54px;
+    height: 4px;
+  }
+
+  html.mobile-controls-enabled #dash-ready {
+    min-width: 24px;
+    font-size: 0.3rem;
   }
 
   html.mobile-controls-enabled .hud-box,

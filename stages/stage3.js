@@ -630,6 +630,7 @@ function buildMap() {
     { key: "clueMarker", x: 7628, y: FLOOR_Y - 204, w: 68, h: 40, alpha: 0.64 },
     { key: "bonesHuge", x: 7905, y: FLOOR_Y - 18, w: 148, h: 92, alpha: 0.28 },
   ];
+  cleanStageDecor();
 
   MAP.roomLights = [
     { x: 30, y: FLOOR_Y - 280, w: 880, h: 350, glow: 0.08 },
@@ -1609,6 +1610,34 @@ function wrongDoor() {
 /* ═══════════════════════════════════════════════════════════════════
    DRAW
 ═══════════════════════════════════════════════════════════════════ */
+function cleanStageDecor() {
+  if (MAP.decorBack) {
+    MAP.decorBack.forEach(function (item) {
+      if (!item || !item.key) return;
+      if (item.key === "web") item.alpha = Math.min(item.alpha || 0.22, 0.24);
+      else if (item.key.indexOf("vines") === 0) item.alpha = Math.min(item.alpha || 0.18, 0.2);
+      else if (item.key.indexOf("mural") === 0) item.alpha = Math.min(item.alpha || 0.12, 0.12);
+      else if (item.key === "cage") item.alpha = Math.min(item.alpha || 0.18, 0.18);
+    });
+  }
+
+  if (MAP.decorFront) {
+    MAP.decorFront.forEach(function (item) {
+      if (!item || !item.key) return;
+      if (item.key.indexOf("bones") === 0) {
+        var floorLine = item.y;
+        if (item.y > FLOOR_Y - item.h) floorLine = Math.min(FLOOR_Y, item.y + 8);
+        item.y = floorLine - item.h + 8;
+        item.alpha = Math.min(Math.max(item.alpha || 0.28, 0.28), 0.42);
+      } else if (item.key === "jar") {
+        item.alpha = Math.min(item.alpha || 0.76, 0.8);
+      } else if (item.key === "blood") {
+        item.alpha = Math.min(item.alpha || 0.2, 0.22);
+      }
+    });
+  }
+}
+
 function tutDraw() {
   var W = TC.width,
     H = TC.height;
