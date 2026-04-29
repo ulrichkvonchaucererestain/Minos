@@ -106,8 +106,9 @@ var SPR = {
   decor: {},
   torch: null,
   mapTheme: { map: null, roof: null, fall: null },
-  pot: null, // For the Pot 1 can be found in pot-sprite.js
+  pot: null,  // For the Pot 1 can be found in pot-sprite.js
   pot2: null, // For the Pot 2 can be found in pot-sprite.js
+  sword: null, // Rusted Blade pickup sprite (sword.js)
   input: null,
 };
 var sprOK = false;
@@ -206,6 +207,7 @@ async function loadSpr() {
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
   if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
   if (typeof SPRITE_POT2 !== "undefined") SPR.pot2 = await li(SPRITE_POT2);
+  if (typeof SPRITE_SWORD !== "undefined") SPR.sword = await li(SPRITE_SWORD);
   SPR.torch = await li(TORCH_ASSET);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
@@ -2194,38 +2196,51 @@ function drawSword() {
   var sy = sw.y + bob;
 
   // Glow effect
-  var gl = TX.createRadialGradient(sx, sy, 2, sx, sy, 35);
-  gl.addColorStop(0, "rgba(180,180,200,0.3)");
+  var gl = TX.createRadialGradient(sx, sy, 2, sx, sy, 38);
+  gl.addColorStop(0, "rgba(200,210,255,0.35)");
+  gl.addColorStop(0.5, "rgba(140,150,220,0.15)");
   gl.addColorStop(1, "transparent");
   TX.fillStyle = gl;
-  TX.fillRect(sx - 40, sy - 40, 80, 80);
+  TX.fillRect(sx - 44, sy - 44, 88, 88);
 
-  // Draw sword (fallback since no sprite - using drawn shape)
-  TX.save();
-  TX.translate(sx, sy);
-  TX.rotate(Math.PI / 4); // 45 degree angle
+  // Draw sword sprite if loaded, else fall back to drawn shape
+  if (SPR.sword && SPR.sword.complete && SPR.sword.naturalWidth) {
+    TX.save();
+    TX.translate(sx, sy);
+    TX.rotate(Math.PI / 4); // 45 degree angle for pickup display
+    // Draw centered on origin; sw.w/h is the pickup hitbox (48x48)
+    var drawW = 56;
+    var drawH = 56;
+    TX.drawImage(SPR.sword, -drawW / 2, -drawH / 2, drawW, drawH);
+    TX.restore();
+  } else {
+    // Fallback drawn sword
+    TX.save();
+    TX.translate(sx, sy);
+    TX.rotate(Math.PI / 4);
 
-  // Blade
-  TX.fillStyle = "#c0c0c0";
-  TX.fillRect(-3, -18, 6, 28);
-  TX.fillStyle = "#e8e8e8";
-  TX.fillRect(-1, -18, 2, 26);
+    // Blade
+    TX.fillStyle = "#c0c0c0";
+    TX.fillRect(-3, -18, 6, 28);
+    TX.fillStyle = "#e8e8e8";
+    TX.fillRect(-1, -18, 2, 26);
 
-  // Guard
-  TX.fillStyle = "#8a6a20";
-  TX.fillRect(-8, 8, 16, 3);
+    // Guard
+    TX.fillStyle = "#8a6a20";
+    TX.fillRect(-8, 8, 16, 3);
 
-  // Hilt
-  TX.fillStyle = "#5a3a10";
-  TX.fillRect(-2, 11, 4, 10);
+    // Hilt
+    TX.fillStyle = "#5a3a10";
+    TX.fillRect(-2, 11, 4, 10);
 
-  // Pommel
-  TX.fillStyle = "#8a6a20";
-  TX.beginPath();
-  TX.arc(0, 22, 3, 0, Math.PI * 2);
-  TX.fill();
+    // Pommel
+    TX.fillStyle = "#8a6a20";
+    TX.beginPath();
+    TX.arc(0, 22, 3, 0, Math.PI * 2);
+    TX.fill();
 
-  TX.restore();
+    TX.restore();
+  }
 
   // Interaction prompt
   var pxSw = PL.x + PL_COX;

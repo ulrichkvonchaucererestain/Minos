@@ -214,6 +214,10 @@ async function loadSpr() {
   SPR.torch = await li(TORCH_ASSET);
   SPR.rat = await Promise.all(MOB_RAT_PATHS.map(li));
   SPR.bat = await li(MOB_BAT_PATH);
+  if (typeof SPRITE_HELMET !== "undefined")
+    SPR.helmet = await li(SPRITE_HELMET);
+  if (typeof SPRITE_CHESTPLATE !== "undefined")
+    SPR.chestplate = await li(SPRITE_CHESTPLATE);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
   var decorKeys = Object.keys(DECOR_PATHS);
@@ -432,6 +436,30 @@ function buildMap() {
     bobTimer: 0,
   };
 
+   /* ── ARMOR PICKUPS ── */
+  var earlyPlatforms = MAP.platforms.slice(1, 5); // platforms 1-4 (indices 1,2,3,4)
+  
+  // Helmet — early platform
+  var helmetPlatform = earlyPlatforms[Math.floor(Math.random() * earlyPlatforms.length)];
+  MAP.helmet = {
+    x: helmetPlatform.x + helmetPlatform.w * 0.3 + Math.random() * (helmetPlatform.w * 0.4),
+    y: helmetPlatform.y - 55,
+    w: 44,
+    h: 44,
+    collected: false,
+    bobTimer: Math.random() * Math.PI * 2,
+    type: "helmet",
+    label: "Helmet",
+  };
+
+  // Chestplate — different early platform
+  var chestPlatform;
+  var attempts = 0;
+  do {
+    chestPlatform = earlyPlatforms[Math.floor(Math.random() * earlyPlatforms.length)];
+    attempts++;
+  } while (chestPlatform === helmetPlatform && attempts < 10);
+
   // NEW — 3 doors scattered in the map
   var dW = 118,
     dH = 154;
@@ -592,6 +620,10 @@ var GS = {
   quizQuestions: [], // array of {q, options, answer}
   quizCurrent: 0, // current question index
   quizEl: null, // DOM element reference
+
+  armorPieces: 0, // 0, 1, or 2 (helmet + chestplate)
+  hasHelmet: false,
+  hasChestplate: false,
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -721,12 +753,20 @@ function resetToStart() {
     });
   }
   // Re-randomize which door is correct
+    // Re-randomize which door is correct
   MAP._correctDoorIdx = Math.floor(Math.random() * 3);
   MAP.doors[0].correct = MAP._correctDoorIdx === 0;
   MAP.doors[1].correct = MAP._correctDoorIdx === 1;
   MAP.doors[2].correct = MAP._correctDoorIdx === 2;
+  // Reset quiz state on all doors
+  MAP.doors.forEach(function(d) { d._quizState = null; });
   GS.hasGold = false;
   if (MAP.gold) MAP.gold.collected = false;
+  GS.armorPieces = 0;
+  GS.hasHelmet = false;
+  GS.hasChestplate = false;
+  if (MAP.helmet) MAP.helmet.collected = false;
+  if (MAP.chestplate) MAP.chestplate.collected = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -902,10 +942,32 @@ function buildQuiz() {
 }
 
 function openQuiz(doorIndex) {
+  // Initialize per-door quiz state if not exists
+  if (!MAP.doors[doorIndex]._quizState) {
+    MAP.doors[doorIndex]._quizState = {
+      questions: buildQuiz(),
+      current: 0,
+      answered: [], // track which questions were answered correctly
+    };
+  }
+  
+  var qState = MAP.doors[doorIndex]._quizState;
+  
+  // If all questions already answered correctly, check if door is correct
+  if (qState.current >= qState.questions.length) {
+    // All done — resolve the door
+    if (MAP.doors[doorIndex].correct) {
+      window.location.href = "stage6.html";
+    } else {
+      wrongDoor();
+    }
+    return;
+  }
+  
   GS.quizActive = true;
   GS.quizDoor = doorIndex;
-  GS.quizQuestions = buildQuiz();
-  GS.quizCurrent = 0;
+  GS.quizQuestions = qState.questions;
+  GS.quizCurrent = qState.current;
   GS.paused = true;
   renderQuizUI();
 }
@@ -979,6 +1041,8 @@ window.quizAnswer = function (chosen) {
   if (!GS.quizActive) return;
   var q = GS.quizQuestions[GS.quizCurrent];
   var correct = String(chosen) === String(q.answer);
+  var doorIdx = GS.quizDoor;
+  var qState = MAP.doors[doorIdx]._quizState;
 
   if (!correct) {
     // Wrong answer → lose 1 heart, close quiz, resume game
@@ -996,24 +1060,26 @@ window.quizAnswer = function (chosen) {
     return;
   }
 
-  // Correct!
-  GS.quizCurrent++;
-  if (GS.quizCurrent >= GS.quizQuestions.length) {
-    // All 6 answered correctly → advance
-    closeQuizUI();
-    GS.quizActive = false;
-    GS.paused = false;
-    var door = MAP.doors[GS.quizDoor];
-    if (door && door.correct) {
-      // Correct door — advance to next stage
+  // Correct! — save progress and close quiz (player must return for next question)
+  qState.current++;
+  qState.answered.push(GS.quizCurrent);
+  
+  closeQuizUI();
+  GS.quizActive = false;
+  GS.paused = false;
+  
+  var remaining = qState.questions.length - qState.current;
+  
+  if (remaining > 0) {
+    // More questions remain — player must re-approach door
+    showBadge("✓ Correct! " + remaining + " more riddle(s) remain. Re-enter the door.");
+  } else {
+    // All questions answered — resolve the door
+    if (MAP.doors[doorIdx].correct) {
       window.location.href = "stage6.html";
     } else {
-      // Fake door — jumpscare even after answering all correctly
       wrongDoor();
     }
-  } else {
-    // Next question
-    renderQuizUI();
   }
 };
 
@@ -1258,8 +1324,33 @@ function tutUpdate() {
       }
     }
   }
+
+  /* ── ARMOR PICKUP (auto-equip on proximity) ── */
+  [MAP.helmet, MAP.chestplate].forEach(function (armor) {
+    if (!armor || armor.collected) return;
+    var pxA = PL.x + PL_COX + PL.w / 2;
+    var pyA = PL.y + PL_COY + PL.h / 2;
+    var ax = armor.x + armor.w / 2;
+    var ay = armor.y + armor.h / 2;
+    var distA = Math.hypot(pxA - ax, pyA - ay);
+
+    if (distA < 55) {
+      armor.collected = true;
+      if (armor.type === "helmet" && !GS.hasHelmet) {
+        GS.hasHelmet = true;
+        GS.armorPieces++;
+        showBadge("🛡️ Helmet equipped!");
+      } else if (armor.type === "chestplate" && !GS.hasChestplate) {
+        GS.hasChestplate = true;
+        GS.armorPieces++;
+        showBadge("🛡️ Chestplate equipped!");
+      }
+      spawnArmorBreakPtcls(ax, ay, armor.type); // sparkle effect on pickup
+    }
+  });
+
   /* ── DOOR INTERACTION ── */
-  // NEW — Gold-gated door interaction with quiz
+
   /* ── DOOR INTERACTION ── */
   if (!GS.quizActive) {
     GS.activeDoorIndex = -1;
@@ -1350,6 +1441,7 @@ function tutUpdate() {
 /* ── DAMAGE / DEATH ─────────────────────────────────────────────── */
 function takeDamage(source) {
   if (PL.iframes > 0) return;
+
   if (source === "void") {
     GS.lives = 0;
     PL.iframes = 0;
@@ -1357,6 +1449,46 @@ function takeDamage(source) {
     startDeathSequence(source);
     return;
   }
+
+  // ARMOR ABSORBS DAMAGE: spike, rat, bat, hammer, readySpike
+  var armorSources = ["spike", "mob", "hammer", "readySpike"];
+  if (armorSources.indexOf(source) !== -1 && GS.armorPieces > 0) {
+    // Armor breaks, player takes NO damage
+    GS.armorPieces--;
+    if (GS.hasHelmet && GS.hasChestplate) {
+      // Break chestplate first, then helmet
+      if (GS.hasChestplate) {
+        GS.hasChestplate = false;
+        showBadge("💔 Chestplate shattered!");
+        spawnArmorBreakPtcls(
+          PL.x + PL.sw / 2,
+          PL.y + PL.sh * 0.4,
+          "chestplate",
+        );
+      } else {
+        GS.hasHelmet = false;
+        showBadge("💔 Helmet shattered!");
+        spawnArmorBreakPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.4, "helmet");
+      }
+    } else if (GS.hasHelmet) {
+      GS.hasHelmet = false;
+      GS.armorPieces = 0;
+      showBadge("💔 Helmet shattered!");
+      spawnArmorBreakPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.4, "helmet");
+    } else if (GS.hasChestplate) {
+      GS.hasChestplate = false;
+      GS.armorPieces = 0;
+      showBadge("💔 Chestplate shattered!");
+      spawnArmorBreakPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.4, "chestplate");
+    }
+
+    // Brief iframe flash to show armor absorbed hit
+    PL.iframes = 20;
+    spawnImpactPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.55, 6);
+    updateHUD();
+    return;
+  }
+
   GS.lives = Math.max(0, GS.lives - 1);
   PL.iframes = 12;
   PL.vy = -10;
@@ -1626,6 +1758,7 @@ function tutDraw() {
   drawShaft(H);
   drawHammer();
   drawGold();
+  drawArmorPickups();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
   drawMobs();
@@ -2181,6 +2314,48 @@ function drawGold() {
   TX.textAlign = "left";
 }
 
+function drawArmorPickups() {
+  [MAP.helmet, MAP.chestplate].forEach(function(armor) {
+    if (!armor || armor.collected) return;
+    if (armor.x < CAM.x - 60 || armor.x > CAM.x + TC.width + 60) return;
+    
+    armor.bobTimer = (armor.bobTimer || 0) + 0.05;
+    var bob = Math.sin(armor.bobTimer) * 5;
+    var ax = armor.x + armor.w / 2;
+    var ay = armor.y + bob;
+
+    // Glow
+    var glowCol = armor.type === "helmet" ? "rgba(136,170,255," : "rgba(255,136,68,";
+    var gl = TX.createRadialGradient(ax, ay, 2, ax, ay, 35);
+    gl.addColorStop(0, glowCol + "0.35)");
+    gl.addColorStop(1, "transparent");
+    TX.fillStyle = gl;
+    TX.fillRect(ax - 40, ay - 40, 80, 80);
+
+    // Draw sprite
+    var spr = armor.type === "helmet" ? SPR.helmet : SPR.chestplate;
+    if (spr && spr.complete && spr.naturalWidth) {
+      TX.drawImage(spr, ax - armor.w / 2, ay - armor.h / 2, armor.w, armor.h);
+    } else {
+      // Fallback
+      TX.fillStyle = armor.type === "helmet" ? "#88aaff" : "#ff8844";
+      TX.fillRect(ax - armor.w / 2, ay - armor.h / 2, armor.w, armor.h);
+      TX.fillStyle = "#fff";
+      TX.font = "bold 10px serif";
+      TX.textAlign = "center";
+      TX.fillText(armor.type === "helmet" ? "H" : "C", ax, ay + 4);
+      TX.textAlign = "left";
+    }
+
+    // Label
+    TX.fillStyle = armor.type === "helmet" ? "rgba(136,170,255,0.9)" : "rgba(255,136,68,0.9)";
+    TX.font = "bold 9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText(armor.label, ax, ay - armor.h / 2 - 8);
+    TX.textAlign = "left";
+  });
+}
+
 function drawDoors() {
   MAP.doors.forEach(function (door, i) {
     if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
@@ -2437,11 +2612,27 @@ function drawPlayer() {
   }
 
   // Gold item indicator above head
+    // Gold item indicator above head
   if (GS.hasGold) {
     TX.globalAlpha = 1;
     TX.font = "18px serif";
     TX.textAlign = "center";
     TX.fillText("🪙", PL.x + PL.sw / 2, PL.y - 6);
+    TX.textAlign = "left";
+  }
+
+  // ARMOR INDICATORS above player
+  if (GS.armorPieces > 0) {
+    TX.globalAlpha = 1;
+    TX.font = "14px serif";
+    TX.textAlign = "center";
+    var armorY = PL.y - 22;
+    if (GS.hasHelmet) {
+      TX.fillText("🪖", PL.x + PL.sw / 2 - 10, armorY);
+    }
+    if (GS.hasChestplate) {
+      TX.fillText("👕", PL.x + PL.sw / 2 + 10, armorY);
+    }
     TX.textAlign = "left";
   }
   TX.restore();
@@ -2528,6 +2719,23 @@ function spawnGoldPtcls(gx, gy) {
       col: "#ffd700",
       type: "ember",
     });
+}
+
+function spawnArmorBreakPtcls(x, y, type) {
+  var col = type === "helmet" ? "#88aaff" : "#ff8844";
+  for (var i = 0; i < 14; i++) {
+    GS.ptcls.push({
+      x: x + (Math.random() - 0.5) * 24,
+      y: y + (Math.random() - 0.5) * 16,
+      vx: (Math.random() - 0.5) * 5,
+      vy: -(Math.random() * 3 + 1),
+      life: 1,
+      dec: 0.03 + Math.random() * 0.02,
+      sz: Math.random() * 5 + 3,
+      col: col,
+      type: "ember",
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

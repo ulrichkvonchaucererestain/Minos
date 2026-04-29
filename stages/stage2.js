@@ -231,7 +231,10 @@ function getSelectedMapTheme() {
 var CAM = { x: 0, y: 0 }; // horizontal only
 
 function isMobileViewport() {
-  return window.matchMedia && window.matchMedia("(max-width: 900px), (max-height: 520px)").matches;
+  return (
+    window.matchMedia &&
+    window.matchMedia("(max-width: 900px), (max-height: 520px)").matches
+  );
 }
 
 function getCanvasRenderScale() {
@@ -331,39 +334,86 @@ function buildMap() {
   MAP.readySpike = null;
   MAP.hammer = null;
 
-  /* ── STAGE II EXIT (no relic gate) ── */
-  MAP.gold = null;
+  /* ── GOLDEN THREAD KEY ── */
+  MAP.gold = {
+    x: 1200,
+    y: galleryY - 70,
+    w: 48,
+    h: 48,
+    collected: false,
+    bobTimer: 0,
+  };
 
-  /* ── SINGLE EXIT DOOR ── */
+  /* ── STAGE II EXIT — 3 DOORS (2 fake, 1 real) ── */
   var dW = 118,
     dH = 154;
   var doorY = FLOOR_Y - dH;
+
+  // Randomly assign which door is correct (0, 1, or 2)
+  var correctDoorIndex = Math.floor(Math.random() * 3);
+
   MAP.doors = [
     {
-      x: 72,
-      y: doorY,
+      x: 2400, // scattered: mid-left area
+      y: loftY - dH,
       w: dW,
       h: dH,
-      correct: false,
-      label: "BACK",
-      targetStage: "stage1.html",
+      correct: correctDoorIndex === 0,
+      fake: correctDoorIndex !== 0,
+      label: correctDoorIndex === 0 ? "???" : "DOOR I",
+      hint: "The true path lies where shadows gather near the climb.",
     },
     {
-      x: 8020,
+      x: 5200, // scattered: lower area
+      y: lowerY - dH,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 1,
+      fake: correctDoorIndex !== 1,
+      label: correctDoorIndex === 1 ? "???" : "DOOR II",
+      hint: "Seek the threshold where the bones whisper warnings.",
+    },
+    {
+      x: 7800, // scattered: near end
       y: doorY,
       w: dW,
       h: dH,
-      correct: true,
-      label: "EXIT",
+      correct: correctDoorIndex === 2,
+      fake: correctDoorIndex !== 2,
+      label: correctDoorIndex === 2 ? "???" : "DOOR III",
+      hint: "The exit breathes where the thread of gold was spun.",
     },
   ];
+
+  // Store correct index for hint system
+  MAP.correctDoorIndex = correctDoorIndex;
+
+  // Track which doors have been attempted
+  MAP.doors.forEach(function (d) {
+    d.attempted = false;
+  });
+
   MAP.doorFrameRect = null;
 
   MAP.decorBack = [
     { key: "cage", x: 168, y: FLOOR_Y - 268, w: 110, h: 90, alpha: 0.18 },
     { key: "web", x: 352, y: FLOOR_Y - 258, w: 142, h: 52, alpha: 0.28 },
-    { key: "vinesGreenWide", x: 540, y: FLOOR_Y - 228, w: 174, h: 58, alpha: 0.15 },
-    { key: "muralShade", x: 760, y: FLOOR_Y - 292, w: 198, h: 154, alpha: 0.12 },
+    {
+      key: "vinesGreenWide",
+      x: 540,
+      y: FLOOR_Y - 228,
+      w: 174,
+      h: 58,
+      alpha: 0.15,
+    },
+    {
+      key: "muralShade",
+      x: 760,
+      y: FLOOR_Y - 292,
+      w: 198,
+      h: 154,
+      alpha: 0.12,
+    },
     { key: "web", x: 1110, y: loftY - 92, w: 122, h: 44, alpha: 0.22 },
     { key: "vinesRed3", x: 1320, y: loftY - 130, w: 84, h: 244, alpha: 0.24 },
     { key: "web", x: 1568, y: galleryY - 102, w: 144, h: 52, alpha: 0.34 },
@@ -373,10 +423,24 @@ function buildMap() {
     { key: "web", x: 2630, y: loftY - 88, w: 122, h: 44, alpha: 0.24 },
     { key: "web", x: 3010, y: loftY - 98, w: 136, h: 48, alpha: 0.28 },
     { key: "web", x: 3390, y: FLOOR_Y - 250, w: 146, h: 54, alpha: 0.22 },
-    { key: "vinesGreenWide", x: 3650, y: FLOOR_Y - 238, w: 166, h: 54, alpha: 0.16 },
+    {
+      key: "vinesGreenWide",
+      x: 3650,
+      y: FLOOR_Y - 238,
+      w: 166,
+      h: 54,
+      alpha: 0.16,
+    },
     { key: "web", x: 3960, y: lowerY - 108, w: 132, h: 46, alpha: 0.3 },
     { key: "muralLady", x: 4140, y: lowerY - 198, w: 130, h: 108, alpha: 0.13 },
-    { key: "vinesGreenWide", x: 4460, y: lowerY - 234, w: 176, h: 58, alpha: 0.16 },
+    {
+      key: "vinesGreenWide",
+      x: 4460,
+      y: lowerY - 234,
+      w: 176,
+      h: 58,
+      alpha: 0.16,
+    },
     { key: "web", x: 4740, y: lowerY - 110, w: 124, h: 42, alpha: 0.28 },
     { key: "cage", x: 5035, y: lowerY - 266, w: 112, h: 92, alpha: 0.2 },
     { key: "writing", x: 5205, y: lowerY - 260, w: 154, h: 66, alpha: 0.2 },
@@ -384,11 +448,32 @@ function buildMap() {
     { key: "web", x: 5735, y: rise2Y - 90, w: 122, h: 42, alpha: 0.24 },
     { key: "vinesRed4", x: 5950, y: rise3Y - 204, w: 92, h: 250, alpha: 0.24 },
     { key: "web", x: 6310, y: loftY - 94, w: 138, h: 50, alpha: 0.3 },
-    { key: "muralSeeker", x: 6555, y: FLOOR_Y - 286, w: 178, h: 140, alpha: 0.13 },
-    { key: "vinesGreenWide", x: 6845, y: mezzY - 154, w: 180, h: 60, alpha: 0.18 },
+    {
+      key: "muralSeeker",
+      x: 6555,
+      y: FLOOR_Y - 286,
+      w: 178,
+      h: 140,
+      alpha: 0.13,
+    },
+    {
+      key: "vinesGreenWide",
+      x: 6845,
+      y: mezzY - 154,
+      w: 180,
+      h: 60,
+      alpha: 0.18,
+    },
     { key: "web", x: 7070, y: mezzY - 86, w: 120, h: 42, alpha: 0.22 },
     { key: "web", x: 7395, y: FLOOR_Y - 242, w: 134, h: 48, alpha: 0.22 },
-    { key: "vinesGreenWide", x: 7640, y: FLOOR_Y - 232, w: 170, h: 56, alpha: 0.16 },
+    {
+      key: "vinesGreenWide",
+      x: 7640,
+      y: FLOOR_Y - 232,
+      w: 170,
+      h: 56,
+      alpha: 0.16,
+    },
     { key: "web", x: 7920, y: FLOOR_Y - 240, w: 138, h: 50, alpha: 0.24 },
     { key: "web", x: 8195, y: FLOOR_Y - 238, w: 126, h: 44, alpha: 0.2 },
   ];
@@ -451,6 +536,92 @@ var GS = {
   stepCardTimer: null,
 };
 
+/* ── DROPPED ITEMS SYSTEM ── */
+var DROPPED_ITEMS = []; // Array of {x, y, type, bobTimer, active}
+
+function spawnDroppedItem(x, y, type) {
+  DROPPED_ITEMS.push({
+    x: x,
+    y: y,
+    type: type, // "gold"
+    bobTimer: Math.random() * Math.PI * 2,
+    active: true,
+    spawnTime: Date.now(),
+  });
+}
+
+function clearDroppedItems() {
+  DROPPED_ITEMS = [];
+}
+
+function drawDroppedItems() {
+  DROPPED_ITEMS.forEach(function (item) {
+    if (!item.active) return;
+    if (item.x < CAM.x - 60 || item.x > CAM.x + TC.width + 60) return;
+
+    item.bobTimer += 0.05;
+    var bob = Math.sin(item.bobTimer) * 6;
+    var ix = item.x,
+      iy = item.y + bob;
+
+    // Glow
+    var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 35);
+    gl.addColorStop(0, "rgba(255,215,0,.35)");
+    gl.addColorStop(1, "transparent");
+    TX.fillStyle = gl;
+    TX.fillRect(ix - 40, iy - 40, 80, 80);
+
+    var itemImg = SPR.gold || SPR.decor.threadPaper;
+    if (itemImg && itemImg.complete && itemImg.naturalWidth) {
+      TX.drawImage(itemImg, ix - 20, iy - 20, 40, 40);
+    } else {
+      TX.save();
+      TX.shadowBlur = 15;
+      TX.shadowColor = "#ffd700";
+      TX.fillStyle = "#ffd700";
+      TX.beginPath();
+      TX.arc(ix, iy, 14, 0, Math.PI * 2);
+      TX.fill();
+      TX.fillStyle = "#ffaa00";
+      TX.beginPath();
+      TX.arc(ix, iy, 10, 0, Math.PI * 2);
+      TX.fill();
+      TX.restore();
+    }
+
+    // Label
+    TX.fillStyle = "rgba(255,215,0,.7)";
+    TX.font = "bold 9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText("Dropped Key", ix, iy - 22);
+    TX.fillText("[E] Pick up", ix, iy - 12);
+    TX.textAlign = "left";
+  });
+}
+
+function checkDroppedItemPickup() {
+  if (GS.hasGold) return; // Already has gold
+
+  for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
+    var item = DROPPED_ITEMS[i];
+    if (!item.active) continue;
+
+    var px = PL.x + PL_COX + PL.w / 2;
+    var py = PL.y + PL_COY + PL.h / 2;
+    var dist = Math.hypot(px - item.x, py - item.y);
+
+    if (dist < 60 || (JP["KeyE"] && dist < 100)) {
+      // Pick up
+      item.active = false;
+      GS.hasGold = true;
+      showBadge("✨ Golden Thread recovered!");
+      spawnGoldPtcls(item.x, item.y);
+      JP["KeyE"] = false;
+      break;
+    }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    TUTORIAL STEPS
 ═══════════════════════════════════════════════════════════════════ */
@@ -503,6 +674,265 @@ var STEPS = [
 ];
 
 /* ═══════════════════════════════════════════════════════════════════
+   MATH QUIZ SYSTEM
+═══════════════════════════════════════════════════════════════════ */
+var QUIZ_QUESTIONS = [
+  {
+    q: "What is 17 × 4?",
+    choices: ["58", "68", "72", "64"],
+    answer: 1, // index of correct choice (68)
+    hint: "10×4 = 40, 7×4 = 28, 40+28 = 68",
+  },
+  {
+    q: "Solve: 144 ÷ 12",
+    choices: ["10", "11", "12", "14"],
+    answer: 2,
+    hint: "12 × 12 = 144",
+  },
+  {
+    q: "What is 8² + 6²?",
+    choices: ["100", "96", "110", "98"],
+    answer: 0,
+    hint: "64 + 36 = 100",
+  },
+  {
+    q: "If 3x + 7 = 22, what is x?",
+    choices: ["4", "5", "6", "7"],
+    answer: 1,
+    hint: "3x = 15, so x = 5",
+  },
+  {
+    q: "What is the remainder when 97 is divided by 8?",
+    choices: ["0", "1", "2", "3"],
+    answer: 1,
+    hint: "8 × 12 = 96, 97 − 96 = 1",
+  },
+  {
+    q: "Simplify: (15 + 9) ÷ 4 × 2",
+    choices: ["10", "12", "8", "14"],
+    answer: 1,
+    hint: "24 ÷ 4 = 6, 6 × 2 = 12",
+  },
+];
+
+function getRandomQuestion() {
+  var idx = Math.floor(Math.random() * QUIZ_QUESTIONS.length);
+  return QUIZ_QUESTIONS[idx];
+}
+
+function buildQuizModal() {
+  // Create modal if it doesn't exist
+  if (document.getElementById("quiz-modal")) return;
+
+  var modal = document.createElement("div");
+  modal.id = "quiz-modal";
+  modal.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "z-index:9000",
+    "display:none",
+    "align-items:center",
+    "justify-content:center",
+    "background:rgba(0,0,0,0.85)",
+    "backdrop-filter:blur(4px)",
+  ].join(";");
+
+  var card = document.createElement("div");
+  card.id = "quiz-card";
+  card.style.cssText = [
+    "background:linear-gradient(180deg,#1a1210 0%,#0d0908 100%)",
+    "border:2px solid #d4a843",
+    "border-radius:8px",
+    "padding:32px 28px",
+    "max-width:420px",
+    "width:90%",
+    "box-shadow:0 0 40px rgba(212,168,67,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
+    "text-align:center",
+    "font-family:Cinzel,serif",
+  ].join(";");
+
+  var title = document.createElement("div");
+  title.id = "quiz-title";
+  title.textContent = "🔒 THE LABYRINTH ASKS";
+  title.style.cssText = [
+    "color:#d4a843",
+    "font-size:18px",
+    "font-weight:bold",
+    "margin-bottom:20px",
+    "letter-spacing:1px",
+  ].join(";");
+
+  var question = document.createElement("div");
+  question.id = "quiz-question";
+  question.style.cssText = [
+    "color:#e8dcc8",
+    "font-size:16px",
+    "margin-bottom:24px",
+    "line-height:1.5",
+    "min-height:48px",
+  ].join(";");
+
+  var choicesDiv = document.createElement("div");
+  choicesDiv.id = "quiz-choices";
+  choicesDiv.style.cssText = [
+    "display:flex",
+    "flex-direction:column",
+    "gap:10px",
+    "margin-bottom:20px",
+  ].join(";");
+
+  var feedback = document.createElement("div");
+  feedback.id = "quiz-feedback";
+  feedback.style.cssText = [
+    "color:#ff6644",
+    "font-size:13px",
+    "min-height:20px",
+    "margin-bottom:12px",
+    "font-style:italic",
+  ].join(";");
+
+  var hintDiv = document.createElement("div");
+  hintDiv.id = "quiz-hint";
+  hintDiv.style.cssText = [
+    "color:#88bb88",
+    "font-size:12px",
+    "min-height:18px",
+    "display:none",
+    "font-style:italic",
+    "border-top:1px solid rgba(212,168,67,0.2)",
+    "padding-top:10px",
+    "margin-top:10px",
+  ].join(";");
+
+  card.appendChild(title);
+  card.appendChild(question);
+  card.appendChild(choicesDiv);
+  card.appendChild(feedback);
+  card.appendChild(hintDiv);
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+}
+
+function showQuizModal(doorIndex) {
+  buildQuizModal();
+  var modal = document.getElementById("quiz-modal");
+  var questionEl = document.getElementById("quiz-question");
+  var choicesEl = document.getElementById("quiz-choices");
+  var feedbackEl = document.getElementById("quiz-feedback");
+  var hintEl = document.getElementById("quiz-hint");
+
+  // Pick one random question
+  var qData = getRandomQuestion();
+  GS.currentQuiz = {
+    doorIndex: doorIndex,
+    data: qData,
+    answered: false,
+  };
+
+  questionEl.textContent = qData.q;
+  feedbackEl.textContent = "";
+  hintEl.style.display = "none";
+  hintEl.textContent = "";
+  choicesEl.innerHTML = "";
+
+  qData.choices.forEach(function (choice, idx) {
+    var btn = document.createElement("button");
+    btn.textContent = choice;
+    btn.style.cssText = [
+      "background:linear-gradient(180deg,#2a1e18 0%,#1a1210 100%)",
+      "border:1px solid #5a3a20",
+      "color:#d4c4a8",
+      "padding:12px 16px",
+      "border-radius:4px",
+      "cursor:pointer",
+      "font-family:Cinzel,serif",
+      "font-size:14px",
+      "transition:all 0.15s",
+      "width:100%",
+    ].join(";");
+
+    btn.onmouseenter = function () {
+      btn.style.borderColor = "#d4a843";
+      btn.style.background = "linear-gradient(180deg,#3a2a20 0%,#2a1e18 100%)";
+    };
+    btn.onmouseleave = function () {
+      btn.style.borderColor = "#5a3a20";
+      btn.style.background = "linear-gradient(180deg,#2a1e18 0%,#1a1210 100%)";
+    };
+
+    btn.onclick = function () {
+      if (GS.currentQuiz.answered) return;
+      handleQuizAnswer(idx);
+    };
+
+    choicesEl.appendChild(btn);
+  });
+
+  modal.style.display = "flex";
+  GS.paused = true;
+}
+
+function handleQuizAnswer(choiceIndex) {
+  if (!GS.currentQuiz) return;
+  var quiz = GS.currentQuiz;
+  var feedbackEl = document.getElementById("quiz-feedback");
+  var hintEl = document.getElementById("quiz-hint");
+  var choicesEl = document.getElementById("quiz-choices");
+
+  quiz.answered = true;
+
+  // Disable all buttons
+  var buttons = choicesEl.querySelectorAll("button");
+  buttons.forEach(function (btn, idx) {
+    btn.style.pointerEvents = "none";
+    btn.style.opacity = "0.6";
+    if (idx === quiz.data.answer) {
+      btn.style.borderColor = "#44aa44";
+      btn.style.background = "linear-gradient(180deg,#1a3018 0%,#102010 100%)";
+      btn.style.color = "#88ff88";
+    }
+  });
+
+  if (choiceIndex === quiz.data.answer) {
+    // CORRECT — proceed to next stage
+    feedbackEl.textContent = "✓ Correct! The door yields...";
+    feedbackEl.style.color = "#88ff88";
+
+    setTimeout(function () {
+      closeQuizModal();
+      GS.won = true;
+      showScreen("screen-win");
+    }, 1200);
+  } else {
+    // WRONG — 1 heart damage + hint
+    feedbackEl.textContent = "✗ Wrong! The labyrinth tightens its grip...";
+    feedbackEl.style.color = "#ff6644";
+
+    // Show hint about correct door
+    hintEl.textContent =
+      "💡 Hint: " +
+      quiz.data.hint +
+      " | " +
+      MAP.doors[MAP.correctDoorIndex].hint;
+    hintEl.style.display = "block";
+
+    // Damage
+    setTimeout(function () {
+      closeQuizModal();
+      takeDamage("quiz");
+      MAP.doors[quiz.doorIndex].attempted = true;
+    }, 2200);
+  }
+}
+
+function closeQuizModal() {
+  var modal = document.getElementById("quiz-modal");
+  if (modal) modal.style.display = "none";
+  GS.paused = false;
+  GS.currentQuiz = null;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════════════════════ */
 async function tutInit() {
@@ -511,6 +941,7 @@ async function tutInit() {
   tutResize();
   window.addEventListener("resize", tutResize);
   buildHUD();
+  buildQuizModal();
   await loadSpr();
   spawnPlayer();
   GS.startTime = Date.now();
@@ -549,21 +980,34 @@ function spawnPlayer() {
   PL.moving = false;
   PL.sprinting = false;
   CAM.x = 0;
-  GS.hasGold = false;
+  // Don't reset hasGold here — dropped items persist until picked up or void death
   GS.activeDoorIndex = -1;
 }
 
 function resetToStart() {
   // Reset all traps
-  MAP.spikes.forEach(function (s) {
-    s.active = false;
-    s.riseTimer = 0;
-  });
+  // Re-randomize correct door on reset
+  if (MAP.doors && MAP.doors.length === 3) {
+    var newCorrect = Math.floor(Math.random() * 3);
+    MAP.correctDoorIndex = newCorrect;
+    MAP.doors.forEach(function (d, i) {
+      d.correct = i === newCorrect;
+      d.fake = i !== newCorrect;
+      d.label = i === newCorrect ? "???" : "DOOR " + ["I", "II", "III"][i];
+      d.attempted = false;
+    });
+  }
+
+  // Clear quiz state
+  GS.currentQuiz = null;
+  closeQuizModal();
   if (MAP.hammer) {
     MAP.hammer.angle = 0;
     MAP.hammer.swingTimer = 0;
     MAP.hammer.hitCooldown = 0;
   }
+  // Clear dropped items on full reset
+  clearDroppedItems();
   GS.hasGold = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
@@ -711,7 +1155,7 @@ function tutUpdate() {
       }
     }
   }
-  
+
   // Clamp right edge of world
   if (PL.x + PL.sw > WORLD) {
     PL.x = WORLD - PL.sw;
@@ -834,12 +1278,22 @@ function tutUpdate() {
     ) {
       GS.activeDoorIndex = i;
       if (JP["KeyE"]) {
-        if (door.targetStage) {
-          window.location.href = door.targetStage;
-        } else {
-          GS.won = true;
-          showScreen("screen-win");
+        if (!GS.hasGold) {
+          showBadge("🔒 Locked! Find the Golden Thread first...");
+          JP["KeyE"] = false;
+          /* ── DROPPED ITEM PICKUP ── */
+          checkDroppedItemPickup();
+          return;
         }
+
+        if (door.fake) {
+          // Wrong door — jumpscare + reset
+          wrongDoor();
+        } else {
+          // Right door — quiz time
+          showQuizModal(i);
+        }
+        JP["KeyE"] = false;
       }
     }
   });
@@ -876,15 +1330,13 @@ function tutUpdate() {
   /* ── CAMERA ── */
   var targetCamX = PL.x + PL.sw / 2 - TC.width / 2;
   var targetCamY = PL.y + PL.sh / 2 - TC.height / 2;
-  
+
   // Clamp to world bounds
   targetCamX = Math.max(0, Math.min(WORLD - TC.width, targetCamX));
   targetCamY = Math.max(0, Math.min(TC.height * 2 - TC.height, targetCamY)); // Adjust vertical bounds as needed
-  
+
   CAM.x += (targetCamX - CAM.x) * 0.12;
   CAM.y += (targetCamY - CAM.y) * 0.12;
-
-
 
   /* ── PARTICLES ── */
   updateParticles();
@@ -903,16 +1355,37 @@ function tutUpdate() {
   updateHUD();
 }
 
-/* ── DAMAGE / DEATH ─────────────────────────────────────────────── */
 function takeDamage(source) {
   if (PL.iframes > 0) return;
+
   if (source === "void") {
+    // VOID DEATH: respawn items, reset lives, no item drop
     GS.lives = 0;
     PL.iframes = 0;
+
+    // Clear any previously dropped items (they respawn at original location)
+    clearDroppedItems();
+
+    // Reset gold to map spawn location (respawn)
+    if (MAP.gold) {
+      MAP.gold.collected = false;
+    }
+    GS.hasGold = false;
+
     updateHUD();
     startDeathSequence(source);
     return;
   }
+
+  // NORMAL DEATH (spike, hammer, quiz wrong): drop items where player died
+  if (GS.hasGold && MAP.gold) {
+    // Drop the gold at player's death location
+    spawnDroppedItem(PL.x + PL.sw / 2, PL.y + PL.sh * 0.5, "gold");
+    MAP.gold.collected = true; // Mark original as gone
+    GS.hasGold = false;
+    showBadge("💔 Golden Thread dropped!");
+  }
+
   GS.lives = Math.max(0, GS.lives - 1);
   PL.iframes = 12;
   PL.vy = -10;
@@ -946,8 +1419,12 @@ function spawnImpactPtcls(x, y, count) {
       dec: 0.035 + Math.random() * 0.03,
       sz: Math.random() * (isEmber ? 4 : 3) + 2,
       col: isEmber
-        ? (Math.random() < 0.5 ? "#ffd36c" : "#ffb347")
-        : (Math.random() < 0.5 ? "#9b1f2d" : "#67202a"),
+        ? Math.random() < 0.5
+          ? "#ffd36c"
+          : "#ffb347"
+        : Math.random() < 0.5
+          ? "#9b1f2d"
+          : "#67202a",
       type: isEmber ? "ember" : "dust",
     });
   }
@@ -969,7 +1446,9 @@ function startDeathSequence(source) {
     y: PL.y,
     vx:
       source === "hammer"
-        ? (PL.x + PL.sw / 2 < MAP.hammer.anchorX ? -2.8 : 2.8)
+        ? PL.x + PL.sw / 2 < MAP.hammer.anchorX
+          ? -2.8
+          : 2.8
         : PL.dir * 1.2,
     vy: -6.4,
     rot: source === "hammer" ? 0.18 * PL.dir : 0,
@@ -1006,7 +1485,7 @@ function updateDeathFx() {
   fx.vx *= 0.95;
   fx.rot += fx.rotV;
   fx.rotV *= 0.985;
-  fx.scale = 1 + Math.sin(Math.min(fx.t, 16) / 16 * Math.PI) * 0.07;
+  fx.scale = 1 + Math.sin((Math.min(fx.t, 16) / 16) * Math.PI) * 0.07;
   fx.glow = Math.max(0, 1 - fx.t / 22);
   fx.alpha = fx.t < 12 ? 1 : Math.max(0, 1 - (fx.t - 12) / 28);
   GS.deathFlash = Math.max(0, 1 - fx.t / 20);
@@ -1040,7 +1519,7 @@ function wrongDoor() {
     "background:#000",
     "opacity:0",
     "transition:opacity 0.05s",
-    "overflow:hidden"
+    "overflow:hidden",
   ].join(";");
 
   var img = new Image();
@@ -1052,7 +1531,7 @@ function wrongDoor() {
     "object-fit:cover",
     "transform:scale(1.08)",
     "image-rendering:pixelated",
-    "filter:brightness(1.3) contrast(1.4)"
+    "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
   // Use SPRITE_MINO if available, otherwise a red fallback
@@ -1063,7 +1542,8 @@ function wrongDoor() {
     overlay.style.background = "#cc0000";
     var txt = document.createElement("div");
     txt.textContent = "YOU CHOSE WRONG";
-    txt.style.cssText = "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
+    txt.style.cssText =
+      "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
     overlay.appendChild(txt);
   }
 
@@ -1074,7 +1554,9 @@ function wrongDoor() {
   var fl = document.getElementById("wrong-flash");
   if (fl) {
     fl.classList.add("show");
-    setTimeout(function () { fl.classList.remove("show"); }, 200);
+    setTimeout(function () {
+      fl.classList.remove("show");
+    }, 200);
   }
 
   // Screen shake
@@ -1126,8 +1608,7 @@ function tutDraw() {
   TX.clearRect(0, 0, W, H);
 
   TX.save();
-TX.translate(-CAM.x, -CAM.y);
-
+  TX.translate(-CAM.x, -CAM.y);
 
   drawBG(W, H);
   drawChamberDepth(H);
@@ -1140,6 +1621,7 @@ TX.translate(-CAM.x, -CAM.y);
   drawShaft(H);
   drawHammer();
   drawGold();
+  drawDroppedItems();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
   drawParticles();
@@ -1173,7 +1655,14 @@ function drawBG(W, H) {
     TX.drawImage(SPR.mapTheme.roof, 0, 0, WORLD, H * 0.18);
     TX.restore();
   }
-  var haze = TX.createRadialGradient(CAM.x + W * 0.5, H * 0.18, 10, CAM.x + W * 0.5, H * 0.42, W * 0.7);
+  var haze = TX.createRadialGradient(
+    CAM.x + W * 0.5,
+    H * 0.18,
+    10,
+    CAM.x + W * 0.5,
+    H * 0.42,
+    W * 0.7,
+  );
   haze.addColorStop(0, "rgba(214,187,128,0.11)");
   haze.addColorStop(1, "transparent");
   TX.fillStyle = haze;
@@ -1217,10 +1706,23 @@ function drawBG(W, H) {
     var torchH = 34;
     var torchBaseY = ty - 6;
     if (torch) {
-      TX.drawImage(torch, tx - torchW * 0.5, torchBaseY - torchH, torchW, torchH);
+      TX.drawImage(
+        torch,
+        tx - torchW * 0.5,
+        torchBaseY - torchH,
+        torchW,
+        torchH,
+      );
     }
 
-    var emberGlow = TX.createRadialGradient(tx, torchBaseY - 28, 0, tx, torchBaseY - 28, 34);
+    var emberGlow = TX.createRadialGradient(
+      tx,
+      torchBaseY - 28,
+      0,
+      tx,
+      torchBaseY - 28,
+      34,
+    );
     emberGlow.addColorStop(0, "rgba(255,240,184,.48)");
     emberGlow.addColorStop(0.3, "rgba(255,170,70,.26)");
     emberGlow.addColorStop(1, "transparent");
@@ -1234,13 +1736,23 @@ function drawBG(W, H) {
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 45 - flameWobble * 0.12);
     TX.quadraticCurveTo(tx + 10, torchBaseY - 30, tx, torchBaseY - 12);
-    TX.quadraticCurveTo(tx - 12, torchBaseY - 30, tx, torchBaseY - 45 - flameWobble * 0.12);
+    TX.quadraticCurveTo(
+      tx - 12,
+      torchBaseY - 30,
+      tx,
+      torchBaseY - 45 - flameWobble * 0.12,
+    );
     TX.fill();
     TX.fillStyle = "rgba(255,241,190,.96)";
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 38 - flameWobble * 0.08);
     TX.quadraticCurveTo(tx + 5, torchBaseY - 28, tx, torchBaseY - 18);
-    TX.quadraticCurveTo(tx - 6, torchBaseY - 28, tx, torchBaseY - 38 - flameWobble * 0.08);
+    TX.quadraticCurveTo(
+      tx - 6,
+      torchBaseY - 28,
+      tx,
+      torchBaseY - 38 - flameWobble * 0.08,
+    );
     TX.fill();
     TX.restore();
   }
@@ -1257,7 +1769,12 @@ function drawChamberDepth(H) {
     TX.fillStyle = "rgba(10,8,14,.22)";
     TX.fillRect(zone.x, zone.y, zone.w, zone.h);
 
-    var archG = TX.createLinearGradient(zone.x, zone.y, zone.x, zone.y + zone.h);
+    var archG = TX.createLinearGradient(
+      zone.x,
+      zone.y,
+      zone.x,
+      zone.y + zone.h,
+    );
     archG.addColorStop(0, "rgba(26,18,22,.44)");
     archG.addColorStop(0.25, "rgba(10,7,12,.1)");
     archG.addColorStop(1, "rgba(0,0,0,0)");
@@ -1289,7 +1806,7 @@ function drawChamberDepth(H) {
     TX.save();
     var cg = TX.createLinearGradient(col.x, col.y, col.x + col.w, col.y);
     cg.addColorStop(0, "rgba(14,10,16," + col.alpha + ")");
-    cg.addColorStop(0.5, "rgba(42,30,34," + (col.alpha * 1.2) + ")");
+    cg.addColorStop(0.5, "rgba(42,30,34," + col.alpha * 1.2 + ")");
     cg.addColorStop(1, "rgba(12,8,12," + col.alpha + ")");
     TX.fillStyle = cg;
     TX.fillRect(col.x, col.y, col.w, col.h);
@@ -1305,7 +1822,8 @@ function drawDecorLayer(list) {
   if (!list) return;
   list.forEach(function (item) {
     var img = SPR.decor[item.key];
-    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40) return;
+    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40)
+      return;
     TX.save();
     TX.globalAlpha = item.alpha == null ? 1 : item.alpha;
     TX.drawImage(img, item.x, item.y, item.w, item.h);
@@ -1419,7 +1937,12 @@ function drawSpikeRack(x, y, w, spikeH, gap) {
     TX.closePath();
     TX.fill();
 
-    var bladeG = TX.createLinearGradient(tipX, y - spikeH, tipX, rackTop + rackHeight);
+    var bladeG = TX.createLinearGradient(
+      tipX,
+      y - spikeH,
+      tipX,
+      rackTop + rackHeight,
+    );
     bladeG.addColorStop(0, "#f3e5d5");
     bladeG.addColorStop(0.18, "#d8d1c8");
     bladeG.addColorStop(0.55, "#8a8c93");
@@ -1460,7 +1983,8 @@ function drawSpikeRack(x, y, w, spikeH, gap) {
 
 function drawPlates() {
   MAP.plates.forEach(function (plate) {
-    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20) return;
+    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20)
+      return;
 
     TX.save();
     TX.fillStyle = plate.active ? "rgba(156,104,28,.95)" : "rgba(106,74,24,.9)";
@@ -1521,7 +2045,6 @@ function drawShaft(H) {
   }
   TX.fillStyle = "rgba(0,0,0,.26)";
   TX.fillRect(sh.x + 10, sh.y + 6, sh.w - 20, sh.bottom - sh.y - 6);
-
 }
 
 function drawHammer() {
@@ -1531,7 +2054,8 @@ function drawHammer() {
   var hx = hm.anchorX + Math.sin(hm.angle) * hm.length;
   var hy2 = hm.anchorY + Math.cos(hm.angle) * hm.length;
 
-  var hmImg = SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
+  var hmImg =
+    SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
   if (hmImg && hmImg.complete && hmImg.naturalWidth) {
     TX.save();
     // Rotate one hammer asset around the pointer/ball for a genuinely steady swing.
@@ -1548,7 +2072,12 @@ function drawHammer() {
     TX.translate(hm.anchorX, hm.anchorY);
     TX.rotate(hm.angle);
     // Fallback rectangle if no sprite
-    var hg = TX.createLinearGradient(-hm.hw / 2, -hm.hh / 2, hm.hw / 2, hm.hh / 2);
+    var hg = TX.createLinearGradient(
+      -hm.hw / 2,
+      -hm.hh / 2,
+      hm.hw / 2,
+      hm.hh / 2,
+    );
     hg.addColorStop(0, "#909090");
     hg.addColorStop(0.4, "#c0c0c8");
     hg.addColorStop(1, "#484858");
@@ -1650,13 +2179,21 @@ function drawGold() {
 function drawDoors() {
   MAP.doors.forEach(function (door, i) {
     if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
-    var lit = false;
-    var pulse = 1;
-
+    // Only the CORRECT door glows when player has the gold key
+    var lit = door.correct && GS.hasGold;
+    var pulse = lit ? 0.7 + 0.3 * Math.sin(Date.now() * 0.004) : 1;
     TX.save();
     TX.fillStyle = "rgba(0,0,0,.22)";
     TX.beginPath();
-    TX.ellipse(door.x + door.w / 2, door.y + door.h + 10, door.w * 0.56, 10, 0, 0, Math.PI * 2);
+    TX.ellipse(
+      door.x + door.w / 2,
+      door.y + door.h + 10,
+      door.w * 0.56,
+      10,
+      0,
+      0,
+      Math.PI * 2,
+    );
     TX.fill();
     TX.fillStyle = "rgba(32,18,18,.88)";
     TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
@@ -1665,22 +2202,51 @@ function drawDoors() {
     TX.restore();
 
     // Glow for correct door
+    // Glow for correct door — golden ethereal aura
     if (lit) {
       TX.save();
-      TX.shadowBlur = 30;
-      TX.shadowColor = "#ffd700";
+      TX.shadowBlur = 40 + 10 * Math.sin(Date.now() * 0.006);
+      TX.shadowColor = "rgba(255,215,0,0.6)";
       var glowG = TX.createRadialGradient(
         door.x + door.w / 2,
         door.y + door.h / 2,
-        10,
+        5,
         door.x + door.w / 2,
         door.y + door.h / 2,
-        80,
+        100 + 15 * Math.sin(Date.now() * 0.003),
       );
-      glowG.addColorStop(0, "rgba(255,215,0,.35)");
+      glowG.addColorStop(
+        0,
+        "rgba(255,215,0," + (0.25 + 0.1 * Math.sin(Date.now() * 0.005)) + ")",
+      );
+      glowG.addColorStop(
+        0.4,
+        "rgba(255,180,60," + (0.12 + 0.06 * Math.sin(Date.now() * 0.004)) + ")",
+      );
       glowG.addColorStop(1, "transparent");
       TX.fillStyle = glowG;
-      TX.fillRect(door.x - 40, door.y - 20, door.w + 80, door.h + 40);
+      TX.fillRect(door.x - 60, door.y - 40, door.w + 120, door.h + 80);
+
+      // Floating sparkles around correct door
+      var sparkleCount = 5;
+      for (var spk = 0; spk < sparkleCount; spk++) {
+        var spkAngle = Date.now() * 0.002 + (spk / sparkleCount) * Math.PI * 2;
+        var spkRadius = 50 + 20 * Math.sin(Date.now() * 0.003 + spk);
+        var spkX = door.x + door.w / 2 + Math.cos(spkAngle) * spkRadius;
+        var spkY = door.y + door.h / 2 + Math.sin(spkAngle) * spkRadius * 0.6;
+        var spkAlpha = 0.4 + 0.4 * Math.sin(Date.now() * 0.005 + spk);
+        TX.fillStyle = "rgba(255,230,150," + spkAlpha + ")";
+        TX.beginPath();
+        TX.arc(
+          spkX,
+          spkY,
+          2 + Math.sin(Date.now() * 0.007 + spk),
+          0,
+          Math.PI * 2,
+        );
+        TX.fill();
+      }
+
       TX.restore();
     }
 
@@ -1730,13 +2296,23 @@ function drawDoors() {
       }
     }
     // Labels
-    TX.fillStyle = lit ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
+    TX.fillStyle = door.correct ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
     TX.font = "9px Cinzel,serif";
     TX.textAlign = "center";
-    TX.fillText(door.label || "EXIT", door.x + door.w / 2, door.y + door.h + 14);
+    TX.fillText(
+      door.label || "EXIT",
+      door.x + door.w / 2,
+      door.y + door.h + 14,
+    );
     if (GS.activeDoorIndex === i) {
       TX.fillStyle = "rgba(255,215,0,.95)";
-      TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
+      if (!GS.hasGold) {
+        TX.fillText("🔒 NEED KEY", door.x + door.w / 2, door.y - 8);
+      } else if (door.attempted) {
+        TX.fillText("[E] RETRY", door.x + door.w / 2, door.y - 8);
+      } else {
+        TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
+      }
     }
     TX.textAlign = "left";
   });
@@ -1776,7 +2352,7 @@ function drawPlayer() {
     TX.globalAlpha = fx.alpha;
     TX.shadowBlur = 24 * fx.glow;
     TX.shadowColor = "rgba(255,180,90,.85)";
-    TX.fillStyle = "rgba(0,0,0," + (0.18 * fx.alpha) + ")";
+    TX.fillStyle = "rgba(0,0,0," + 0.18 * fx.alpha + ")";
     TX.beginPath();
     TX.ellipse(
       fx.x + PL.sw / 2,
@@ -1791,7 +2367,10 @@ function drawPlayer() {
 
     TX.translate(fx.x + PL.sw / 2, fx.y + PL.sh * 0.56);
     TX.rotate(fx.rot);
-    TX.scale((PL.dir === -1 ? -1 : 1) * fx.scale, Math.max(0.78, 1 - fx.t * 0.01));
+    TX.scale(
+      (PL.dir === -1 ? -1 : 1) * fx.scale,
+      Math.max(0.78, 1 - fx.t * 0.01),
+    );
 
     if (img && img.complete && img.naturalWidth) {
       TX.drawImage(img, -PL.sw / 2, -PL.sh * 0.56, PL.sw, PL.sh);
