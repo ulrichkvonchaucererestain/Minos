@@ -2504,22 +2504,35 @@ function drawMobs() {
 function drawParticles() {
   GS.ptcls.forEach(function (p) {
     TX.save();
-    TX.globalAlpha = p.life * 0.75;
-    TX.fillStyle = p.col;
-    TX.shadowBlur = 5;
-    TX.shadowColor = p.col;
-    TX.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+    if (p.type === "dash") {
+      TX.globalAlpha = p.life * 0.44;
+      TX.strokeStyle = p.col;
+      TX.lineWidth = p.sz;
+      TX.lineCap = "round";
+      TX.beginPath();
+      TX.moveTo(p.x, p.y);
+      TX.lineTo(p.x - p.vx * (p.len || 6), p.y - p.vy * (p.len || 6));
+      TX.stroke();
+    } else {
+      TX.globalAlpha = p.life * 0.75;
+      TX.fillStyle = p.col;
+      TX.shadowBlur = 5;
+      TX.shadowColor = p.col;
+      TX.fillRect(p.x - p.sz / 2, p.y - p.sz / 2, p.sz, p.sz);
+    }
     TX.restore();
   });
 }
 
 function drawPlayer() {
   var img = null;
-  if (!PL.grounded && SPR.jump.length) {
+  if (PL.dashing && SPR.run.length) {
+    img = SPR.run[PL.frame % Math.max(SPR.run.length, 1)];
+  } else if (!PL.grounded && SPR.jump.length) {
     img = SPR.jump[Math.min(PL.frame, Math.max(SPR.jump.length - 1, 0))];
   } else if (!PL.moving) {
     img = PL.ifrm === 0 ? SPR.idle : SPR.idle2;
-  } else if (PL.sprinting || PL.dashing) {
+  } else if (PL.sprinting) {
     img = SPR.run[PL.frame % Math.max(SPR.run.length, 1)];
   } else {
     img = SPR.walk[PL.frame % Math.max(SPR.walk.length, 1)];
@@ -2570,11 +2583,6 @@ function drawPlayer() {
     return;
   }
 
-  if (PL.dashing) {
-    TX.globalAlpha = 0.55 + Math.random() * 0.3;
-    TX.shadowBlur = 18;
-    TX.shadowColor = "#44aaff";
-  }
   // Shadow ellipse
   TX.fillStyle = "rgba(0,0,0,.3)";
   TX.beginPath();
@@ -2588,6 +2596,24 @@ function drawPlayer() {
     Math.PI * 2,
   );
   TX.fill();
+
+  if (PL.dashing && img && img.complete && img.naturalWidth) {
+    for (var trail = 3; trail >= 1; trail--) {
+      var ghostX = PL.x - PL.ddir * trail * 14;
+      TX.save();
+      TX.globalAlpha = 0.1 + (4 - trail) * 0.055;
+      TX.shadowBlur = 10;
+      TX.shadowColor = "rgba(212,168,67,.42)";
+      if (PL.dir === -1) {
+        TX.translate(ghostX + PL.sw, PL.y);
+        TX.scale(-1, 1);
+        TX.drawImage(img, 0, 0, PL.sw, PL.sh);
+      } else {
+        TX.drawImage(img, ghostX, PL.y, PL.sw, PL.sh);
+      }
+      TX.restore();
+    }
+  }
 
   if (img && img.complete && img.naturalWidth) {
     if (PL.dir === -1) {
@@ -2697,12 +2723,13 @@ function spawnDashPtcl() {
     GS.ptcls.push({
       x: PL.x + PL.sw / 2 + (Math.random() - 0.5) * PL_COX,
       y: PL.y + PL.sh * 0.5 + (Math.random() - 0.5) * 20,
-      vx: -PL.ddir * (Math.random() * 2.5 + 1),
-      vy: (Math.random() - 0.5) * 1.5,
+      vx: -PL.ddir * (Math.random() * 3.2 + 2.2),
+      vy: (Math.random() - 0.5) * 0.8,
       life: 1,
-      dec: 0.09 + Math.random() * 0.06,
-      sz: Math.random() * 5 + 3,
-      col: "#44aaff",
+      dec: 0.1 + Math.random() * 0.05,
+      sz: Math.random() * 3 + 2,
+      len: Math.random() * 4 + 7,
+      col: Math.random() < 0.5 ? "#d4a843" : "#8a5a28",
       type: "dash",
     });
 }
