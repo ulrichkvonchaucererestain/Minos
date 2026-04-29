@@ -12,6 +12,34 @@
     KeyQ: { key: "q", label: "Throw" },
   };
 
+  var CONTROL_ICONS = {
+    KeyE:
+      '<svg viewBox="0 0 32 32" aria-hidden="true">' +
+      '<path d="M16 4v8" />' +
+      '<path d="M11 7.5a10 10 0 1 0 10 0" />' +
+      "</svg>",
+    KeyQ:
+      '<svg viewBox="0 0 32 32" aria-hidden="true">' +
+      '<path d="M7 22 24 8" />' +
+      '<path d="m20 7 5 2-1 5" />' +
+      '<path d="M8 22l-2 4 4-2" />' +
+      '<path d="M12 18c3.5 1.8 6.8 1.7 10-.3" />' +
+      "</svg>",
+    KeyF:
+      '<svg viewBox="0 0 32 32" aria-hidden="true">' +
+      '<path d="M5 17h14" />' +
+      '<path d="m15 10 7 7-7 7" />' +
+      '<path d="M4 10h7" />' +
+      '<path d="M4 24h7" />' +
+      "</svg>",
+    Space:
+      '<svg viewBox="0 0 32 32" aria-hidden="true">' +
+      '<path d="M7 22h18" />' +
+      '<path d="M16 22V8" />' +
+      '<path d="m10 14 6-6 6 6" />' +
+      "</svg>",
+  };
+
   var activeKeys = new Set();
 
   function dispatchKey(code, type) {
@@ -109,7 +137,13 @@
     button.type = "button";
     button.className = "mobile-control-btn " + (className || "");
     button.dataset.keyCode = code;
-    button.innerHTML = '<span class="mobile-control-main">' + text + "</span>";
+    button.innerHTML =
+      '<span class="mobile-control-icon">' +
+      (CONTROL_ICONS[code] || "") +
+      "</span>" +
+      '<span class="mobile-control-main">' +
+      text +
+      "</span>";
     button.setAttribute("aria-label", KEY_LABELS[code].label);
 
     button.addEventListener("pointerdown", function (event) {
@@ -136,7 +170,15 @@
     var knob = document.createElement("div");
     joystick.className = "mobile-control-pad mobile-move-pad mobile-joystick";
     knob.className = "mobile-joystick-knob";
-    knob.innerHTML = '<span class="mobile-joystick-arrows">← →</span>';
+    knob.innerHTML =
+      '<span class="mobile-joystick-arrows" aria-hidden="true">' +
+      '<svg viewBox="0 0 36 24">' +
+      '<path d="M14 12H4" />' +
+      '<path d="m8 7-5 5 5 5" />' +
+      '<path d="M22 12h10" />' +
+      '<path d="m28 7 5 5-5 5" />' +
+      "</svg>" +
+      "</span>";
     joystick.setAttribute("aria-label", "Movement joystick");
     joystick.appendChild(knob);
 

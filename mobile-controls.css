@@ -114,9 +114,11 @@ html.game-controls-ready #mobile-controls {
 }
 
 .mobile-joystick-arrows {
-  font-size: 0.84rem;
-  letter-spacing: 6px;
-  transform: translateX(3px);
+  display: flex;
+  width: 54%;
+  height: 42%;
+  align-items: center;
+  justify-content: center;
 }
 
 .mobile-action-pad {
@@ -134,6 +136,10 @@ html.game-controls-ready #mobile-controls {
 .mobile-control-btn {
   width: clamp(48px, 7vw, 58px);
   height: clamp(48px, 7vw, 58px);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(212, 168, 67, 0.82);
   border-radius: 50%;
   background:
@@ -152,14 +158,36 @@ html.game-controls-ready #mobile-controls {
 }
 
 .mobile-control-main {
-  display: block;
-  font-size: 0.58rem;
-  line-height: 1;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
-.mobile-control-arrow .mobile-control-main {
-  font-size: 1.45rem;
+.mobile-control-icon {
+  width: 58%;
+  height: 58%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f4d98e;
+  filter: drop-shadow(0 0 8px rgba(212, 168, 67, 0.32));
+  pointer-events: none;
+}
+
+.mobile-control-icon svg,
+.mobile-joystick-arrows svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .mobile-control-primary {
@@ -170,8 +198,19 @@ html.game-controls-ready #mobile-controls {
     linear-gradient(180deg, rgba(135, 86, 36, 0.96), rgba(66, 36, 18, 0.96));
 }
 
-.mobile-control-small .mobile-control-main {
-  font-size: 1rem;
+.mobile-control-small .mobile-control-icon {
+  width: 52%;
+  height: 52%;
+}
+
+.mobile-control-wide .mobile-control-icon {
+  width: 56%;
+  height: 56%;
+}
+
+.mobile-control-primary .mobile-control-icon {
+  width: 60%;
+  height: 60%;
 }
 
 .mobile-control-btn.is-pressed {
@@ -180,6 +219,11 @@ html.game-controls-ready #mobile-controls {
   background:
     radial-gradient(circle at 36% 24%, rgba(255, 239, 186, 0.26), transparent 34%),
     linear-gradient(180deg, rgba(153, 100, 45, 0.98), rgba(91, 49, 23, 0.98));
+}
+
+.mobile-control-btn.is-pressed .mobile-control-icon {
+  color: #fff0bc;
+  transform: scale(0.92);
 }
 
 .action-top {
