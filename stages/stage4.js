@@ -575,7 +575,7 @@ function buildMap() {
       correct: correctDoorIndex === 0,
       label: correctDoorIndex === 0 ? "EXIT" : "DOOR A",
       answered: false,
-      questions: getRandomQuestions(1),
+      questions: getRandomQuestions(6),
     },
     {
       x: 4500,
@@ -585,7 +585,7 @@ function buildMap() {
       correct: correctDoorIndex === 1,
       label: correctDoorIndex === 1 ? "EXIT" : "DOOR B",
       answered: false,
-      questions: getRandomQuestions(1),
+      questions: getRandomQuestions(6),
     },
     {
       x: 7200,
@@ -595,7 +595,7 @@ function buildMap() {
       correct: correctDoorIndex === 2,
       label: correctDoorIndex === 2 ? "EXIT" : "DOOR C",
       answered: false,
-      questions: getRandomQuestions(1),
+      questions: getRandomQuestions(6),
     },
   ];
   MAP.doorFrameRect = null;
@@ -856,7 +856,7 @@ function resetToStart() {
       door.label =
         i === correctDoorIndex ? "EXIT" : "DOOR " + String.fromCharCode(65 + i);
       door.answered = false;
-      door.questions = getRandomQuestions(1);
+      door.questions = getRandomQuestions(6);
     });
   }
   GS.dead = false;
@@ -931,7 +931,8 @@ function buildQuizUI() {
   var subtitle = document.createElement("div");
   subtitle.style.cssText =
     "text-align:center;margin-bottom:16px;font-size:13px;color:#a08050;";
-  subtitle.textContent = "Answer the question correctly to unlock the door...";
+  subtitle.textContent =
+    "Answer 4 out of 6 questions correctly to unlock the door...";
 
   var progress = document.createElement("div");
   progress.id = "quiz-progress";
@@ -969,7 +970,12 @@ function showQuizQuestion() {
   var total = currentQuiz.questions.length;
 
   document.getElementById("quiz-progress").textContent =
-    "Question " + (quizQuestionIndex + 1) + " of " + total;
+    "Question " +
+    (quizQuestionIndex + 1) +
+    " of " +
+    total +
+    "  |  Correct: " +
+    quizCorrectCount;
   document.getElementById("quiz-question").textContent = q.q;
 
   var optionsDiv = document.getElementById("quiz-options");
@@ -1059,7 +1065,7 @@ function finishQuiz() {
   var door = currentQuiz.door;
   var doorIndex = currentQuiz.doorIndex;
   var total = currentQuiz.questions.length;
-  var passed = quizCorrectCount >= 1; // Need 4/6 correct to pass
+  var passed = quizCorrectCount >= 4; // Need 4/6 correct to pass
 
   door.answered = true;
 
@@ -1116,8 +1122,7 @@ function finishQuiz() {
     result.innerHTML = [
       '<h2 style="color:#ff2a2a;margin-bottom:16px;">✗ Failed!</h2>',
       '<p style="font-size:18px;color:#f0e6d2;margin-bottom:20px;">',
-      "You answered incorrectly.",
-      "<br>You need to answer correctly to proceed.</p>",
+      "You only answered " + quizCorrectCount + "/" + total + " correctly.",
       "<br>You need at least 4 correct answers.</p>",
       '<button id="quiz-continue" style="',
       "background:linear-gradient(180deg,#4a1a1a 0%,#3a1010 100%);",

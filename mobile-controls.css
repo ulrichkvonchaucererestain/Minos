@@ -277,7 +277,7 @@ html.mobile-controls-enabled #ctrl-hint {
   }
 
   html.mobile-controls-enabled .hud-box {
-    min-width: 92px;
+    min-width: 86px;
   }
 
   html.mobile-controls-enabled #tutorial-menu-btn {
@@ -286,6 +286,7 @@ html.mobile-controls-enabled #ctrl-hint {
   }
 
   html.mobile-controls-enabled .hud-lbl {
+    margin-bottom: 3px;
     font-size: 0.44rem;
     letter-spacing: 2px;
   }
@@ -314,41 +315,58 @@ html.mobile-controls-enabled #ctrl-hint {
   }
 
   html.mobile-controls-enabled #step-card {
-    top: max(54px, calc(env(safe-area-inset-top) + 42px));
+    top: max(52px, calc(env(safe-area-inset-top) + 44px));
     left: max(8px, env(safe-area-inset-left));
     right: auto;
     transform: none;
-    width: min(300px, 34vw);
+    width: min(320px, 36vw);
     min-width: 0;
     max-width: none;
-    padding: 7px 9px;
-    opacity: 0.9;
+    max-height: min(150px, calc(100dvh - 188px));
+    padding: 8px 10px;
+    overflow: hidden;
+    opacity: 0.94;
     text-align: center;
+    pointer-events: none;
   }
 
   html.mobile-controls-enabled #step-card.hidden-card {
-    transform: translateY(-8px);
+    transform: translateY(-6px);
   }
 
   html.mobile-controls-enabled #step-card.quiet-card {
     transform: none;
+    opacity: 0.76;
   }
 
   html.mobile-controls-enabled #step-title {
-    font-size: 0.54rem;
+    margin-bottom: 4px;
+    font-size: 0.56rem;
     letter-spacing: 2px;
-    margin-bottom: 3px;
   }
 
   html.mobile-controls-enabled #step-desc {
-    font-size: 0.46rem;
-    line-height: 1.35;
-    max-height: 34px;
+    max-height: 42px;
     overflow: hidden;
+    font-size: 0.48rem;
+    line-height: 1.35;
   }
 
   html.mobile-controls-enabled #step-keys {
-    display: none;
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+    max-height: 28px;
+    overflow: hidden;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  html.mobile-controls-enabled .key-chip {
+    padding: 3px 7px;
+    font-size: 0.42rem;
+    letter-spacing: 0.8px;
+    white-space: nowrap;
   }
 
   html.mobile-controls-enabled #stam-wrap {
@@ -378,7 +396,7 @@ html.mobile-controls-enabled #ctrl-hint {
     right: max(8px, env(safe-area-inset-right)) !important;
     bottom: auto !important;
     left: auto !important;
-    transform: scale(0.58);
+    transform: scale(0.56);
     transform-origin: top right;
     z-index: 1700 !important;
   }
@@ -387,7 +405,7 @@ html.mobile-controls-enabled #ctrl-hint {
     top: max(112px, calc(env(safe-area-inset-top) + 100px)) !important;
     right: max(8px, env(safe-area-inset-right)) !important;
     bottom: auto !important;
-    transform: scale(0.72);
+    transform: scale(0.7);
     transform-origin: top right;
   }
 }
@@ -429,13 +447,17 @@ html.mobile-controls-enabled #ctrl-hint {
     font-size: 0.5rem;
   }
 
+  html.mobile-controls-enabled #stam-wrap {
+    display: none;
+  }
+
   html.mobile-controls-enabled .hud-box,
   html.mobile-controls-enabled #tutorial-menu-btn {
     padding: 4px 7px;
   }
 
   html.mobile-controls-enabled .hud-box {
-    min-width: 78px;
+    min-width: 76px;
   }
 
   html.mobile-controls-enabled #tutorial-menu-btn {
@@ -451,23 +473,31 @@ html.mobile-controls-enabled #ctrl-hint {
     font-size: 0.78rem;
   }
 
-  html.mobile-controls-enabled #stam-wrap {
-    display: none;
-  }
-
   html.mobile-controls-enabled #step-card {
-    top: max(52px, calc(env(safe-area-inset-top) + 44px));
-    width: min(260px, 30vw);
-    padding: 5px 7px;
+    top: max(48px, calc(env(safe-area-inset-top) + 40px));
+    width: min(285px, 34vw);
+    max-height: 94px;
+    padding: 6px 8px;
   }
 
-  html.mobile-controls-enabled #step-desc,
+  html.mobile-controls-enabled #step-desc {
+    max-height: 30px;
+    font-size: 0.43rem;
+    line-height: 1.25;
+  }
+
   html.mobile-controls-enabled #step-keys {
-    display: none;
+    margin-top: 4px;
+    max-height: 24px;
+  }
+
+  html.mobile-controls-enabled .key-chip {
+    padding: 2px 6px;
+    font-size: 0.38rem;
   }
 
   html.mobile-controls-enabled #inventory-wrap {
-    top: max(52px, calc(env(safe-area-inset-top) + 44px)) !important;
-    transform: scale(0.5);
+    top: max(48px, calc(env(safe-area-inset-top) + 40px)) !important;
+    transform: scale(0.48);
   }
 }
