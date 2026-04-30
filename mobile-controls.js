@@ -10,7 +10,7 @@
     ShiftLeft: { key: "Shift", label: "Dash" },
     ShiftRight: { key: "Shift", label: "Dash" },
     KeyE: { key: "e", label: "E" },
-    KeyQ: { key: "q", label: "Throw" },
+    KeyR: { key: "r", label: "Throw" },
   };
 
   var CONTROL_ICONS = {
@@ -19,7 +19,7 @@
       '<path d="M16 4v8" />' +
       '<path d="M11 7.5a10 10 0 1 0 10 0" />' +
       "</svg>",
-    KeyQ:
+    KeyR:
       '<svg viewBox="0 0 32 32" aria-hidden="true">' +
       '<path d="M7 22 24 8" />' +
       '<path d="m20 7 5 2-1 5" />' +
@@ -278,7 +278,7 @@
     var actionPad = document.createElement("div");
     actionPad.className = "mobile-control-pad mobile-action-pad";
     actionPad.appendChild(makeButton("KeyE", "E", "mobile-control-small action-top"));
-    actionPad.appendChild(makeButton("KeyQ", "Throw", "mobile-control-wide action-left"));
+    actionPad.appendChild(makeButton("KeyR", "Throw", "mobile-control-wide action-left"));
     actionPad.appendChild(makeButton("ShiftLeft", "Dash", "mobile-control-wide action-right"));
     actionPad.appendChild(makeButton("Space", "Jump", "mobile-control-primary action-bottom"));
 

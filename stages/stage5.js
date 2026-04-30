@@ -262,6 +262,7 @@ window.addEventListener("keydown", function (e) {
       "KeyS",
       "KeyD",
       "KeyE",
+      "KeyR",
       "ShiftLeft",
       "ShiftRight",
     ].indexOf(e.code) !== -1
@@ -1348,6 +1349,9 @@ function tutUpdate() {
       spawnArmorBreakPtcls(ax, ay, armor.type); // sparkle effect on pickup
     }
   });
+  handleThrowInput();
+  updateThrowFx();
+
 
   /* ── DOOR INTERACTION ── */
 
@@ -1786,6 +1790,7 @@ function tutDraw() {
   drawShaft(H);
   drawHammer();
   drawGold();
+  drawThrowFx();
   drawArmorPickups();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
@@ -2274,6 +2279,140 @@ function drawHammer() {
     TX.fillText("⚠", hm.anchorX, hm.anchorY - 20);
     TX.restore();
   }
+}
+
+
+function getThrowLandingY(x) {
+  var best = FLOOR_Y;
+  var feet = PL.y + PL.sh - 8;
+  if (MAP.platforms) {
+    MAP.platforms.forEach(function (p) {
+      if (x >= p.x - 20 && x <= p.x + p.w + 20 && p.y >= PL.y && p.y < best) {
+        best = p.y;
+      }
+    });
+  }
+  if (best < feet - 180) best = feet;
+  return best;
+}
+
+function startThrownItem(icon) {
+  var sx = PL.x + PL.sw / 2 + PL.dir * 28;
+  var sy = PL.y + PL.sh * 0.38;
+  var maxX = typeof WORLD === "number" ? WORLD - 80 : sx + PL.dir * 320;
+  var tx = Math.max(80, Math.min(maxX, sx + PL.dir * 340));
+  var landingY = getThrowLandingY(tx);
+  GS.throwFx = {
+    icon: icon || "??",
+    sx: sx,
+    sy: sy,
+    x: sx,
+    y: sy,
+    tx: tx,
+    ty: landingY - 34,
+    t: 0,
+    life: 34,
+    spin: 0,
+  };
+  PL.throwTimer = 18;
+}
+
+function handleThrowInput() {
+  if (!JP["KeyR"]) return;
+  JP["KeyR"] = false;
+  if (GS.throwFx) return;
+
+  var icon = "??";
+  var didThrow = false;
+  if (GS.inventory && GS.inventory.length) {
+    var item = GS.inventory[GS.inventory.length - 1];
+    icon = item.icon || icon;
+    if (typeof removeFromInventory === "function") removeFromInventory(item.id);
+    else GS.inventory.pop();
+    if (item.id === "goldenThread") GS.hasGold = false;
+    didThrow = true;
+  } else if (GS.hasGold) {
+    GS.hasGold = false;
+    didThrow = true;
+  }
+
+  if (!didThrow) {
+    if (typeof showBadge === "function") showBadge("Inventory is empty.");
+    return;
+  }
+
+  if (MAP.gold) {
+    MAP.gold.collected = true;
+    MAP.gold.visible = true;
+  }
+  if (typeof updateTutorialInventoryUI === "function") updateTutorialInventoryUI();
+  if (typeof renderInventoryHUD === "function") renderInventoryHUD();
+  if (typeof showBadge === "function") showBadge("Golden Thread thrown!");
+  startThrownItem(icon);
+}
+
+function updateThrowFx() {
+  if (PL.throwTimer > 0) PL.throwTimer--;
+  var fx = GS.throwFx;
+  if (!fx) return;
+  fx.t++;
+  fx.spin += 0.55;
+  var p = Math.min(1, fx.t / fx.life);
+  var ease = 1 - Math.pow(1 - p, 3);
+  fx.x = fx.sx + (fx.tx - fx.sx) * ease;
+  fx.y = fx.sy + (fx.ty - fx.sy) * ease - Math.sin(p * Math.PI) * 120;
+
+  if (p >= 1) {
+    if (MAP.gold) {
+      MAP.gold.x = fx.tx - MAP.gold.w / 2;
+      MAP.gold.y = getThrowLandingY(fx.tx) - Math.max(64, MAP.gold.h * 0.68);
+      MAP.gold.collected = false;
+      MAP.gold.visible = true;
+      MAP.gold.bobTimer = 0;
+      if (typeof spawnGoldPtcls === "function") spawnGoldPtcls(MAP.gold.x + MAP.gold.w / 2, MAP.gold.y + MAP.gold.h / 2);
+    }
+    GS.throwFx = null;
+  }
+}
+
+function drawThrowFx() {
+  if (PL.throwTimer > 0) {
+    var k = PL.throwTimer / 18;
+    var handX = PL.x + PL.sw / 2 + PL.dir * 24;
+    var handY = PL.y + PL.sh * 0.4;
+    TX.save();
+    TX.globalAlpha = 0.25 + k * 0.5;
+    TX.strokeStyle = "rgba(240,209,138,.9)";
+    TX.lineWidth = 2 + k * 3;
+    TX.lineCap = "round";
+    TX.beginPath();
+    TX.moveTo(handX - PL.dir * 18, handY + 16);
+    TX.quadraticCurveTo(handX + PL.dir * 18, handY - 6, handX + PL.dir * 52, handY - 18);
+    TX.stroke();
+    TX.restore();
+  }
+
+  var fx = GS.throwFx;
+  if (!fx) return;
+  TX.save();
+  TX.globalAlpha = 0.35;
+  TX.strokeStyle = "rgba(240,209,138,.75)";
+  TX.lineWidth = 3;
+  TX.lineCap = "round";
+  TX.beginPath();
+  TX.moveTo(fx.sx, fx.sy);
+  TX.quadraticCurveTo((fx.sx + fx.x) / 2, Math.min(fx.sy, fx.y) - 64, fx.x, fx.y);
+  TX.stroke();
+  TX.globalAlpha = 1;
+  TX.shadowBlur = 18;
+  TX.shadowColor = "rgba(255,215,0,.9)";
+  TX.translate(fx.x, fx.y);
+  TX.rotate(fx.spin);
+  TX.font = "24px serif";
+  TX.textAlign = "center";
+  TX.textBaseline = "middle";
+  TX.fillText(fx.icon, 0, 0);
+  TX.restore();
 }
 
 function drawGold() {
