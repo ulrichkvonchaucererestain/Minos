@@ -7,7 +7,8 @@
     KeyA: { key: "a", label: "Left" },
     KeyD: { key: "d", label: "Right" },
     Space: { key: " ", label: "Jump" },
-    KeyF: { key: "f", label: "Dash" },
+    ShiftLeft: { key: "Shift", label: "Dash" },
+    ShiftRight: { key: "Shift", label: "Dash" },
     KeyE: { key: "e", label: "E" },
     KeyQ: { key: "q", label: "Throw" },
   };
@@ -25,7 +26,7 @@
       '<path d="M8 22l-2 4 4-2" />' +
       '<path d="M12 18c3.5 1.8 6.8 1.7 10-.3" />' +
       "</svg>",
-    KeyF:
+    ShiftLeft:
       '<svg viewBox="0 0 32 32" aria-hidden="true">' +
       '<path d="M5 17h14" />' +
       '<path d="m15 10 7 7-7 7" />' +
@@ -278,7 +279,7 @@
     actionPad.className = "mobile-control-pad mobile-action-pad";
     actionPad.appendChild(makeButton("KeyE", "E", "mobile-control-small action-top"));
     actionPad.appendChild(makeButton("KeyQ", "Throw", "mobile-control-wide action-left"));
-    actionPad.appendChild(makeButton("KeyF", "Dash", "mobile-control-wide action-right"));
+    actionPad.appendChild(makeButton("ShiftLeft", "Dash", "mobile-control-wide action-right"));
     actionPad.appendChild(makeButton("Space", "Jump", "mobile-control-primary action-bottom"));
 
     controls.appendChild(fullscreenButton);

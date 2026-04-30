@@ -206,7 +206,7 @@ var CAM = { x: 0, y: 0 };
 var KEYS = {}, JP = {};
 window.addEventListener("keydown", function (e) {
   if (["Space","ArrowUp","ArrowLeft","ArrowRight","ArrowDown",
-       "KeyW","KeyA","KeyS","KeyD","KeyE","KeyF","ShiftLeft","ShiftRight"
+       "KeyW","KeyA","KeyS","KeyD","KeyE","ShiftLeft","ShiftRight"
       ].indexOf(e.code) !== -1) e.preventDefault();
   if (!KEYS[e.code]) JP[e.code] = true;
   KEYS[e.code] = true;
@@ -972,7 +972,7 @@ function tutUpdate() {
 
   /* ── INPUT ── */
   var canSpr = PL.stamina > STAM_MIN;
-  PL.sprinting = (KEYS["ShiftLeft"] || KEYS["ShiftRight"]) && canSpr && !PL.dashing;
+  PL.sprinting = false;
   PL.moving = false;
 
   if (!PL.dashing) {
@@ -991,14 +991,15 @@ function tutUpdate() {
     JP["KeyW"] = JP["Space"] = JP["ArrowUp"] = false;
   }
 
-  if (JP["KeyF"] && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
+  if ((JP["ShiftLeft"] || JP["ShiftRight"]) && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
     PL.dashing  = true;
     PL.dtmr     = DASH_DUR;
     PL.ddir     = PL.dir;
     PL.stamina -= DASH_COST;
     PL.dcd      = DASH_CD;
     if (PL.vy > 0) PL.vy *= 0.3;
-    JP["KeyF"] = false;
+    JP["ShiftLeft"] = false;
+    JP["ShiftRight"] = false;
   }
   if (PL.dashing) {
     PL.vx = PL.ddir * DASH_SPD;
@@ -1606,7 +1607,7 @@ function drawReadySpike() {
   TX.fillStyle="rgba(8,14,22,.72)"; TX.fillRect(rs.x+rs.w/2-74,rs.y-48-28,148,20);
   TX.strokeStyle="rgba(68,170,255,.28)"; TX.strokeRect(rs.x+rs.w/2-74,rs.y-48-28,148,20);
   TX.fillStyle="rgba(92,184,255,.9)"; TX.font="bold 10px Cinzel,serif"; TX.textAlign="center";
-  TX.fillText("DASH [F]",rs.x+rs.w/2,rs.y-48-14); TX.textAlign="left";
+  TX.fillText("DASH [SHIFT]",rs.x+rs.w/2,rs.y-48-14); TX.textAlign="left";
 }
 
 function drawShaft(H) {

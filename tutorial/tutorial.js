@@ -254,7 +254,6 @@ window.addEventListener("keydown", function (e) {
       "KeyS",
       "KeyD",
       "KeyE",
-      "KeyF",
       "ShiftLeft",
       "ShiftRight",
     ].indexOf(e.code) !== -1
@@ -515,9 +514,9 @@ var STEPS = [
   {
     icon: "💨",
     title: "Dash!",
-    desc: "You fell into a shaft. A row of spikes blocks the path. Press F to DASH through the gap!",
+    desc: "You fell into a shaft. A row of spikes blocks the path. Press Shift to DASH through the gap!",
     mobileDesc: "You fell into a shaft. Tap Dash to burst through the spike gap.",
-    keys: ["F → Dash"],
+    keys: ["Shift -> Dash"],
     mobileKeys: ["Dash -> Burst forward"],
     trigger: function () {
       return PL.x > 2860;
@@ -661,8 +660,7 @@ function tutUpdate() {
 
   /* ── INPUT ── */
   var canSpr = PL.stamina > STAM_MIN;
-  PL.sprinting =
-    (KEYS["ShiftLeft"] || KEYS["ShiftRight"]) && canSpr && !PL.dashing;
+  PL.sprinting = false;
   PL.moving = false;
 
   if (!PL.dashing) {
@@ -695,14 +693,15 @@ function tutUpdate() {
   }
 
   // Dash
-  if (JP["KeyF"] && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
+  if ((JP["ShiftLeft"] || JP["ShiftRight"]) && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
     PL.dashing = true;
     PL.dtmr = DASH_DUR;
     PL.ddir = PL.dir;
     PL.stamina -= DASH_COST;
     PL.dcd = DASH_CD;
     if (PL.vy > 0) PL.vy *= 0.3;
-    JP["KeyF"] = false;
+    JP["ShiftLeft"] = false;
+    JP["ShiftRight"] = false;
   }
   if (PL.dashing) {
     PL.vx = PL.ddir * DASH_SPD;
@@ -1575,7 +1574,7 @@ function drawReadySpike() {
   TX.fillStyle = "rgba(92,184,255,.9)";
   TX.font = "bold 10px Cinzel,serif";
   TX.textAlign = "center";
-  TX.fillText("DASH [F]", rs.x + rs.w / 2, rs.y - spikeH - 14);
+  TX.fillText("DASH [SHIFT]", rs.x + rs.w / 2, rs.y - spikeH - 14);
   TX.textAlign = "left";
 }
 

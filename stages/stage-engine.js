@@ -48,7 +48,7 @@ function ensureStageShell() {
         <span id="dash-ready">Ready</span>
       </div>
       <div id="hud-bottom">
-        <div id="ctrl-hint">[D] Walk - [A] Back - [W/Space] Jump - [F] Dash - [Shift] Sprint - [Q] Drop - [P] Pause</div>
+        <div id="ctrl-hint">[D] Walk - [A] Back - [W/Space] Jump - [Shift] Dash - [Q] Drop - [P] Pause</div>
         <button id="inv-toggle-btn" class="bag-btn" type="button" onclick="toggleInventory()">Bag</button>
       </div>
       <div id="inventory-ui" class="overlay hidden">
