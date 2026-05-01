@@ -103,6 +103,8 @@ var SPR = {
   hammerRight: [],
   gold: null,
   spike: null,
+  pot: null,
+  sword: null,
   decor: {},
   torch: null,
   mapTheme: { map: null, roof: null, fall: null },
@@ -201,6 +203,8 @@ async function loadSpr() {
   if (typeof SPRITE_DOOR2 !== "undefined") SPR.door2 = await li(SPRITE_DOOR2);
   if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
+  if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
+  if (typeof SPRITE_SWORD !== "undefined") SPR.sword = await li(SPRITE_SWORD);
   SPR.torch = await li(TORCH_ASSET);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
@@ -258,6 +262,7 @@ window.addEventListener("keydown", function (e) {
       "KeyD",
       "KeyE",
       "KeyR",
+      "KeyF",
       "ShiftLeft",
       "ShiftRight",
     ].indexOf(e.code) !== -1
@@ -334,15 +339,27 @@ function buildMap() {
   MAP.readySpike = null;
   MAP.hammer = null;
 
-  /* ── GOLDEN THREAD KEY ── */
-  MAP.gold = {
-    x: 1200,
-    y: galleryY - 70,
-    w: 48,
-    h: 48,
-    collected: false,
-    bobTimer: 0,
-  };
+  /* ── POTS (3 random, one has the gold thread) ── */
+  MAP.gold = null; // gold thread is now inside a pot, not floating
+
+  var potPositions = [
+    { x: 920, y: mezzY - 68 }, // near early platform jar decor
+    { x: 5185, y: lowerY - 72 }, // mid-map lower section
+    { x: 7430, y: FLOOR_Y - 72 }, // near end corridor
+  ];
+  var goldPotIndex = Math.floor(Math.random() * 3);
+
+  MAP.pots = potPositions.map(function (pos, i) {
+    return {
+      x: pos.x,
+      y: pos.y,
+      w: 52,
+      h: 68,
+      hasGold: i === goldPotIndex,
+      broken: false,
+      breakTimer: 0, // counts up after breaking for shatter anim
+    };
+  });
 
   /* ── STAGE II EXIT — 3 DOORS (2 fake, 1 real) ── */
   var dW = 118,
@@ -535,6 +552,12 @@ var GS = {
   deathFlash: 0,
   badgeTimer: null,
   stepCardTimer: null,
+  sword: {
+    active: false,
+    timer: 0,
+    cooldown: 0,
+    dir: 1,
+  },
 };
 
 /* ── DROPPED ITEMS SYSTEM ── */
@@ -983,6 +1006,7 @@ function spawnPlayer() {
   CAM.x = 0;
   // Don't reset hasGold here — dropped items persist until picked up or void death
   GS.activeDoorIndex = -1;
+  GS.hasSword = true;
 }
 
 function resetToStart() {
@@ -1023,6 +1047,16 @@ function resetToStart() {
   spawnPlayer();
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
+
+  // Re-randomize which pot has the gold
+  if (MAP.pots) {
+    var newGoldPot = Math.floor(Math.random() * MAP.pots.length);
+    MAP.pots.forEach(function (pot, i) {
+      pot.hasGold = i === newGoldPot;
+      pot.broken = false;
+      pot.breakTimer = 0;
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1078,7 +1112,12 @@ function tutUpdate() {
   }
 
   // Dash
-  if ((JP["ShiftLeft"] || JP["ShiftRight"]) && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
+  if (
+    (JP["ShiftLeft"] || JP["ShiftRight"]) &&
+    PL.dcd <= 0 &&
+    PL.stamina >= DASH_COST &&
+    !PL.dashing
+  ) {
     PL.dashing = true;
     PL.dtmr = DASH_DUR;
     PL.ddir = PL.dir;
@@ -1268,6 +1307,13 @@ function tutUpdate() {
   }
   handleThrowInput();
   updateThrowFx();
+
+  /* ── POT BREAK TIMER ── */
+  if (MAP.pots) {
+    MAP.pots.forEach(function (pot) {
+      if (pot.broken) pot.breakTimer++;
+    });
+  }
 
   /* ── DOOR INTERACTION ── */
   GS.activeDoorIndex = -1;
@@ -1611,9 +1657,12 @@ function cleanStageDecor() {
     MAP.decorBack.forEach(function (item) {
       if (!item || !item.key) return;
       if (item.key === "web") item.alpha = Math.min(item.alpha || 0.22, 0.24);
-      else if (item.key.indexOf("vines") === 0) item.alpha = Math.min(item.alpha || 0.18, 0.2);
-      else if (item.key.indexOf("mural") === 0) item.alpha = Math.min(item.alpha || 0.12, 0.12);
-      else if (item.key === "cage") item.alpha = Math.min(item.alpha || 0.18, 0.18);
+      else if (item.key.indexOf("vines") === 0)
+        item.alpha = Math.min(item.alpha || 0.18, 0.2);
+      else if (item.key.indexOf("mural") === 0)
+        item.alpha = Math.min(item.alpha || 0.12, 0.12);
+      else if (item.key === "cage")
+        item.alpha = Math.min(item.alpha || 0.18, 0.18);
     });
   }
 
@@ -1622,7 +1671,8 @@ function cleanStageDecor() {
       if (!item || !item.key) return;
       if (item.key.indexOf("bones") === 0) {
         var floorLine = item.y;
-        if (item.y > FLOOR_Y - item.h) floorLine = Math.min(FLOOR_Y, item.y + 8);
+        if (item.y > FLOOR_Y - item.h)
+          floorLine = Math.min(FLOOR_Y, item.y + 8);
         item.y = floorLine - item.h + 8;
         item.alpha = Math.min(Math.max(item.alpha || 0.28, 0.28), 0.42);
       } else if (item.key === "jar") {
@@ -1653,6 +1703,7 @@ function tutDraw() {
   drawShaft(H);
   drawHammer();
   drawGold();
+  drawPots();
   drawThrowFx();
   drawDroppedItems();
   drawDoors();
@@ -2143,7 +2194,6 @@ function drawHammer() {
   }
 }
 
-
 function getThrowLandingY(x) {
   var best = FLOOR_Y;
   var feet = PL.y + PL.sh - 8;
@@ -2179,6 +2229,52 @@ function startThrownItem(icon) {
   PL.throwTimer = 18;
 }
 
+/* ── SWORD SWING ── */
+if (GS.hasSword) {
+  if (GS.sword.cooldown > 0) GS.sword.cooldown--;
+
+  if (JP["KeyF"] && !GS.sword.active && GS.sword.cooldown <= 0) {
+    GS.sword.active = true;
+    GS.sword.timer = 18; // swing lasts 18 frames
+    GS.sword.dir = PL.dir;
+    GS.sword.cooldown = 28;
+    JP["KeyF"] = false;
+
+    // Check pot collision during the swing
+    if (MAP.pots) {
+      var swingReach = 72; // horizontal reach of the swing
+      var swingCX = PL.x + PL_COX + PL.w / 2 + GS.sword.dir * swingReach * 0.5;
+      var swingCY = PL.y + PL_COY + PL.h * 0.45;
+
+      MAP.pots.forEach(function (pot) {
+        if (pot.broken) return;
+        var potCX = pot.x + pot.w / 2;
+        var potCY = pot.y + pot.h / 2;
+        var dx = Math.abs(swingCX - potCX);
+        var dy = Math.abs(swingCY - potCY);
+        if (dx < swingReach && dy < pot.h * 0.7) {
+          pot.broken = true;
+          pot.breakTimer = 0;
+          spawnPotShards(potCX, potCY);
+          if (pot.hasGold && !GS.hasGold) {
+            spawnDroppedItem(potCX, pot.y, "gold");
+            showBadge("⚔️ Pot smashed — Golden Thread found!");
+          } else {
+            showBadge("⚔️ Empty pot.");
+          }
+        }
+      });
+    }
+  }
+
+  if (GS.sword.active) {
+    GS.sword.timer--;
+    if (GS.sword.timer <= 0) {
+      GS.sword.active = false;
+    }
+  }
+}
+
 function handleThrowInput() {
   if (!JP["KeyR"]) return;
   JP["KeyR"] = false;
@@ -2207,7 +2303,8 @@ function handleThrowInput() {
     MAP.gold.collected = true;
     MAP.gold.visible = true;
   }
-  if (typeof updateTutorialInventoryUI === "function") updateTutorialInventoryUI();
+  if (typeof updateTutorialInventoryUI === "function")
+    updateTutorialInventoryUI();
   if (typeof renderInventoryHUD === "function") renderInventoryHUD();
   if (typeof showBadge === "function") showBadge("Golden Thread thrown!");
   startThrownItem(icon);
@@ -2231,7 +2328,11 @@ function updateThrowFx() {
       MAP.gold.collected = false;
       MAP.gold.visible = true;
       MAP.gold.bobTimer = 0;
-      if (typeof spawnGoldPtcls === "function") spawnGoldPtcls(MAP.gold.x + MAP.gold.w / 2, MAP.gold.y + MAP.gold.h / 2);
+      if (typeof spawnGoldPtcls === "function")
+        spawnGoldPtcls(
+          MAP.gold.x + MAP.gold.w / 2,
+          MAP.gold.y + MAP.gold.h / 2,
+        );
     }
     GS.throwFx = null;
   }
@@ -2249,7 +2350,12 @@ function drawThrowFx() {
     TX.lineCap = "round";
     TX.beginPath();
     TX.moveTo(handX - PL.dir * 18, handY + 16);
-    TX.quadraticCurveTo(handX + PL.dir * 18, handY - 6, handX + PL.dir * 52, handY - 18);
+    TX.quadraticCurveTo(
+      handX + PL.dir * 18,
+      handY - 6,
+      handX + PL.dir * 52,
+      handY - 18,
+    );
     TX.stroke();
     TX.restore();
   }
@@ -2263,7 +2369,12 @@ function drawThrowFx() {
   TX.lineCap = "round";
   TX.beginPath();
   TX.moveTo(fx.sx, fx.sy);
-  TX.quadraticCurveTo((fx.sx + fx.x) / 2, Math.min(fx.sy, fx.y) - 64, fx.x, fx.y);
+  TX.quadraticCurveTo(
+    (fx.sx + fx.x) / 2,
+    Math.min(fx.sy, fx.y) - 64,
+    fx.x,
+    fx.y,
+  );
   TX.stroke();
   TX.globalAlpha = 1;
   TX.shadowBlur = 18;
@@ -2341,6 +2452,45 @@ function drawGold() {
   TX.fillText("Golden Thread", gx, g.y + bob - 26);
   TX.fillText("[E] Pick up", gx, g.y + bob - 14);
   TX.textAlign = "left";
+}
+
+function drawPots() {
+  if (!MAP.pots) return;
+  MAP.pots.forEach(function (pot) {
+    if (pot.x + pot.w < CAM.x - 60 || pot.x > CAM.x + TC.width + 60) return;
+    if (pot.broken) return; // don't draw after shattering
+
+    TX.save();
+
+    var potImg = SPR.pot;
+    if (potImg && potImg.complete && potImg.naturalWidth) {
+      TX.drawImage(potImg, pot.x, pot.y, pot.w, pot.h);
+    } else {
+      // Fallback drawn pot
+      TX.fillStyle = "#8B6955";
+      TX.beginPath();
+      TX.ellipse(
+        pot.x + pot.w / 2,
+        pot.y + pot.h * 0.72,
+        pot.w * 0.42,
+        pot.h * 0.28,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      TX.fill();
+      TX.fillStyle = "#A0785A";
+      TX.fillRect(
+        pot.x + pot.w * 0.18,
+        pot.y + pot.h * 0.1,
+        pot.w * 0.64,
+        pot.h * 0.65,
+      );
+      TX.fillStyle = "#C4A882";
+      TX.fillRect(pot.x + pot.w * 0.14, pot.y + pot.h * 0.08, pot.w * 0.72, 8);
+    }
+    TX.restore();
+  });
 }
 
 function drawDoors() {
@@ -2622,6 +2772,7 @@ function drawPlayer() {
   }
 
   // Gold item indicator above head
+  // Gold item indicator above head
   if (GS.hasGold) {
     TX.globalAlpha = 1;
     TX.font = "18px serif";
@@ -2629,6 +2780,81 @@ function drawPlayer() {
     TX.fillText("🪙", PL.x + PL.sw / 2, PL.y - 6);
     TX.textAlign = "left";
   }
+
+  // ── SWORD DRAW ──
+  if (GS.hasSword && !GS.deathFx) {
+    var swingProgress = GS.sword.active
+      ? 1 - GS.sword.timer / 18 // 0 → 1 over the swing duration
+      : 0;
+
+    // Pivot from player's hand area
+    var handX = PL.x + PL.sw / 2 + PL.dir * 10;
+    var handY = PL.y + PL_COY + PL.h * 0.38;
+
+    // Idle angle: pointing down-forward. Swing: arc upward then forward.
+    var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
+    var swingAngle =
+      PL.dir === 1
+        ? idleAngle - Math.PI * 0.9 * Math.sin(swingProgress * Math.PI)
+        : idleAngle + Math.PI * 0.9 * Math.sin(swingProgress * Math.PI);
+
+    var angle = GS.sword.active ? swingAngle : idleAngle;
+    var swordLen = 44;
+    var swordW = 7;
+
+    TX.save();
+    TX.translate(handX, handY);
+    TX.rotate(angle);
+
+    // Swing trail
+    if (GS.sword.active && swingProgress < 0.85) {
+      TX.save();
+      TX.globalAlpha = 0.18 * (1 - swingProgress);
+      TX.strokeStyle = "#ffe066";
+      TX.lineWidth = swordW * 2.2;
+      TX.lineCap = "round";
+      TX.beginPath();
+      TX.moveTo(0, 0);
+      TX.lineTo(0, swordLen);
+      TX.stroke();
+      TX.restore();
+    }
+
+    var swordImg = SPR.sword;
+    if (swordImg && swordImg.complete && swordImg.naturalWidth) {
+      // Draw sprite: blade goes along the positive-Y axis from handle
+      TX.drawImage(swordImg, -swordW / 2, -4, swordW + 6, swordLen + 8);
+    } else {
+      // Fallback — drawn sword
+      // Blade
+      var bG = TX.createLinearGradient(-swordW / 2, 0, swordW / 2, 0);
+      bG.addColorStop(0, "#b8bcc8");
+      bG.addColorStop(0.5, "#e8eaf0");
+      bG.addColorStop(1, "#7a7e8a");
+      TX.fillStyle = bG;
+      TX.fillRect(-swordW / 2, 0, swordW, swordLen);
+
+      // Tip
+      TX.fillStyle = "#dde0ea";
+      TX.beginPath();
+      TX.moveTo(-swordW / 2, swordLen);
+      TX.lineTo(swordW / 2, swordLen);
+      TX.lineTo(0, swordLen + 12);
+      TX.closePath();
+      TX.fill();
+
+      // Guard
+      TX.fillStyle = "#d4a843";
+      TX.fillRect(-10, -4, 20, 5);
+
+      // Grip
+      TX.fillStyle = "#5a3010";
+      TX.fillRect(-3, -14, 6, 14);
+    }
+
+    TX.restore();
+  }
+
   TX.restore();
 }
 
@@ -2670,6 +2896,33 @@ function drawStamBar(W, H) {
   var dr = document.getElementById("dash-ready");
   if (dr)
     dr.textContent = PL.dcd <= 0 && PL.stamina >= DASH_COST ? "READY" : "";
+
+  // Sword HUD indicator
+  var swordHud = document.getElementById("sword-hud");
+  if (!swordHud && GS.hasSword) {
+    swordHud = document.createElement("div");
+    swordHud.id = "sword-hud";
+    swordHud.style.cssText = [
+      "position:fixed",
+      "bottom:54px",
+      "right:18px",
+      "background:rgba(10,6,4,0.82)",
+      "border:1px solid #d4a843",
+      "border-radius:6px",
+      "padding:4px 10px",
+      "color:#e8dcc8",
+      "font-family:Cinzel,serif",
+      "font-size:11px",
+      "pointer-events:none",
+      "z-index:200",
+    ].join(";");
+    swordHud.textContent = "⚔️  [F] Swing";
+    document.body.appendChild(swordHud);
+  }
+  if (swordHud) {
+    var swReady = GS.sword && GS.sword.cooldown <= 0;
+    swordHud.style.opacity = swReady ? "1" : "0.45";
+  }
 }
 
 /* ── PARTICLES ──────────────────────────────────────────────────── */
@@ -2714,6 +2967,24 @@ function spawnGoldPtcls(gx, gy) {
       col: "#ffd700",
       type: "ember",
     });
+}
+
+function spawnPotShards(cx, cy) {
+  for (var i = 0; i < 14; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var speed = Math.random() * 5 + 2;
+    GS.ptcls.push({
+      x: cx + (Math.random() - 0.5) * 20,
+      y: cy + (Math.random() - 0.5) * 20,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3,
+      life: 1,
+      dec: 0.04 + Math.random() * 0.03,
+      sz: Math.random() * 5 + 3,
+      col: Math.random() < 0.5 ? "#8B6955" : "#C4A882",
+      type: "dust",
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
