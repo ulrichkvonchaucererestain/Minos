@@ -194,7 +194,10 @@ var SPR = {
   mapTheme: { map: null, roof: null, fall: null },
   rat: [],
   bat: null,
+  pot: null,
+  sword: null,
 };
+
 var sprOK = false;
 var HAMMER_LEFT_PATHS = [
   "../hammer_animation_swing_to_the_left1.png",
@@ -297,11 +300,14 @@ async function loadSpr() {
   if (typeof SPRITE_DOOR2 !== "undefined") SPR.door2 = await li(SPRITE_DOOR2);
   if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
+
   SPR.torch = await li(TORCH_ASSET);
   SPR.rat = await Promise.all(MOB_RAT_PATHS.map(li));
   SPR.bat = await li(MOB_BAT_PATH);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
+  if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
+  if (typeof SPRITE_SWORD !== "undefined") SPR.sword = await li(SPRITE_SWORD);
   var decorKeys = Object.keys(DECOR_PATHS);
   for (var i = 0; i < decorKeys.length; i++) {
     SPR.decor[decorKeys[i]] = await li(DECOR_PATHS[decorKeys[i]]);
@@ -358,6 +364,7 @@ window.addEventListener("keydown", function (e) {
       "KeyR",
       "ShiftLeft",
       "ShiftRight",
+      "ShiftLeft",
     ].indexOf(e.code) !== -1
   )
     e.preventDefault();
@@ -485,15 +492,26 @@ function buildMap() {
   MAP.readySpike = null;
   MAP.hammer = null;
 
-  /* ── GOLDEN THREAD (Required to unlock doors) ── */
-  MAP.gold = {
-    x: 3500, // Positioned before the doors
-    y: rise2Y - 120,
-    w: 64,
-    h: 64,
-    collected: false,
-    bobTimer: 0,
-  };
+  /* ── GOLDEN THREAD — hidden inside one of 3 pots ── */
+  MAP.gold = null;
+
+  var potPositions = [
+    { x: 1520, y: mezzY - 72 },
+    { x: 4700, y: mezzY - 72 },
+    { x: 7420, y: FLOOR_Y - 72 },
+  ];
+  var goldPotIndex = Math.floor(Math.random() * 3);
+  MAP.pots = potPositions.map(function (pos, i) {
+    return {
+      x: pos.x,
+      y: pos.y,
+      w: 52,
+      h: 68,
+      hasGold: i === goldPotIndex,
+      broken: false,
+      breakTimer: 0,
+    };
+  });
 
   /* ── THREE DOORS: 2 FAKE, 1 REAL ── */
   /* ── THREE DOORS: 2 FAKE, 1 REAL ── */
@@ -677,6 +695,12 @@ var GS = {
   deathFlash: 0,
   badgeTimer: null,
   stepCardTimer: null,
+  sword: {
+    active: false,
+    timer: 0,
+    cooldown: 0,
+    dir: 1,
+  },
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -770,6 +794,7 @@ function spawnPlayer() {
   CAM.x = 0;
   GS.hasGold = false;
   GS.activeDoorIndex = -1;
+  GS.hasSword = true;
   if (MAP.mobs) {
     MAP.mobs.forEach(function (m) {
       m.dead = false;
@@ -803,15 +828,12 @@ function resetToStart() {
   }
   GS.hasGold = false;
   GS.activeDoorIndex = -1;
-  // Reset doors
-  if (MAP.doors) {
-    var correctDoorIndex = Math.floor(Math.random() * 3);
-    MAP.doors.forEach(function (door, i) {
-      door.correct = i === correctDoorIndex;
-      door.label =
-        i === correctDoorIndex ? "EXIT" : "DOOR " + String.fromCharCode(65 + i);
-      door.answered = false;
-      door.question = null;
+  if (MAP.pots) {
+    var newGoldPot = Math.floor(Math.random() * MAP.pots.length);
+    MAP.pots.forEach(function (pot, i) {
+      pot.hasGold = i === newGoldPot;
+      pot.broken = false;
+      pot.breakTimer = 0;
     });
   }
   GS.dead = false;
@@ -1071,7 +1093,12 @@ function tutUpdate() {
   }
 
   // Dash
-  if ((JP["ShiftLeft"] || JP["ShiftRight"]) && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
+  if (
+    (JP["ShiftLeft"] || JP["ShiftRight"]) &&
+    PL.dcd <= 0 &&
+    PL.stamina >= DASH_COST &&
+    !PL.dashing
+  ) {
     PL.dashing = true;
     PL.dtmr = DASH_DUR;
     PL.ddir = PL.dir;
@@ -1236,26 +1263,62 @@ function tutUpdate() {
     }
   }
 
-  /* ── GOLDEN THREAD PICKUP ── */
-  if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
-    var g = MAP.gold;
-    var px6 = PL.x + PL_COX,
-      py6 = PL.y + PL_COY;
+  /* ── SWORD SWING ── */
+  if (GS.hasSword) {
+    if (GS.sword.cooldown > 0) GS.sword.cooldown--;
 
-    // Auto-pickup on proximity (no E key needed, just walk near it)
-    if (
-      Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 70 &&
-      Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 70
-    ) {
-      MAP.gold.collected = true;
-      GS.hasGold = true;
-      showBadge("✨ Golden Thread collected! Doors are now unlocked!");
-      spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
+    if (JP["KeyF"] && !GS.sword.active && GS.sword.cooldown <= 0) {
+      GS.sword.active = true;
+      GS.sword.timer = 18;
+      GS.sword.dir = PL.dir;
+      GS.sword.cooldown = 28;
+      JP["KeyF"] = false;
+
+      if (MAP.pots) {
+        var swingReach = 72;
+        var swingCX =
+          PL.x + PL_COX + PL.w / 2 + GS.sword.dir * swingReach * 0.5;
+        var swingCY = PL.y + PL_COY + PL.h * 0.45;
+
+        MAP.pots.forEach(function (pot) {
+          if (pot.broken) return;
+          var potCX = pot.x + pot.w / 2;
+          var potCY = pot.y + pot.h / 2;
+          var dx = Math.abs(swingCX - potCX);
+          var dy = Math.abs(swingCY - potCY);
+          if (dx < swingReach && dy < pot.h * 0.7) {
+            pot.broken = true;
+            pot.breakTimer = 0;
+            spawnPotShards(potCX, potCY);
+            if (pot.hasGold && !GS.hasGold) {
+              spawnDroppedItem(potCX, pot.y, "gold");
+              showBadge("⚔️ Pot smashed — Golden Thread found!");
+            } else {
+              showBadge("⚔️ Empty pot.");
+            }
+          }
+        });
+      }
+    }
+
+    if (GS.sword.active) {
+      GS.sword.timer--;
+      if (GS.sword.timer <= 0) GS.sword.active = false;
     }
   }
+
+  /* ── POT BREAK TIMER ── */
+  if (MAP.pots) {
+    MAP.pots.forEach(function (pot) {
+      if (pot.broken) pot.breakTimer++;
+    });
+  }
+
   handleThrowInput();
   updateThrowFx();
 
+  checkDroppedItemPickup();
+  JP["KeyE"] = false;
 
   /* ── DOOR INTERACTION ── */
   GS.activeDoorIndex = -1;
@@ -1618,9 +1681,12 @@ function cleanStageDecor() {
     MAP.decorBack.forEach(function (item) {
       if (!item || !item.key) return;
       if (item.key === "web") item.alpha = Math.min(item.alpha || 0.22, 0.24);
-      else if (item.key.indexOf("vines") === 0) item.alpha = Math.min(item.alpha || 0.18, 0.2);
-      else if (item.key.indexOf("mural") === 0) item.alpha = Math.min(item.alpha || 0.12, 0.12);
-      else if (item.key === "cage") item.alpha = Math.min(item.alpha || 0.18, 0.18);
+      else if (item.key.indexOf("vines") === 0)
+        item.alpha = Math.min(item.alpha || 0.18, 0.2);
+      else if (item.key.indexOf("mural") === 0)
+        item.alpha = Math.min(item.alpha || 0.12, 0.12);
+      else if (item.key === "cage")
+        item.alpha = Math.min(item.alpha || 0.18, 0.18);
     });
   }
 
@@ -1629,7 +1695,8 @@ function cleanStageDecor() {
       if (!item || !item.key) return;
       if (item.key.indexOf("bones") === 0) {
         var floorLine = item.y;
-        if (item.y > FLOOR_Y - item.h) floorLine = Math.min(FLOOR_Y, item.y + 8);
+        if (item.y > FLOOR_Y - item.h)
+          floorLine = Math.min(FLOOR_Y, item.y + 8);
         item.y = floorLine - item.h + 8;
         item.alpha = Math.min(Math.max(item.alpha || 0.28, 0.28), 0.42);
       } else if (item.key === "jar") {
@@ -1660,6 +1727,8 @@ function tutDraw() {
   drawShaft(H);
   drawHammer();
   drawGold();
+  drawPots();
+  drawDroppedItems();
   drawThrowFx();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
@@ -1803,25 +1872,33 @@ function drawBG(W, H) {
 function drawDoors() {
   MAP.doors.forEach(function (door, i) {
     if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
-    
+
     var locked = !GS.hasGold;
     var lit = door.correct && GS.hasGold && !door.answered;
     var pulse = 0.7 + Math.sin(Date.now() * 0.004 + i) * 0.3;
-    
+
     TX.save();
-    
+
     // Shadow
     TX.fillStyle = "rgba(0,0,0,.22)";
     TX.beginPath();
-    TX.ellipse(door.x + door.w / 2, door.y + door.h + 10, door.w * 0.56, 10, 0, 0, Math.PI * 2);
+    TX.ellipse(
+      door.x + door.w / 2,
+      door.y + door.h + 10,
+      door.w * 0.56,
+      10,
+      0,
+      0,
+      Math.PI * 2,
+    );
     TX.fill();
-    
+
     // Base
     TX.fillStyle = "rgba(32,18,18,.88)";
     TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
     TX.fillStyle = "rgba(232,194,106,.18)";
     TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 2);
-    
+
     // Glow for correct/unlocked door
     if (lit) {
       TX.shadowBlur = 30;
@@ -1834,12 +1911,12 @@ function drawDoors() {
         door.y + door.h / 2,
         80,
       );
-      glowG.addColorStop(0, "rgba(255,215,0," + (0.35 * pulse) + ")");
+      glowG.addColorStop(0, "rgba(255,215,0," + 0.35 * pulse + ")");
       glowG.addColorStop(1, "transparent");
       TX.fillStyle = glowG;
       TX.fillRect(door.x - 40, door.y - 20, door.w + 80, door.h + 40);
     }
-    
+
     // Door frame/image
     var frame = SPR.decor.doorFrame;
     if (frame && frame.complete && frame.naturalWidth) {
@@ -1849,7 +1926,7 @@ function drawDoors() {
       var cropH = frame.naturalHeight * 0.745;
       var drawY = door.y + 12;
       var drawH = door.h - 4;
-      
+
       if (locked) {
         TX.globalAlpha = 0.5;
       } else if (door.answered && !door.correct) {
@@ -1857,7 +1934,7 @@ function drawDoors() {
       } else {
         TX.globalAlpha = lit ? pulse : 0.88;
       }
-      
+
       TX.drawImage(
         frame,
         cropX,
@@ -1879,11 +1956,11 @@ function drawDoors() {
       } else {
         TX.fillStyle = lit ? "#8a6a20" : "#3a2010";
       }
-      
+
       TX.fillRect(door.x, door.y, door.w, door.h);
-      TX.fillStyle = locked ? "#5a3818" : (lit ? "#ffd700" : "#5a3818");
+      TX.fillStyle = locked ? "#5a3818" : lit ? "#ffd700" : "#5a3818";
       TX.fillRect(door.x + 4, door.y + 4, door.w - 8, door.h - 8);
-      
+
       if (lit) {
         TX.fillStyle = "#ffd700";
         TX.font = "bold 18px serif";
@@ -1891,7 +1968,7 @@ function drawDoors() {
         TX.fillText("✓", door.x + door.w / 2, door.y + door.h / 2 + 6);
         TX.textAlign = "left";
       }
-      
+
       if (locked) {
         TX.fillStyle = "#8a6a3a";
         TX.font = "bold 24px serif";
@@ -1899,19 +1976,26 @@ function drawDoors() {
         TX.fillText("🔒", door.x + door.w / 2, door.y + door.h / 2 + 8);
         TX.textAlign = "left";
       }
-      
-      TX.strokeStyle = locked ? "#4a3020" : (lit ? "#ffd700" : "#5a3818");
+
+      TX.strokeStyle = locked ? "#4a3020" : lit ? "#ffd700" : "#5a3818";
       TX.lineWidth = 3;
       TX.strokeRect(door.x, door.y, door.w, door.h);
     }
-    
+
     // Labels
-    TX.fillStyle = locked ? "rgba(120,100,80,0.6)" : 
-                   (lit ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)");
+    TX.fillStyle = locked
+      ? "rgba(120,100,80,0.6)"
+      : lit
+        ? "rgba(255,215,0,.9)"
+        : "rgba(212,168,67,.4)";
     TX.font = "9px Cinzel,serif";
     TX.textAlign = "center";
-    TX.fillText(door.label || "EXIT", door.x + door.w / 2, door.y + door.h + 14);
-    
+    TX.fillText(
+      door.label || "EXIT",
+      door.x + door.w / 2,
+      door.y + door.h + 14,
+    );
+
     if (GS.activeDoorIndex === i) {
       if (locked) {
         TX.fillStyle = "rgba(255,100,100,.9)";
@@ -1927,7 +2011,7 @@ function drawDoors() {
         TX.fillText("✕ SEALED", door.x + door.w / 2, door.y - 8);
       }
     }
-    
+
     TX.textAlign = "left";
     TX.restore();
   });
@@ -2283,7 +2367,6 @@ function drawHammer() {
   }
 }
 
-
 function getThrowLandingY(x) {
   var best = FLOOR_Y;
   var feet = PL.y + PL.sh - 8;
@@ -2347,7 +2430,8 @@ function handleThrowInput() {
     MAP.gold.collected = true;
     MAP.gold.visible = true;
   }
-  if (typeof updateTutorialInventoryUI === "function") updateTutorialInventoryUI();
+  if (typeof updateTutorialInventoryUI === "function")
+    updateTutorialInventoryUI();
   if (typeof renderInventoryHUD === "function") renderInventoryHUD();
   if (typeof showBadge === "function") showBadge("Golden Thread thrown!");
   startThrownItem(icon);
@@ -2371,7 +2455,11 @@ function updateThrowFx() {
       MAP.gold.collected = false;
       MAP.gold.visible = true;
       MAP.gold.bobTimer = 0;
-      if (typeof spawnGoldPtcls === "function") spawnGoldPtcls(MAP.gold.x + MAP.gold.w / 2, MAP.gold.y + MAP.gold.h / 2);
+      if (typeof spawnGoldPtcls === "function")
+        spawnGoldPtcls(
+          MAP.gold.x + MAP.gold.w / 2,
+          MAP.gold.y + MAP.gold.h / 2,
+        );
     }
     GS.throwFx = null;
   }
@@ -2389,7 +2477,12 @@ function drawThrowFx() {
     TX.lineCap = "round";
     TX.beginPath();
     TX.moveTo(handX - PL.dir * 18, handY + 16);
-    TX.quadraticCurveTo(handX + PL.dir * 18, handY - 6, handX + PL.dir * 52, handY - 18);
+    TX.quadraticCurveTo(
+      handX + PL.dir * 18,
+      handY - 6,
+      handX + PL.dir * 52,
+      handY - 18,
+    );
     TX.stroke();
     TX.restore();
   }
@@ -2403,7 +2496,12 @@ function drawThrowFx() {
   TX.lineCap = "round";
   TX.beginPath();
   TX.moveTo(fx.sx, fx.sy);
-  TX.quadraticCurveTo((fx.sx + fx.x) / 2, Math.min(fx.sy, fx.y) - 64, fx.x, fx.y);
+  TX.quadraticCurveTo(
+    (fx.sx + fx.x) / 2,
+    Math.min(fx.sy, fx.y) - 64,
+    fx.x,
+    fx.y,
+  );
   TX.stroke();
   TX.globalAlpha = 1;
   TX.shadowBlur = 18;
@@ -2685,6 +2783,64 @@ function drawPlayer() {
     TX.fillText("🪙", PL.x + PL.sw / 2, PL.y - 6);
     TX.textAlign = "left";
   }
+
+  // ── SWORD DRAW ──
+  if (GS.hasSword && !GS.deathFx) {
+    var swingProgress = GS.sword.active ? 1 - GS.sword.timer / 18 : 0;
+    var handX = PL.x + PL.sw / 2 + PL.dir * 10;
+    var handY = PL.y + PL_COY + PL.h * 0.38;
+    var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
+    var raiseAngle = PL.dir === 1 ? -Math.PI * 0.75 : Math.PI * 1.75;
+    var swingAngle =
+      PL.dir === 1
+        ? raiseAngle + Math.PI * 0.9 * swingProgress
+        : raiseAngle - Math.PI * 0.9 * swingProgress;
+    var angle = GS.sword.active ? swingAngle : idleAngle;
+    var swordLen = 44,
+      swordW = 7;
+
+    TX.save();
+    TX.translate(handX, handY);
+    TX.rotate(angle);
+
+    if (GS.sword.active && swingProgress < 0.85) {
+      TX.save();
+      TX.globalAlpha = 0.18 * (1 - swingProgress);
+      TX.strokeStyle = "#ffe066";
+      TX.lineWidth = swordW * 2.2;
+      TX.lineCap = "round";
+      TX.beginPath();
+      TX.moveTo(0, 0);
+      TX.lineTo(0, swordLen);
+      TX.stroke();
+      TX.restore();
+    }
+
+    var swordImg = SPR.sword;
+    if (swordImg && swordImg.complete && swordImg.naturalWidth) {
+      TX.drawImage(swordImg, -swordW / 2, -4, swordW + 6, swordLen + 8);
+    } else {
+      var bG = TX.createLinearGradient(-swordW / 2, 0, swordW / 2, 0);
+      bG.addColorStop(0, "#b8bcc8");
+      bG.addColorStop(0.5, "#e8eaf0");
+      bG.addColorStop(1, "#7a7e8a");
+      TX.fillStyle = bG;
+      TX.fillRect(-swordW / 2, 0, swordW, swordLen);
+      TX.fillStyle = "#dde0ea";
+      TX.beginPath();
+      TX.moveTo(-swordW / 2, swordLen);
+      TX.lineTo(swordW / 2, swordLen);
+      TX.lineTo(0, swordLen + 12);
+      TX.closePath();
+      TX.fill();
+      TX.fillStyle = "#d4a843";
+      TX.fillRect(-10, -4, 20, 5);
+      TX.fillStyle = "#5a3010";
+      TX.fillRect(-3, -14, 6, 14);
+    }
+    TX.restore();
+  }
+
   TX.restore();
 }
 
@@ -2770,6 +2926,132 @@ function spawnGoldPtcls(gx, gy) {
       col: "#ffd700",
       type: "ember",
     });
+}
+
+/* ── DROPPED ITEMS SYSTEM ── */
+var DROPPED_ITEMS = [];
+
+function spawnDroppedItem(x, y, type) {
+  DROPPED_ITEMS.push({
+    x: x,
+    y: y,
+    type: type,
+    bobTimer: Math.random() * Math.PI * 2,
+    active: true,
+    spawnTime: Date.now(),
+  });
+}
+
+function clearDroppedItems() {
+  DROPPED_ITEMS = [];
+}
+
+function checkDroppedItemPickup() {
+  if (GS.hasGold) return;
+  for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
+    var item = DROPPED_ITEMS[i];
+    if (!item.active) continue;
+    var px = PL.x + PL_COX + PL.w / 2;
+    var py = PL.y + PL_COY + PL.h / 2;
+    var dist = Math.hypot(px - item.x, py - item.y);
+    if (dist < 60 || (JP["KeyE"] && dist < 100)) {
+      item.active = false;
+      GS.hasGold = true;
+      showBadge("✨ Golden Thread recovered!");
+      spawnGoldPtcls(item.x, item.y);
+      JP["KeyE"] = false;
+      break;
+    }
+  }
+}
+
+function drawDroppedItems() {
+  DROPPED_ITEMS.forEach(function (item) {
+    if (!item.active) return;
+    if (item.x < CAM.x - 60 || item.x > CAM.x + TC.width + 60) return;
+    item.bobTimer += 0.05;
+    var bob = Math.sin(item.bobTimer) * 6;
+    var ix = item.x,
+      iy = item.y + bob;
+    var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 35);
+    gl.addColorStop(0, "rgba(255,215,0,.35)");
+    gl.addColorStop(1, "transparent");
+    TX.fillStyle = gl;
+    TX.fillRect(ix - 40, iy - 40, 80, 80);
+    var itemImg = SPR.gold || SPR.decor.threadPaper;
+    if (itemImg && itemImg.complete && itemImg.naturalWidth) {
+      TX.drawImage(itemImg, ix - 20, iy - 20, 40, 40);
+    } else {
+      TX.save();
+      TX.shadowBlur = 15;
+      TX.shadowColor = "#ffd700";
+      TX.fillStyle = "#ffd700";
+      TX.beginPath();
+      TX.arc(ix, iy, 14, 0, Math.PI * 2);
+      TX.fill();
+      TX.restore();
+    }
+    TX.fillStyle = "rgba(255,215,0,.7)";
+    TX.font = "bold 9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText("Golden Thread", ix, iy - 22);
+    TX.fillText("[E] Pick up", ix, iy - 12);
+    TX.textAlign = "left";
+  });
+}
+
+function spawnPotShards(cx, cy) {
+  for (var i = 0; i < 14; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var speed = Math.random() * 5 + 2;
+    GS.ptcls.push({
+      x: cx + (Math.random() - 0.5) * 20,
+      y: cy + (Math.random() - 0.5) * 20,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3,
+      life: 1,
+      dec: 0.04 + Math.random() * 0.03,
+      sz: Math.random() * 5 + 3,
+      col: Math.random() < 0.5 ? "#8B6955" : "#C4A882",
+      type: "dust",
+    });
+  }
+}
+
+function drawPots() {
+  if (!MAP.pots) return;
+  MAP.pots.forEach(function (pot) {
+    if (pot.x + pot.w < CAM.x - 60 || pot.x > CAM.x + TC.width + 60) return;
+    if (pot.broken) return;
+    TX.save();
+    var potImg = SPR.pot;
+    if (potImg && potImg.complete && potImg.naturalWidth) {
+      TX.drawImage(potImg, pot.x, pot.y, pot.w, pot.h);
+    } else {
+      TX.fillStyle = "#8B6955";
+      TX.beginPath();
+      TX.ellipse(
+        pot.x + pot.w / 2,
+        pot.y + pot.h * 0.72,
+        pot.w * 0.42,
+        pot.h * 0.28,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      TX.fill();
+      TX.fillStyle = "#A0785A";
+      TX.fillRect(
+        pot.x + pot.w * 0.18,
+        pot.y + pot.h * 0.1,
+        pot.w * 0.64,
+        pot.h * 0.65,
+      );
+      TX.fillStyle = "#C4A882";
+      TX.fillRect(pot.x + pot.w * 0.14, pot.y + pot.h * 0.08, pot.w * 0.72, 8);
+    }
+    TX.restore();
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════
