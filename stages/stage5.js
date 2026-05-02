@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   LABYRINTH OF MINOS — STAGE V   stage3.js
+   LABYRINTH OF MINOS — STAGE III   stage3.js
    Faithfully implements the hand-drawn sketch:
    START → 1.5-block obstacle → pressure-plate spike1 → platform →
    pressure-plate spike2 → fall-down shaft → ready spike (DASH) →
@@ -30,6 +30,92 @@ var MAP_THEME_ASSETS = {
   },
 };
 
+/* ── SPACE QUESTIONS DATABASE ─────────────────────────────────── */
+var SPACE_QUESTIONS = [
+  {
+    q: "Which planet is closest to the Sun?",
+    options: ["Venus", "Mercury", "Mars", "Earth"],
+    correct: 1, // Mercury
+  },
+  {
+    q: "What is the largest planet in our solar system?",
+    options: ["Saturn", "Neptune", "Jupiter", "Uranus"],
+    correct: 2, // Jupiter
+  },
+  {
+    q: "Which planet is known as the Red Planet?",
+    options: ["Venus", "Jupiter", "Mars", "Mercury"],
+    correct: 2, // Mars
+  },
+  {
+    q: "What is the name of the galaxy that contains our Solar System?",
+    options: ["Andromeda", "Triangulum", "Whirlpool", "Milky Way"],
+    correct: 3, // Milky Way
+  },
+  {
+    q: "Which planet has the most extensive ring system?",
+    options: ["Jupiter", "Uranus", "Saturn", "Neptune"],
+    correct: 2, // Saturn
+  },
+  {
+    q: "What is the hottest planet in our solar system?",
+    options: ["Mercury", "Venus", "Mars", "Jupiter"],
+    correct: 1, // Venus
+  },
+  {
+    q: "Who was the first person to walk on the Moon?",
+    options: ["Buzz Aldrin", "Yuri Gagarin", "Neil Armstrong", "John Glenn"],
+    correct: 2, // Neil Armstrong
+  },
+  {
+    q: "What is the Great Red Spot on Jupiter?",
+    options: ["A volcano", "A massive storm", "A crater", "A lake"],
+    correct: 1, // A massive storm
+  },
+  {
+    q: "Which two planets have no moons?",
+    options: [
+      "Earth & Mars",
+      "Mercury & Venus",
+      "Jupiter & Saturn",
+      "Uranus & Neptune",
+    ],
+    correct: 1, // Mercury & Venus
+  },
+  {
+    q: "How long does light take to travel from the Sun to Earth?",
+    options: ["8 minutes", "1 hour", "1 day", "1 second"],
+    correct: 0, // 8 minutes
+  },
+  {
+    q: "What is a light-year a measure of?",
+    options: ["Time", "Distance", "Speed", "Brightness"],
+    correct: 1, // Distance
+  },
+  {
+    q: "Which dwarf planet was reclassified from a planet in 2006?",
+    options: ["Ceres", "Eris", "Pluto", "Haumea"],
+    correct: 2, // Pluto
+  },
+];
+
+function getRandomQuestion() {
+  var idx = Math.floor(Math.random() * SPACE_QUESTIONS.length);
+  return SPACE_QUESTIONS[idx];
+}
+
+function getRandomQuestions(count) {
+  var shuffled = SPACE_QUESTIONS.slice();
+  // Fisher-Yates shuffle
+  for (var i = shuffled.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = temp;
+  }
+  return shuffled.slice(0, count);
+}
+
 /* ── PHYSICS CONSTANTS ─────────────────────────────────────────── */
 var PX = 3.0; // base walk speed
 var SPR_MULT = 1.22; // sprint multiplier
@@ -37,8 +123,8 @@ var JUMP_V = -13.5;
 var GRAV = 0.58;
 var FRIC = 0.8;
 var DASH_COST = 28,
-  DASH_SPD = 15,
-  DASH_DUR = 13,
+  DASH_SPD = 18,
+  DASH_DUR = 16,
   DASH_CD = 52;
 var STAM_MAX = 100,
   STAM_DRAIN = 0.55,
@@ -46,7 +132,7 @@ var STAM_MAX = 100,
   STAM_MIN = 15;
 
 /* ── WORLD DIMENSIONS ──────────────────────────────────────────── */
-// Stage V keeps Stage III's feel but changes the obstacle route and increases danger.
+// Stage III extends Stage II with denser hazards, tighter climbs, and roaming mobs.
 var WORLD = 9100;
 var TILE = 48; // 1 game tile = 48px
 
@@ -108,7 +194,10 @@ var SPR = {
   mapTheme: { map: null, roof: null, fall: null },
   rat: [],
   bat: null,
+  pot: null,
+  sword: null,
 };
+
 var sprOK = false;
 var HAMMER_LEFT_PATHS = [
   "../hammer_animation_swing_to_the_left1.png",
@@ -211,15 +300,14 @@ async function loadSpr() {
   if (typeof SPRITE_DOOR2 !== "undefined") SPR.door2 = await li(SPRITE_DOOR2);
   if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
+
   SPR.torch = await li(TORCH_ASSET);
   SPR.rat = await Promise.all(MOB_RAT_PATHS.map(li));
   SPR.bat = await li(MOB_BAT_PATH);
-  if (typeof SPRITE_HELMET !== "undefined")
-    SPR.helmet = await li(SPRITE_HELMET);
-  if (typeof SPRITE_CHESTPLATE !== "undefined")
-    SPR.chestplate = await li(SPRITE_CHESTPLATE);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
+  if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
+  if (typeof SPRITE_SWORD !== "undefined") SPR.sword = await li(SPRITE_SWORD);
   var decorKeys = Object.keys(DECOR_PATHS);
   for (var i = 0; i < decorKeys.length; i++) {
     SPR.decor[decorKeys[i]] = await li(DECOR_PATHS[decorKeys[i]]);
@@ -246,6 +334,17 @@ function getSelectedMapTheme() {
 /* ── CAMERA ─────────────────────────────────────────────────────── */
 var CAM = { x: 0, y: 0 }; // horizontal only
 
+function isMobileViewport() {
+  return (
+    window.matchMedia &&
+    window.matchMedia("(max-width: 900px), (max-height: 520px)").matches
+  );
+}
+
+function getCanvasRenderScale() {
+  return isMobileViewport() ? 1.14 : 1;
+}
+
 /* ── KEYS ─────────────────────────────────────────────────────────── */
 var KEYS = {},
   JP = {};
@@ -265,6 +364,7 @@ window.addEventListener("keydown", function (e) {
       "KeyR",
       "ShiftLeft",
       "ShiftRight",
+      "ShiftLeft",
     ].indexOf(e.code) !== -1
   )
     e.preventDefault();
@@ -301,28 +401,26 @@ function buildMap() {
   var rise3Y = FLOOR_Y + TILE * 0.2;
 
   MAP.platforms = [
-    { x: 0, y: FLOOR_Y, w: 500, h: ph },
-    { x: 650, y: mezzY, w: 180, h: TILE },
-    { x: 930, y: loftY, w: 190, h: TILE },
-    { x: 1220, y: FLOOR_Y, w: 280, h: ph },
-    { x: 1600, y: lowerY, w: 220, h: ph },
-    { x: 1890, y: rise1Y, w: 180, h: TILE },
-    { x: 2140, y: rise2Y, w: 170, h: TILE },
-    { x: 2380, y: FLOOR_Y, w: 260, h: ph },
-    { x: 2740, y: mezzY, w: 190, h: TILE },
-    { x: 3010, y: trenchY, w: 150, h: ph },
-    { x: 3280, y: lowerY, w: 220, h: ph },
-    { x: 3590, y: mezzY, w: 180, h: TILE },
-    { x: 3880, y: loftY, w: 190, h: TILE },
-    { x: 4170, y: FLOOR_Y, w: 260, h: ph },
-    { x: 4520, y: rise1Y, w: 180, h: TILE },
-    { x: 4770, y: rise2Y, w: 170, h: TILE },
-    { x: 5000, y: rise3Y, w: 180, h: TILE },
-    { x: 5260, y: mezzY, w: 200, h: TILE },
-    { x: 5550, y: FLOOR_Y, w: 280, h: ph },
-    { x: 5960, y: loftY, w: 200, h: TILE },
-    { x: 6280, y: mezzY, w: 190, h: TILE },
-    { x: 6590, y: FLOOR_Y, w: 1530, h: ph },
+    { x: 0, y: FLOOR_Y, w: 560, h: ph },
+    { x: 760, y: mezzY, w: 220, h: TILE },
+    { x: 1070, y: mezzY, w: 250, h: TILE },
+    { x: 1460, y: FLOOR_Y, w: 360, h: ph },
+    { x: 1980, y: loftY, w: 240, h: TILE },
+    { x: 2320, y: mezzY, w: 200, h: TILE },
+    { x: 2620, y: FLOOR_Y, w: 360, h: ph },
+    { x: 3060, y: trenchY, w: 170, h: ph },
+    { x: 3350, y: lowerY, w: 260, h: ph },
+    { x: 3730, y: rise1Y, w: 230, h: TILE },
+    { x: 4040, y: rise2Y, w: 210, h: TILE },
+    { x: 4330, y: rise3Y, w: 240, h: TILE },
+    { x: 4680, y: mezzY, w: 260, h: TILE },
+    { x: 5040, y: FLOOR_Y, w: 340, h: ph },
+    { x: 5530, y: rise1Y, w: 220, h: TILE },
+    { x: 5840, y: rise2Y, w: 210, h: TILE },
+    { x: 6150, y: mezzY, w: 230, h: TILE },
+    { x: 6490, y: FLOOR_Y, w: 360, h: ph },
+    { x: 7000, y: mezzY, w: 230, h: TILE },
+    { x: 7360, y: FLOOR_Y, w: 1060, h: ph },
   ];
 
   MAP.obstacle = null;
@@ -330,39 +428,37 @@ function buildMap() {
 
   /* ── STAGE III SPIKE LAYOUT ── */
   MAP.spikes = [
-    { x: 1050, y: loftY, w: 64, triggerX: 980, active: false, riseTimer: 0 },
-    { x: 1750, y: lowerY, w: 64, triggerX: 1685, active: false, riseTimer: 0 },
-    { x: 3230, y: lowerY, w: 64, triggerX: 3160, active: false, riseTimer: 0 },
-    { x: 4040, y: loftY, w: 64, triggerX: 3970, active: false, riseTimer: 0 },
-    { x: 5180, y: rise3Y, w: 64, triggerX: 5115, active: false, riseTimer: 0 },
-    { x: 6360, y: mezzY, w: 64, triggerX: 6290, active: false, riseTimer: 0 },
+    { x: 1238, y: mezzY, w: 64, triggerX: 1168, active: false, riseTimer: 0 },
+    { x: 2886, y: FLOOR_Y, w: 64, triggerX: 2808, active: false, riseTimer: 0 },
+    { x: 4406, y: rise3Y, w: 64, triggerX: 4340, active: false, riseTimer: 0 },
+    { x: 7485, y: FLOOR_Y, w: 96, triggerX: 7400, active: false, riseTimer: 0 },
   ];
 
   MAP.mobs = [
     {
       type: "rat",
-      x: 960,
-      startX: 960,
+      x: 2065,
+      startX: 2065,
       y: loftY,
       w: 56,
       h: 32,
-      minX: 945,
-      maxX: 1065,
-      vx: 1.2,
+      minX: 1992,
+      maxX: 2160,
+      vx: 1.15,
       tick: 0,
       dead: false,
       hitCooldown: 0,
     },
     {
       type: "bat",
-      x: 2745,
-      startX: 2745,
+      x: 4690,
+      startX: 4690,
       y: mezzY - 128,
       baseY: mezzY - 128,
       w: 72,
       h: 42,
-      minX: 2720,
-      maxX: 2895,
+      minX: 4638,
+      maxX: 4912,
       vx: 1.45,
       bob: 0,
       tick: 0,
@@ -371,44 +467,14 @@ function buildMap() {
     },
     {
       type: "rat",
-      x: 3910,
-      startX: 3910,
-      y: loftY,
-      w: 56,
-      h: 32,
-      minX: 3890,
-      maxX: 4015,
-      vx: -1.25,
-      tick: 0,
-      dead: false,
-      hitCooldown: 0,
-    },
-    {
-      type: "bat",
-      x: 5290,
-      startX: 5290,
-      y: mezzY - 130,
-      baseY: mezzY - 130,
-      w: 72,
-      h: 42,
-      minX: 5250,
-      maxX: 5415,
-      vx: 1.55,
-      bob: 0,
-      tick: 0,
-      dead: false,
-      hitCooldown: 0,
-    },
-    {
-      type: "rat",
-      x: 6310,
-      startX: 6310,
+      x: 7055,
+      startX: 7055,
       y: mezzY,
       w: 56,
       h: 32,
-      minX: 6295,
-      maxX: 6405,
-      vx: 1.25,
+      minX: 7012,
+      maxX: 7158,
+      vx: -1.25,
       tick: 0,
       dead: false,
       hitCooldown: 0,
@@ -426,163 +492,178 @@ function buildMap() {
   MAP.readySpike = null;
   MAP.hammer = null;
 
-  /* ── STAGE III EXIT ── */
-  MAP.gold = {
-    x: 4230,
-    y: FLOOR_Y - 80,
-    w: 60,
-    h: 60,
-    collected: false,
-    bobTimer: 0,
-  };
+  /* ── GOLDEN THREAD — hidden inside one of 3 pots ── */
+  MAP.gold = null;
 
-   /* ── ARMOR PICKUPS ── */
-  var earlyPlatforms = MAP.platforms.slice(1, 5); // platforms 1-4 (indices 1,2,3,4)
-  
-  // Helmet — early platform
-  var helmetPlatform = earlyPlatforms[Math.floor(Math.random() * earlyPlatforms.length)];
-  MAP.helmet = {
-    x: helmetPlatform.x + helmetPlatform.w * 0.3 + Math.random() * (helmetPlatform.w * 0.4),
-    y: helmetPlatform.y - 55,
-    w: 44,
-    h: 44,
-    collected: false,
-    bobTimer: Math.random() * Math.PI * 2,
-    type: "helmet",
-    label: "Helmet",
-  };
+  var potPositions = [
+    { x: 1520, y: mezzY - 72 },
+    { x: 4700, y: mezzY - 72 },
+    { x: 7420, y: FLOOR_Y - 72 },
+  ];
+  var goldPotIndex = Math.floor(Math.random() * 3);
+  MAP.pots = potPositions.map(function (pos, i) {
+    return {
+      x: pos.x,
+      y: pos.y,
+      w: 52,
+      h: 68,
+      hasGold: i === goldPotIndex,
+      broken: false,
+      breakTimer: 0,
+    };
+  });
 
-  // Chestplate — different early platform
-  var chestPlatform;
-  var attempts = 0;
-  do {
-    chestPlatform = earlyPlatforms[Math.floor(Math.random() * earlyPlatforms.length)];
-    attempts++;
-  } while (chestPlatform === helmetPlatform && attempts < 10);
-
-  // NEW — 3 doors scattered in the map
+  /* ── THREE DOORS: 2 FAKE, 1 REAL ── */
+  /* ── THREE DOORS: 2 FAKE, 1 REAL ── */
   var dW = 118,
     dH = 154;
   var doorY = FLOOR_Y - dH;
 
-  // Randomly pick which door index (0-2) is correct each buildMap call
-  // We store it so it stays consistent until resetToStart
-  if (typeof MAP._correctDoorIdx === "undefined") {
-    MAP._correctDoorIdx = Math.floor(Math.random() * 3);
-  }
+  // Randomly assign which door is correct (0, 1, or 2)
+  var correctDoorIndex = Math.floor(Math.random() * 3);
 
   MAP.doors = [
     {
-      x: 2420, // scattered — near platform at x:2380
-      y: FLOOR_Y - dH,
+      x: 1800,
+      y: doorY,
       w: dW,
       h: dH,
-      correct: MAP._correctDoorIdx === 0,
-      label: "DOOR I",
+      correct: correctDoorIndex === 0,
+      label: correctDoorIndex === 0 ? "EXIT" : "DOOR A",
+      answered: false,
+      question: null, // Will be set when player interacts
     },
     {
-      x: 5590, // scattered — near platform at x:5550
-      y: FLOOR_Y - dH,
+      x: 4500,
+      y: doorY,
       w: dW,
       h: dH,
-      correct: MAP._correctDoorIdx === 1,
-      label: "DOOR II",
+      correct: correctDoorIndex === 1,
+      label: correctDoorIndex === 1 ? "EXIT" : "DOOR B",
+      answered: false,
+      question: null,
     },
     {
-      x: 7850, // scattered — end of last long platform (x:6590 + 1260)
-      y: FLOOR_Y - dH,
+      x: 7200,
+      y: doorY,
       w: dW,
       h: dH,
-      correct: MAP._correctDoorIdx === 2,
-      label: "DOOR III",
+      correct: correctDoorIndex === 2,
+      label: correctDoorIndex === 2 ? "EXIT" : "DOOR C",
+      answered: false,
+      question: null,
     },
   ];
   MAP.doorFrameRect = null;
 
   MAP.decorBack = [
-    { key: "banner", x: 120, y: FLOOR_Y - 312, w: 84, h: 168, alpha: 0.13 },
-    { key: "web", x: 270, y: FLOOR_Y - 258, w: 132, h: 48, alpha: 0.24 },
-    { key: "muralLady", x: 680, y: FLOOR_Y - 286, w: 140, h: 112, alpha: 0.11 },
-
-    { key: "web", x: 950, y: loftY - 96, w: 128, h: 46, alpha: 0.26 },
-    { key: "vinesRed1", x: 1180, y: FLOOR_Y - 208, w: 78, h: 224, alpha: 0.2 },
-    { key: "cage", x: 1600, y: lowerY - 186, w: 104, h: 88, alpha: 0.18 },
-
-    { key: "web", x: 1935, y: rise1Y - 94, w: 126, h: 44, alpha: 0.24 },
-    { key: "web", x: 2160, y: rise2Y - 98, w: 128, h: 46, alpha: 0.25 },
-    {
-      key: "muralShade",
-      x: 2450,
-      y: FLOOR_Y - 290,
-      w: 184,
-      h: 144,
-      alpha: 0.1,
-    },
-
-    { key: "web", x: 3315, y: lowerY - 116, w: 130, h: 46, alpha: 0.24 },
+    { key: "cage", x: 150, y: FLOOR_Y - 276, w: 104, h: 88, alpha: 0.18 },
+    { key: "web", x: 300, y: FLOOR_Y - 256, w: 132, h: 48, alpha: 0.24 },
     {
       key: "vinesGreenWide",
-      x: 3600,
-      y: FLOOR_Y - 214,
+      x: 520,
+      y: FLOOR_Y - 216,
       w: 170,
       h: 56,
       alpha: 0.15,
     },
-    { key: "web", x: 3910, y: loftY - 96, w: 128, h: 46, alpha: 0.26 },
 
-    { key: "banner", x: 4240, y: FLOOR_Y - 306, w: 84, h: 164, alpha: 0.12 },
-    { key: "web", x: 4540, y: rise1Y - 96, w: 128, h: 46, alpha: 0.24 },
-    { key: "web", x: 5030, y: rise3Y - 102, w: 132, h: 46, alpha: 0.28 },
+    { key: "web", x: 820, y: mezzY - 96, w: 126, h: 44, alpha: 0.26 },
+    { key: "writing", x: 1120, y: FLOOR_Y - 178, w: 142, h: 58, alpha: 0.16 },
+    { key: "vinesRed3", x: 1330, y: FLOOR_Y - 208, w: 80, h: 236, alpha: 0.22 },
+
+    { key: "web", x: 2010, y: loftY - 94, w: 128, h: 46, alpha: 0.26 },
+    {
+      key: "muralShade",
+      x: 2230,
+      y: FLOOR_Y - 292,
+      w: 188,
+      h: 146,
+      alpha: 0.1,
+    },
+
+    { key: "web", x: 3110, y: trenchY - 118, w: 132, h: 46, alpha: 0.26 },
+    { key: "vinesGreen", x: 3350, y: lowerY - 142, w: 82, h: 96, alpha: 0.16 },
+    { key: "web", x: 3770, y: rise1Y - 96, w: 138, h: 48, alpha: 0.24 },
+    {
+      key: "vinesGreenWide",
+      x: 4010,
+      y: rise2Y - 156,
+      w: 162,
+      h: 52,
+      alpha: 0.16,
+    },
+    { key: "web", x: 4350, y: rise3Y - 104, w: 132, h: 46, alpha: 0.28 },
+
+    {
+      key: "muralLady",
+      x: 4560,
+      y: FLOOR_Y - 286,
+      w: 138,
+      h: 112,
+      alpha: 0.12,
+    },
+    { key: "web", x: 4720, y: mezzY - 96, w: 132, h: 46, alpha: 0.24 },
+    {
+      key: "vinesGreenWide",
+      x: 5060,
+      y: FLOOR_Y - 212,
+      w: 170,
+      h: 56,
+      alpha: 0.15,
+    },
+
+    { key: "cage", x: 5590, y: rise1Y - 178, w: 104, h: 88, alpha: 0.18 },
+    { key: "writing", x: 5870, y: FLOOR_Y - 188, w: 146, h: 60, alpha: 0.16 },
+    { key: "web", x: 6180, y: mezzY - 96, w: 126, h: 44, alpha: 0.24 },
+    { key: "vinesRed4", x: 6740, y: FLOOR_Y - 212, w: 88, h: 244, alpha: 0.22 },
+    { key: "web", x: 7030, y: mezzY - 96, w: 132, h: 48, alpha: 0.28 },
 
     {
       key: "muralSeeker",
-      x: 5600,
-      y: FLOOR_Y - 286,
+      x: 7410,
+      y: FLOOR_Y - 284,
       w: 176,
       h: 138,
-      alpha: 0.11,
+      alpha: 0.12,
     },
-    { key: "web", x: 5985, y: loftY - 96, w: 130, h: 46, alpha: 0.26 },
-    { key: "vinesRed3", x: 6310, y: FLOOR_Y - 208, w: 82, h: 236, alpha: 0.22 },
-
     {
       key: "vinesGreenWide",
-      x: 7020,
+      x: 7720,
       y: FLOOR_Y - 160,
       w: 180,
       h: 60,
       alpha: 0.18,
     },
-    { key: "web", x: 7950, y: FLOOR_Y - 88, w: 120, h: 42, alpha: 0.22 },
+    { key: "web", x: 7995, y: FLOOR_Y - 88, w: 120, h: 42, alpha: 0.22 },
   ];
 
   MAP.decorFront = [
-    { key: "jar", x: 680, y: mezzY - 58, w: 52, h: 62, alpha: 0.76 },
-    { key: "bonesSmall", x: 952, y: loftY - 4, w: 72, h: 30, alpha: 0.24 },
-    { key: "jar", x: 1628, y: lowerY + 6, w: 56, h: 66, alpha: 0.74 },
-    { key: "bonesWide", x: 3295, y: lowerY + 10, w: 114, h: 52, alpha: 0.24 },
-    { key: "jar", x: 3610, y: mezzY - 58, w: 54, h: 64, alpha: 0.76 },
-    { key: "bonesLarge", x: 3895, y: loftY - 8, w: 110, h: 62, alpha: 0.22 },
-    { key: "blood", x: 5170, y: rise3Y - 86, w: 102, h: 58, alpha: 0.2 },
-    { key: "clueMarker", x: 6295, y: mezzY - 56, w: 68, h: 40, alpha: 0.64 },
-    { key: "bonesHuge", x: 7900, y: FLOOR_Y - 18, w: 148, h: 92, alpha: 0.28 },
+    { key: "jar", x: 812, y: mezzY - 58, w: 52, h: 62, alpha: 0.76 },
+    { key: "bonesSmall", x: 2038, y: loftY - 4, w: 72, h: 30, alpha: 0.22 },
+    { key: "bonesWide", x: 3390, y: lowerY + 10, w: 114, h: 52, alpha: 0.24 },
+    { key: "jar", x: 5105, y: FLOOR_Y - 60, w: 58, h: 68, alpha: 0.78 },
+    { key: "bonesSmall", x: 6540, y: FLOOR_Y - 6, w: 76, h: 32, alpha: 0.2 },
+    { key: "blood", x: 6988, y: FLOOR_Y - 108, w: 108, h: 62, alpha: 0.2 },
+    { key: "clueMarker", x: 7628, y: FLOOR_Y - 204, w: 68, h: 40, alpha: 0.64 },
+    { key: "bonesHuge", x: 7905, y: FLOOR_Y - 18, w: 148, h: 92, alpha: 0.28 },
   ];
   cleanStageDecor();
 
   MAP.roomLights = [
-    { x: 30, y: FLOOR_Y - 280, w: 980, h: 350, glow: 0.08 },
-    { x: 1020, y: FLOOR_Y - 330, w: 1550, h: 410, glow: 0.1 },
-    { x: 2700, y: lowerY - 240, w: 1300, h: 430, glow: 0.11 },
-    { x: 4100, y: FLOOR_Y - 300, w: 1750, h: 370, glow: 0.09 },
-    { x: 5950, y: FLOOR_Y - 270, w: 2200, h: 340, glow: 0.1 },
+    { x: 30, y: FLOOR_Y - 280, w: 880, h: 350, glow: 0.08 },
+    { x: 930, y: FLOOR_Y - 330, w: 1650, h: 410, glow: 0.1 },
+    { x: 2710, y: lowerY - 240, w: 980, h: 430, glow: 0.11 },
+    { x: 3730, y: FLOOR_Y - 280, w: 2050, h: 360, glow: 0.09 },
+    { x: 5900, y: FLOOR_Y - 260, w: 2600, h: 330, glow: 0.1 },
   ];
 
   MAP.roomColumns = [
-    { x: 590, y: 120, w: 22, h: FLOOR_Y - 28, alpha: 0.11 },
-    { x: 1520, y: 126, w: 22, h: FLOOR_Y - 22, alpha: 0.12 },
-    { x: 2990, y: 138, w: 22, h: trenchY - 34, alpha: 0.13 },
-    { x: 4480, y: 120, w: 24, h: FLOOR_Y - 26, alpha: 0.11 },
-    { x: 6900, y: 120, w: 24, h: FLOOR_Y - 24, alpha: 0.13 },
+    { x: 610, y: 120, w: 22, h: FLOOR_Y - 28, alpha: 0.11 },
+    { x: 1700, y: 126, w: 22, h: FLOOR_Y - 22, alpha: 0.12 },
+    { x: 3240, y: 138, w: 22, h: trenchY - 34, alpha: 0.13 },
+    { x: 5110, y: 120, w: 24, h: FLOOR_Y - 26, alpha: 0.11 },
+    { x: 7410, y: 120, w: 24, h: FLOOR_Y - 24, alpha: 0.13 },
   ];
 
   /* ── SPAWN POINT ── */
@@ -600,7 +681,7 @@ var GS = {
   hasGold: false,
   startTime: 0,
   timerSecs: 0,
-  step: 0,
+  step: 0, // tutorial step index
   paused: false,
   dead: false,
   won: false,
@@ -614,17 +695,12 @@ var GS = {
   deathFlash: 0,
   badgeTimer: null,
   stepCardTimer: null,
-
-  // ── NEW: Quiz state ──
-  quizActive: false,
-  quizDoor: null, // which door index triggered the quiz
-  quizQuestions: [], // array of {q, options, answer}
-  quizCurrent: 0, // current question index
-  quizEl: null, // DOM element reference
-
-  armorPieces: 0, // 0, 1, or 2 (helmet + chestplate)
-  hasHelmet: false,
-  hasChestplate: false,
+  sword: {
+    active: false,
+    timer: 0,
+    cooldown: 0,
+    dir: 1,
+  },
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -633,36 +709,36 @@ var GS = {
 var STEPS = [
   {
     icon: "🕸",
-    title: "Stage V — Broken Reliquary",
-    desc: "The fifth chamber tightens the jumps and adds more pressure from spikes and creatures guarding the reliquary path.",
-    keys: ["Stay mobile", "Watch for rats and bats"],
+    title: "Stage III — Infested Climb",
+    desc: "Find the Golden Thread to unlock the mysterious doors. Beware: only one door leads to freedom!",
+    keys: ["Find the Golden Thread", "Choose wisely among 3 doors"],
     trigger: function () {
       return PL.x > 700;
     },
   },
   {
     icon: "☠",
-    title: "Hazards Stack",
-    desc: "Fewer spike traps protect the route now, but 3 mobs patrol the safest-looking ledges.",
-    keys: ["Clear ledges fast"],
+    title: "The Golden Thread",
+    desc: "The Golden Thread lies hidden in the chamber. Without it, the doors remain sealed.",
+    keys: ["Search thoroughly"],
     trigger: function () {
       return PL.x > 2400;
     },
   },
   {
     icon: "🦇",
-    title: "Roaming Threats",
-    desc: "Flying and crawling enemies force cleaner timing. Hesitation is punished harder here.",
-    keys: ["Read patrols"],
+    title: "The Three Doors",
+    desc: "Two doors lead to doom, one to salvation. Each requires answering space riddles correctly.",
+    keys: ["Answer 4/6 questions correctly", "Choose the right door"],
     trigger: function () {
       return PL.x > 5200;
     },
   },
   {
     icon: "🚪",
-    title: "Final Push",
-    desc: "The exit hall is longer and less forgiving. Cross the last hazards and reach the next gate.",
-    keys: ["Finish the chamber"],
+    title: "Final Choice",
+    desc: "Use your knowledge of the cosmos to unlock the true exit. Wrong answers cost health!",
+    keys: ["Space knowledge required", "Hearts are limited"],
     trigger: function () {
       return PL.x > 7900;
     },
@@ -685,8 +761,11 @@ async function tutInit() {
 }
 
 function tutResize() {
-  TC.width = window.innerWidth;
-  TC.height = window.innerHeight;
+  var canvasScale = getCanvasRenderScale();
+  TC.width = Math.round(window.innerWidth * canvasScale);
+  TC.height = Math.round(window.innerHeight * canvasScale);
+  TC.style.width = "100vw";
+  TC.style.height = "100vh";
   TC.getContext("2d").imageSmoothingEnabled = false;
   buildMap();
   spawnPlayer();
@@ -715,6 +794,7 @@ function spawnPlayer() {
   CAM.x = 0;
   GS.hasGold = false;
   GS.activeDoorIndex = -1;
+  GS.hasSword = true;
   if (MAP.mobs) {
     MAP.mobs.forEach(function (m) {
       m.dead = false;
@@ -728,13 +808,6 @@ function spawnPlayer() {
 }
 
 function resetToStart() {
-  // Re-randomize doors
-  MAP._correctDoorIdx = Math.floor(Math.random() * 3);
-  if (MAP.doors && MAP.doors.length === 3) {
-    MAP.doors[0].correct = MAP._correctDoorIdx === 0;
-    MAP.doors[1].correct = MAP._correctDoorIdx === 1;
-    MAP.doors[2].correct = MAP._correctDoorIdx === 2;
-  }
   // Reset all traps
   MAP.spikes.forEach(function (s) {
     s.active = false;
@@ -753,22 +826,16 @@ function resetToStart() {
       m.tick = 0;
     });
   }
-  // Re-randomize which door is correct
-    // Re-randomize which door is correct
-  MAP._correctDoorIdx = Math.floor(Math.random() * 3);
-  MAP.doors[0].correct = MAP._correctDoorIdx === 0;
-  MAP.doors[1].correct = MAP._correctDoorIdx === 1;
-  MAP.doors[2].correct = MAP._correctDoorIdx === 2;
-  // Reset quiz state on all doors
-  MAP.doors.forEach(function(d) { d._quizState = null; });
   GS.hasGold = false;
-  if (MAP.gold) MAP.gold.collected = false;
-  GS.armorPieces = 0;
-  GS.hasHelmet = false;
-  GS.hasChestplate = false;
-  if (MAP.helmet) MAP.helmet.collected = false;
-  if (MAP.chestplate) MAP.chestplate.collected = false;
   GS.activeDoorIndex = -1;
+  if (MAP.pots) {
+    var newGoldPot = Math.floor(Math.random() * MAP.pots.length);
+    MAP.pots.forEach(function (pot, i) {
+      pot.hasGold = i === newGoldPot;
+      pot.broken = false;
+      pot.breakTimer = 0;
+    });
+  }
   GS.dead = false;
   GS.won = false;
   GS.jumpscareActive = false;
@@ -783,306 +850,195 @@ function resetToStart() {
   hideScreen("screen-wrong");
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   MATH QUIZ SYSTEM
-═══════════════════════════════════════════════════════════════════ */
+/* ── DOOR QUIZ SYSTEM (Single Question) ───────────────────────── */
+var currentQuiz = null;
 
-// Question bank — mix of arithmetic operations and percentage history
-var QUIZ_BANK = [
-  // Basic arithmetic
-  function () {
-    var a = Math.floor(Math.random() * 50) + 10,
-      b = Math.floor(Math.random() * 50) + 10;
-    return {
-      q: "What is " + a + " + " + b + "?",
-      answer: a + b,
-      options: shuffle([a + b, a + b + 5, a + b - 3, a + b + 10]),
-    };
-  },
-  function () {
-    var a = Math.floor(Math.random() * 80) + 20,
-      b = Math.floor(Math.random() * a);
-    return {
-      q: "What is " + a + " - " + b + "?",
-      answer: a - b,
-      options: shuffle([a - b, a - b + 4, a - b - 4, a - b + 7]),
-    };
-  },
-  function () {
-    var a = Math.floor(Math.random() * 12) + 2,
-      b = Math.floor(Math.random() * 12) + 2;
-    return {
-      q: "What is " + a + " × " + b + "?",
-      answer: a * b,
-      options: shuffle([a * b, a * b + a, a * b - b, a * b + 2]),
-    };
-  },
-  function () {
-    var b = Math.floor(Math.random() * 10) + 2,
-      a = b * (Math.floor(Math.random() * 10) + 2);
-    return {
-      q: "What is " + a + " ÷ " + b + "?",
-      answer: a / b,
-      options: shuffle([a / b, a / b + 1, a / b - 1, a / b + 2]),
-    };
-  },
-  function () {
-    var a = Math.floor(Math.random() * 20) + 5,
-      b = Math.floor(Math.random() * 20) + 5;
-    return {
-      q: "What is " + a + "² + " + b + "? (a squared plus b)",
-      answer: a * a + b,
-      options: shuffle([a * a + b, a * a + b + 5, a * a - b, a * a + b - 2]),
-    };
-  },
-  // Percentage questions
-  function () {
-    var pct = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
-    var whole = Math.floor(Math.random() * 16 + 4) * 10;
-    return {
-      q: "What is " + pct + "% of " + whole + "?",
-      answer: (pct * whole) / 100,
-      options: shuffle([
-        (pct * whole) / 100,
-        (pct * whole) / 100 + 5,
-        (pct * whole) / 100 - 5,
-        ((pct * whole) / 100) * 2,
-      ]),
-    };
-  },
-  function () {
-    var part = Math.floor(Math.random() * 40) + 10,
-      whole = part + Math.floor(Math.random() * 60) + 10;
-    var pct = Math.round((part / whole) * 100);
-    return {
-      q:
-        "What percentage is " +
-        part +
-        " of " +
-        whole +
-        "? (round to nearest %)",
-      answer: pct,
-      options: shuffle([pct, pct + 5, pct - 5, pct + 10]),
-    };
-  },
-  function () {
-    var orig = (Math.floor(Math.random() * 8) + 2) * 10;
-    var pct = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
-    var result = orig + (orig * pct) / 100;
-    return {
-      q: "A price of " + orig + " increases by " + pct + "%. New price?",
-      answer: result,
-      options: shuffle([result, result + pct, result - pct / 2, orig]),
-    };
-  },
-  function () {
-    var orig = (Math.floor(Math.random() * 8) + 2) * 10;
-    var pct = [10, 20, 25, 50][Math.floor(Math.random() * 4)];
-    var result = orig - (orig * pct) / 100;
-    return {
-      q: "A price of " + orig + " decreases by " + pct + "%. New price?",
-      answer: result,
-      options: shuffle([result, result + pct, result - pct, orig]),
-    };
-  },
-  // History of Percentage
-  function () {
-    return {
-      q: "The word 'percent' comes from which Latin phrase?",
-      answer: "per centum",
-      options: shuffle([
-        "per centum",
-        "pro mille",
-        "per annum",
-        "centus primus",
-      ]),
-    };
-  },
-  function () {
-    return {
-      q: "The '%' symbol first appeared in widespread use around which century?",
-      answer: "15th",
-      options: shuffle(["15th", "12th", "17th", "10th"]),
-    };
-  },
-  function () {
-    return {
-      q: "100% means the whole — what does 200% represent?",
-      answer: "Twice the whole",
-      options: shuffle([
-        "Twice the whole",
-        "Half the whole",
-        "The same",
-        "200 units",
-      ]),
-    };
-  },
-];
-
-function shuffle(arr) {
-  var a = arr.slice();
-  for (var i = a.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var t = a[i];
-    a[i] = a[j];
-    a[j] = t;
-  }
-  return a;
-}
-
-function buildQuiz() {
-  // Pick 6 unique random questions from the bank
-  var indices = [];
-  while (indices.length < 6) {
-    var n = Math.floor(Math.random() * QUIZ_BANK.length);
-    if (indices.indexOf(n) === -1) indices.push(n);
-  }
-  return indices.map(function (i) {
-    return QUIZ_BANK[i]();
-  });
-}
-
-function openQuiz(doorIndex) {
-  // Initialize per-door quiz state if not exists
-  if (!MAP.doors[doorIndex]._quizState) {
-    MAP.doors[doorIndex]._quizState = {
-      questions: buildQuiz(),
-      current: 0,
-      answered: [], // track which questions were answered correctly
-    };
-  }
-  
-  var qState = MAP.doors[doorIndex]._quizState;
-  
-  // If all questions already answered correctly, check if door is correct
-  if (qState.current >= qState.questions.length) {
-    // All done — resolve the door
-    if (MAP.doors[doorIndex].correct) {
-      window.location.href = "stage6.html";
-    } else {
-      wrongDoor();
-    }
-    return;
-  }
-  
-  GS.quizActive = true;
-  GS.quizDoor = doorIndex;
-  GS.quizQuestions = qState.questions;
-  GS.quizCurrent = qState.current;
+function startDoorQuiz(door, doorIndex) {
   GS.paused = true;
-  renderQuizUI();
+  currentQuiz = {
+    door: door,
+    doorIndex: doorIndex,
+    question: door.question,
+  };
+
+  buildQuizUI();
+  showQuizQuestion();
 }
 
-function renderQuizUI() {
-  // Remove old quiz if exists
-  closeQuizUI();
+function buildQuizUI() {
+  var existing = document.getElementById("quiz-overlay");
+  if (existing) existing.remove();
 
-  var q = GS.quizQuestions[GS.quizCurrent];
   var overlay = document.createElement("div");
   overlay.id = "quiz-overlay";
   overlay.style.cssText = [
     "position:fixed",
     "inset:0",
-    "z-index:8000",
+    "z-index:10000",
     "display:flex",
-    "flex-direction:column",
     "align-items:center",
     "justify-content:center",
-    "background:rgba(0,0,0,0.82)",
+    "background:rgba(0,0,0,0.85)",
     "font-family:Cinzel,serif",
   ].join(";");
 
-  var progress = GS.quizCurrent + 1 + " / " + GS.quizQuestions.length;
-  var door = MAP.doors[GS.quizDoor];
+  var container = document.createElement("div");
+  container.id = "quiz-container";
+  container.style.cssText = [
+    "background:linear-gradient(180deg,#1a0f0a 0%,#0d0705 100%)",
+    "border:2px solid #d4a843",
+    "border-radius:8px",
+    "padding:32px",
+    "max-width:560px",
+    "width:90%",
+    "color:#e8c26a",
+    "box-shadow:0 0 40px rgba(212,168,67,0.3)",
+  ].join(";");
 
-  overlay.innerHTML = [
-    '<div style="background:#1a0f0a;border:2px solid #c8a23a;border-radius:10px;',
-    'padding:36px 44px;max-width:520px;width:90%;text-align:center;box-shadow:0 0 60px rgba(200,162,58,0.18)">',
-    '<div style="color:#c8a23a;font-size:13px;letter-spacing:2px;margin-bottom:8px;">',
-    "📜 " + (door ? door.label : "DOOR") + " — RIDDLE OF THE PASSAGE</div>",
-    '<div style="color:#f0e0b0;font-size:12px;margin-bottom:18px;">Question ' +
-      progress +
-      "</div>",
-    '<div style="color:#fff;font-size:20px;font-weight:bold;margin-bottom:28px;line-height:1.4;">',
-    q.q + "</div>",
-    '<div id="quiz-options" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">',
-    q.options
-      .map(function (opt, oi) {
-        return (
-          '<button onclick="quizAnswer(' +
-          JSON.stringify(opt) +
-          ')" style="' +
-          "background:#2a1a10;border:1.5px solid #7a5a20;color:#f0d890;" +
-          "padding:12px 8px;border-radius:6px;font-family:Cinzel,serif;font-size:14px;" +
-          'cursor:pointer;transition:background 0.15s;" ' +
-          "onmouseover=\"this.style.background='#3a2a18'\" " +
-          "onmouseout=\"this.style.background='#2a1a10'\">" +
-          opt +
-          "</button>"
-        );
-      })
-      .join(""),
-    "</div>",
-    '<div style="color:#7a5a20;font-size:11px;margin-top:18px;">',
-    "⚠ Wrong answer costs 1 ❤</div>",
-    "</div>",
-  ].join("");
+  var title = document.createElement("h2");
+  title.id = "quiz-title";
+  title.style.cssText =
+    "margin:0 0 20px 0;color:#ffd700;font-size:24px;text-align:center;";
+  title.textContent = "🔮 Oracle's Riddle";
 
+  var subtitle = document.createElement("div");
+  subtitle.style.cssText =
+    "text-align:center;margin-bottom:16px;font-size:13px;color:#a08050;";
+  subtitle.textContent = "Answer correctly to unlock the door...";
+
+  var question = document.createElement("div");
+  question.id = "quiz-question";
+  question.style.cssText =
+    "font-size:20px;margin-bottom:28px;line-height:1.4;color:#f0e6d2;text-align:center;";
+
+  var options = document.createElement("div");
+  options.id = "quiz-options";
+  options.style.cssText = "display:flex;flex-direction:column;gap:12px;";
+
+  var feedback = document.createElement("div");
+  feedback.id = "quiz-feedback";
+  feedback.style.cssText =
+    "margin-top:20px;text-align:center;font-size:18px;min-height:28px;";
+
+  container.appendChild(title);
+  container.appendChild(subtitle);
+  container.appendChild(question);
+  container.appendChild(options);
+  container.appendChild(feedback);
+  overlay.appendChild(container);
   document.body.appendChild(overlay);
-  GS.quizEl = overlay;
+}
+
+function showQuizQuestion() {
+  if (!currentQuiz) return;
+
+  var q = currentQuiz.question;
+
+  document.getElementById("quiz-question").textContent = q.q;
+
+  var optionsDiv = document.getElementById("quiz-options");
+  optionsDiv.innerHTML = "";
+
+  q.options.forEach(function (opt, idx) {
+    var btn = document.createElement("button");
+    btn.style.cssText = [
+      "background:linear-gradient(180deg,#2a1a10 0%,#1a0f0a 100%)",
+      "border:1px solid #8a6a3a",
+      "color:#e8c26a",
+      "padding:16px 20px",
+      "font-size:17px",
+      "cursor:pointer",
+      "border-radius:4px",
+      "font-family:Cinzel,serif",
+      "transition:all 0.2s",
+      "text-align:left",
+    ].join(";");
+
+    btn.onmouseover = function () {
+      this.style.borderColor = "#d4a843";
+      this.style.background = "linear-gradient(180deg,#3a2a1a 0%,#2a1a10 100%)";
+    };
+    btn.onmouseout = function () {
+      this.style.borderColor = "#8a6a3a";
+      this.style.background = "linear-gradient(180deg,#2a1a10 0%,#1a0f0a 100%)";
+    };
+
+    btn.textContent = String.fromCharCode(65 + idx) + ". " + opt;
+    btn.onclick = function () {
+      handleQuizAnswer(idx);
+    };
+    optionsDiv.appendChild(btn);
+  });
+
+  document.getElementById("quiz-feedback").textContent = "";
+}
+
+function handleQuizAnswer(selectedIndex) {
+  if (!currentQuiz) return;
+
+  var q = currentQuiz.question;
+  var isCorrect = selectedIndex === q.correct;
+  var feedback = document.getElementById("quiz-feedback");
+  var door = currentQuiz.door;
+
+  // Disable all buttons
+  var buttons = document
+    .getElementById("quiz-options")
+    .getElementsByTagName("button");
+  for (var i = 0; i < buttons.length; i++) {
+    buttons[i].disabled = true;
+    if (i === q.correct) {
+      buttons[i].style.borderColor = "#4a8a4a";
+      buttons[i].style.background =
+        "linear-gradient(180deg,#2a4a2a 0%,#1a3a1a 100%)";
+    } else if (i === selectedIndex && !isCorrect) {
+      buttons[i].style.borderColor = "#8a2a2a";
+      buttons[i].style.background =
+        "linear-gradient(180deg,#4a1a1a 0%,#3a1010 100%)";
+    }
+  }
+
+  door.answered = true;
+
+  if (isCorrect) {
+    feedback.innerHTML =
+      '<span style="color:#4aff4a;">✓ Correct! The door unlocks...</span>';
+
+    setTimeout(function () {
+      closeQuizUI();
+
+      if (door.correct) {
+        // Right door + right answer = proceed to stage 4
+        showBadge("🌟 The path opens! Proceeding to Stage IV...");
+        setTimeout(function () {
+          window.location.href = "stage4.html";
+        }, 1500);
+      } else {
+        // Wrong door but right answer = damage, door seals
+        takeDamage("wrongDoor");
+        showBadge("✕ Right answer, but wrong door! -1 Heart");
+      }
+    }, 1200);
+  } else {
+    feedback.innerHTML =
+      '<span style="color:#ff4a4a;">✗ Wrong! The answer was: ' +
+      q.options[q.correct] +
+      "</span>";
+
+    setTimeout(function () {
+      closeQuizUI();
+      takeDamage("quizFail");
+      showBadge("✕ Wrong answer! -1 Heart");
+    }, 1500);
+  }
 }
 
 function closeQuizUI() {
-  var old = document.getElementById("quiz-overlay");
-  if (old && old.parentNode) old.parentNode.removeChild(old);
-  GS.quizEl = null;
-}
-
-window.quizAnswer = function (chosen) {
-  if (!GS.quizActive) return;
-  var q = GS.quizQuestions[GS.quizCurrent];
-  var correct = String(chosen) === String(q.answer);
-  var doorIdx = GS.quizDoor;
-  var qState = MAP.doors[doorIdx]._quizState;
-
-  if (!correct) {
-    // Wrong answer → lose 1 heart, close quiz, resume game
-    closeQuizUI();
-    GS.quizActive = false;
-    GS.paused = false;
-    GS.lives = Math.max(0, GS.lives - 1);
-    updateHUD();
-    spawnImpactPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.55, 10);
-    if (GS.lives <= 0) {
-      startDeathSequence("quiz");
-    } else {
-      showBadge("✕ Wrong! -1 ❤  Try the door again.");
-    }
-    return;
-  }
-
-  // Correct! — save progress and close quiz (player must return for next question)
-  qState.current++;
-  qState.answered.push(GS.quizCurrent);
-  
-  closeQuizUI();
-  GS.quizActive = false;
+  var overlay = document.getElementById("quiz-overlay");
+  if (overlay) overlay.remove();
+  currentQuiz = null;
   GS.paused = false;
-  
-  var remaining = qState.questions.length - qState.current;
-  
-  if (remaining > 0) {
-    // More questions remain — player must re-approach door
-    showBadge("✓ Correct! " + remaining + " more riddle(s) remain. Re-enter the door.");
-  } else {
-    // All questions answered — resolve the door
-    if (MAP.doors[doorIdx].correct) {
-      window.location.href = "stage6.html";
-    } else {
-      wrongDoor();
-    }
-  }
-};
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    UPDATE
@@ -1137,7 +1093,12 @@ function tutUpdate() {
   }
 
   // Dash
-  if ((JP["ShiftLeft"] || JP["ShiftRight"]) && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
+  if (
+    (JP["ShiftLeft"] || JP["ShiftRight"]) &&
+    PL.dcd <= 0 &&
+    PL.stamina >= DASH_COST &&
+    !PL.dashing
+  ) {
     PL.dashing = true;
     PL.dtmr = DASH_DUR;
     PL.ddir = PL.dir;
@@ -1302,88 +1263,108 @@ function tutUpdate() {
     }
   }
 
-  /* ── GOLD THREW PICKUP ── */
-  if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
-    var g = MAP.gold;
-    var px6 = PL.x + PL_COX,
-      py6 = PL.y + PL_COY;
-    if (
-      JP["KeyE"] ||
-      (Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 80 &&
-        Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 80 &&
-        (JP["KeyE"] || KEYS["KeyE"]))
-    ) {
-      // Auto-pickup on proximity
-      if (
-        Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 70 &&
-        Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 70
-      ) {
-        MAP.gold.collected = true;
-        GS.hasGold = true;
-        showBadge("✨ Golden Thread collected!");
-        spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
+  /* ── SWORD SWING ── */
+  if (GS.hasSword) {
+    if (GS.sword.cooldown > 0) GS.sword.cooldown--;
+
+    if (JP["KeyF"] && !GS.sword.active && GS.sword.cooldown <= 0) {
+      GS.sword.active = true;
+      GS.sword.timer = 18;
+      GS.sword.dir = PL.dir;
+      GS.sword.cooldown = 28;
+      JP["KeyF"] = false;
+
+      if (MAP.pots) {
+        var swingReach = 72;
+        var swingCX =
+          PL.x + PL_COX + PL.w / 2 + GS.sword.dir * swingReach * 0.5;
+        var swingCY = PL.y + PL_COY + PL.h * 0.45;
+
+        MAP.pots.forEach(function (pot) {
+          if (pot.broken) return;
+          var potCX = pot.x + pot.w / 2;
+          var potCY = pot.y + pot.h / 2;
+          var dx = Math.abs(swingCX - potCX);
+          var dy = Math.abs(swingCY - potCY);
+          if (dx < swingReach && dy < pot.h * 0.7) {
+            pot.broken = true;
+            pot.breakTimer = 0;
+            spawnPotShards(potCX, potCY);
+            if (pot.hasGold && !GS.hasGold) {
+              spawnDroppedItem(potCX, pot.y, "gold");
+              showBadge("⚔️ Pot smashed — Golden Thread found!");
+            } else {
+              showBadge("⚔️ Empty pot.");
+            }
+          }
+        });
       }
+    }
+
+    if (GS.sword.active) {
+      GS.sword.timer--;
+      if (GS.sword.timer <= 0) GS.sword.active = false;
     }
   }
 
-  /* ── ARMOR PICKUP (auto-equip on proximity) ── */
-  [MAP.helmet, MAP.chestplate].forEach(function (armor) {
-    if (!armor || armor.collected) return;
-    var pxA = PL.x + PL_COX + PL.w / 2;
-    var pyA = PL.y + PL_COY + PL.h / 2;
-    var ax = armor.x + armor.w / 2;
-    var ay = armor.y + armor.h / 2;
-    var distA = Math.hypot(pxA - ax, pyA - ay);
+  /* ── POT BREAK TIMER ── */
+  if (MAP.pots) {
+    MAP.pots.forEach(function (pot) {
+      if (pot.broken) pot.breakTimer++;
+    });
+  }
 
-    if (distA < 55) {
-      armor.collected = true;
-      if (armor.type === "helmet" && !GS.hasHelmet) {
-        GS.hasHelmet = true;
-        GS.armorPieces++;
-        showBadge("🛡️ Helmet equipped!");
-      } else if (armor.type === "chestplate" && !GS.hasChestplate) {
-        GS.hasChestplate = true;
-        GS.armorPieces++;
-        showBadge("🛡️ Chestplate equipped!");
-      }
-      spawnArmorBreakPtcls(ax, ay, armor.type); // sparkle effect on pickup
-    }
-  });
   handleThrowInput();
   updateThrowFx();
 
+  checkDroppedItemPickup();
+  JP["KeyE"] = false;
 
   /* ── DOOR INTERACTION ── */
+  GS.activeDoorIndex = -1;
+  MAP.doors.forEach(function (door, i) {
+    var px7 = PL.x + PL_COX,
+      py7 = PL.y + PL_COY;
+    if (
+      px7 < door.x + door.w + 10 &&
+      px7 + PL.w > door.x - 10 &&
+      py7 + PL.h > door.y &&
+      py7 < door.y + door.h
+    ) {
+      GS.activeDoorIndex = i;
 
-  /* ── DOOR INTERACTION ── */
-  if (!GS.quizActive) {
-    GS.activeDoorIndex = -1;
-    MAP.doors.forEach(function (door, i) {
-      var px7 = PL.x + PL_COX,
-        py7 = PL.y + PL_COY;
-      if (
-        px7 < door.x + door.w + 10 &&
-        px7 + PL.w > door.x - 10 &&
-        py7 + PL.h > door.y &&
-        py7 < door.y + door.h
-      ) {
-        GS.activeDoorIndex = i;
-        if (JP["KeyE"]) {
-          if (!GS.hasGold) {
-            // No gold — show hint, do nothing
-            showBadge("🪙 Find the Golden Thread to open the doors!");
-          } else {
-            // Has gold — open quiz (fake or real, quiz runs either way)
-            openQuiz(i);
-            // If it's a fake door and they get all answers right, jumpscare
-            // (handled inside quizAnswer win condition — see below)
-            door._quizIsCorrect = door.correct; // stash for quizAnswer
-          }
+      if (JP["KeyE"]) {
+        // Check if player has the golden thread
+        if (!GS.hasGold) {
+          showBadge("🔒 Locked! Find the Golden Thread first!");
+          JP["KeyE"] = false;
+          return;
         }
+
+        // If door already answered correctly, proceed to stage 4
+        if (door.answered && door.correct) {
+          window.location.href = "stage4.html";
+          return;
+        }
+
+        // If door already answered wrong, don't allow retry
+        if (door.answered && !door.correct) {
+          showBadge("✕ This door is sealed!");
+          JP["KeyE"] = false;
+          return;
+        }
+
+        // Assign random question if not already assigned
+        if (!door.question) {
+          door.question = getRandomQuestion();
+        }
+
+        // Start single question quiz for this door
+        startDoorQuiz(door, i);
+        JP["KeyE"] = false;
       }
-    });
-    JP["KeyE"] = false;
-  }
+    }
+  });
 
   /* ── VOID DEATH (fall off bottom) ── */
   if (PL.y > TC.height + 80) {
@@ -1445,7 +1426,6 @@ function tutUpdate() {
 /* ── DAMAGE / DEATH ─────────────────────────────────────────────── */
 function takeDamage(source) {
   if (PL.iframes > 0) return;
-
   if (source === "void") {
     GS.lives = 0;
     PL.iframes = 0;
@@ -1453,46 +1433,6 @@ function takeDamage(source) {
     startDeathSequence(source);
     return;
   }
-
-  // ARMOR ABSORBS DAMAGE: spike, rat, bat, hammer, readySpike
-  var armorSources = ["spike", "mob", "hammer", "readySpike"];
-  if (armorSources.indexOf(source) !== -1 && GS.armorPieces > 0) {
-    // Armor breaks, player takes NO damage
-    GS.armorPieces--;
-    if (GS.hasHelmet && GS.hasChestplate) {
-      // Break chestplate first, then helmet
-      if (GS.hasChestplate) {
-        GS.hasChestplate = false;
-        showBadge("💔 Chestplate shattered!");
-        spawnArmorBreakPtcls(
-          PL.x + PL.sw / 2,
-          PL.y + PL.sh * 0.4,
-          "chestplate",
-        );
-      } else {
-        GS.hasHelmet = false;
-        showBadge("💔 Helmet shattered!");
-        spawnArmorBreakPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.4, "helmet");
-      }
-    } else if (GS.hasHelmet) {
-      GS.hasHelmet = false;
-      GS.armorPieces = 0;
-      showBadge("💔 Helmet shattered!");
-      spawnArmorBreakPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.4, "helmet");
-    } else if (GS.hasChestplate) {
-      GS.hasChestplate = false;
-      GS.armorPieces = 0;
-      showBadge("💔 Chestplate shattered!");
-      spawnArmorBreakPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.4, "chestplate");
-    }
-
-    // Brief iframe flash to show armor absorbed hit
-    PL.iframes = 20;
-    spawnImpactPtcls(PL.x + PL.sw / 2, PL.y + PL.sh * 0.55, 6);
-    updateHUD();
-    return;
-  }
-
   GS.lives = Math.max(0, GS.lives - 1);
   PL.iframes = 12;
   PL.vy = -10;
@@ -1642,7 +1582,7 @@ function updateDeathFx() {
 }
 
 function wrongDoor() {
-  // Prevent re-triggering while jumpscare is active
+  // This is now handled by the quiz system, but keep for compatibility
   if (GS.jumpscareActive) return;
   GS.jumpscareActive = true;
   GS.paused = true;
@@ -1675,11 +1615,9 @@ function wrongDoor() {
     "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
-  // Use SPRITE_MINO if available, otherwise a red fallback
   if (typeof SPRITE_MINO !== "undefined") {
     img.src = SPRITE_MINO;
   } else {
-    // Fallback: red screen with text
     overlay.style.background = "#cc0000";
     var txt = document.createElement("div");
     txt.textContent = "YOU CHOSE WRONG";
@@ -1691,7 +1629,6 @@ function wrongDoor() {
   overlay.appendChild(img);
   document.body.appendChild(overlay);
 
-  // Red flash on canvas first
   var fl = document.getElementById("wrong-flash");
   if (fl) {
     fl.classList.add("show");
@@ -1700,7 +1637,6 @@ function wrongDoor() {
     }, 200);
   }
 
-  // Screen shake
   TC.style.transition = "transform 0s";
   var shakeCount = 0;
   var shakeInterval = setInterval(function () {
@@ -1714,18 +1650,15 @@ function wrongDoor() {
     }
   }, 40);
 
-  // Slam the overlay visible
   requestAnimationFrame(function () {
     overlay.style.opacity = "1";
   });
 
-  // Animate the image: scale up for extra scare
   setTimeout(function () {
     img.style.transition = "transform 0.4s ease-out";
     img.style.transform = "scale(1.22)";
   }, 60);
 
-  // Fade out and reset after the scare
   setTimeout(function () {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
@@ -1733,9 +1666,9 @@ function wrongDoor() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
-      GS.lives = 3;
-      resetToStart();
-      showBadge("✕ Wrong door! Start again...");
+      // Don't reset everything, just damage
+      takeDamage("wrongDoor");
+      showBadge("✕ Wrong door! -1 Heart");
     }, 380);
   }, 1100);
 }
@@ -1748,9 +1681,12 @@ function cleanStageDecor() {
     MAP.decorBack.forEach(function (item) {
       if (!item || !item.key) return;
       if (item.key === "web") item.alpha = Math.min(item.alpha || 0.22, 0.24);
-      else if (item.key.indexOf("vines") === 0) item.alpha = Math.min(item.alpha || 0.18, 0.2);
-      else if (item.key.indexOf("mural") === 0) item.alpha = Math.min(item.alpha || 0.12, 0.12);
-      else if (item.key === "cage") item.alpha = Math.min(item.alpha || 0.18, 0.18);
+      else if (item.key.indexOf("vines") === 0)
+        item.alpha = Math.min(item.alpha || 0.18, 0.2);
+      else if (item.key.indexOf("mural") === 0)
+        item.alpha = Math.min(item.alpha || 0.12, 0.12);
+      else if (item.key === "cage")
+        item.alpha = Math.min(item.alpha || 0.18, 0.18);
     });
   }
 
@@ -1759,7 +1695,8 @@ function cleanStageDecor() {
       if (!item || !item.key) return;
       if (item.key.indexOf("bones") === 0) {
         var floorLine = item.y;
-        if (item.y > FLOOR_Y - item.h) floorLine = Math.min(FLOOR_Y, item.y + 8);
+        if (item.y > FLOOR_Y - item.h)
+          floorLine = Math.min(FLOOR_Y, item.y + 8);
         item.y = floorLine - item.h + 8;
         item.alpha = Math.min(Math.max(item.alpha || 0.28, 0.28), 0.42);
       } else if (item.key === "jar") {
@@ -1790,8 +1727,9 @@ function tutDraw() {
   drawShaft(H);
   drawHammer();
   drawGold();
+  drawPots();
+  drawDroppedItems();
   drawThrowFx();
-  drawArmorPickups();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
   drawMobs();
@@ -1929,6 +1867,154 @@ function drawBG(W, H) {
   }
   TX.fillStyle = "rgba(0,0,0,.18)";
   TX.fillRect(0, H * 0.72, WORLD, H * 0.28);
+}
+
+function drawDoors() {
+  MAP.doors.forEach(function (door, i) {
+    if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
+
+    var locked = !GS.hasGold;
+    var lit = door.correct && GS.hasGold && !door.answered;
+    var pulse = 0.7 + Math.sin(Date.now() * 0.004 + i) * 0.3;
+
+    TX.save();
+
+    // Shadow
+    TX.fillStyle = "rgba(0,0,0,.22)";
+    TX.beginPath();
+    TX.ellipse(
+      door.x + door.w / 2,
+      door.y + door.h + 10,
+      door.w * 0.56,
+      10,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    TX.fill();
+
+    // Base
+    TX.fillStyle = "rgba(32,18,18,.88)";
+    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
+    TX.fillStyle = "rgba(232,194,106,.18)";
+    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 2);
+
+    // Glow for correct/unlocked door
+    if (lit) {
+      TX.shadowBlur = 30;
+      TX.shadowColor = "#ffd700";
+      var glowG = TX.createRadialGradient(
+        door.x + door.w / 2,
+        door.y + door.h / 2,
+        10,
+        door.x + door.w / 2,
+        door.y + door.h / 2,
+        80,
+      );
+      glowG.addColorStop(0, "rgba(255,215,0," + 0.35 * pulse + ")");
+      glowG.addColorStop(1, "transparent");
+      TX.fillStyle = glowG;
+      TX.fillRect(door.x - 40, door.y - 20, door.w + 80, door.h + 40);
+    }
+
+    // Door frame/image
+    var frame = SPR.decor.doorFrame;
+    if (frame && frame.complete && frame.naturalWidth) {
+      var cropX = frame.naturalWidth * 0.5;
+      var cropW = frame.naturalWidth * 0.5;
+      var cropY = frame.naturalHeight * 0.255;
+      var cropH = frame.naturalHeight * 0.745;
+      var drawY = door.y + 12;
+      var drawH = door.h - 4;
+
+      if (locked) {
+        TX.globalAlpha = 0.5;
+      } else if (door.answered && !door.correct) {
+        TX.globalAlpha = 0.4;
+      } else {
+        TX.globalAlpha = lit ? pulse : 0.88;
+      }
+
+      TX.drawImage(
+        frame,
+        cropX,
+        cropY,
+        cropW,
+        cropH,
+        door.x - 2,
+        drawY,
+        door.w + 4,
+        drawH,
+      );
+      TX.globalAlpha = 1;
+    } else {
+      // Fallback drawn door
+      if (locked) {
+        TX.fillStyle = "#2a1a0a";
+      } else if (door.answered && !door.correct) {
+        TX.fillStyle = "#3a1010";
+      } else {
+        TX.fillStyle = lit ? "#8a6a20" : "#3a2010";
+      }
+
+      TX.fillRect(door.x, door.y, door.w, door.h);
+      TX.fillStyle = locked ? "#5a3818" : lit ? "#ffd700" : "#5a3818";
+      TX.fillRect(door.x + 4, door.y + 4, door.w - 8, door.h - 8);
+
+      if (lit) {
+        TX.fillStyle = "#ffd700";
+        TX.font = "bold 18px serif";
+        TX.textAlign = "center";
+        TX.fillText("✓", door.x + door.w / 2, door.y + door.h / 2 + 6);
+        TX.textAlign = "left";
+      }
+
+      if (locked) {
+        TX.fillStyle = "#8a6a3a";
+        TX.font = "bold 24px serif";
+        TX.textAlign = "center";
+        TX.fillText("🔒", door.x + door.w / 2, door.y + door.h / 2 + 8);
+        TX.textAlign = "left";
+      }
+
+      TX.strokeStyle = locked ? "#4a3020" : lit ? "#ffd700" : "#5a3818";
+      TX.lineWidth = 3;
+      TX.strokeRect(door.x, door.y, door.w, door.h);
+    }
+
+    // Labels
+    TX.fillStyle = locked
+      ? "rgba(120,100,80,0.6)"
+      : lit
+        ? "rgba(255,215,0,.9)"
+        : "rgba(212,168,67,.4)";
+    TX.font = "9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText(
+      door.label || "EXIT",
+      door.x + door.w / 2,
+      door.y + door.h + 14,
+    );
+
+    if (GS.activeDoorIndex === i) {
+      if (locked) {
+        TX.fillStyle = "rgba(255,100,100,.9)";
+        TX.fillText("🔒 Need Golden Thread", door.x + door.w / 2, door.y - 8);
+      } else if (!door.answered) {
+        TX.fillStyle = "rgba(255,215,0,.95)";
+        TX.fillText("[E] ANSWER RIDDLE", door.x + door.w / 2, door.y - 8);
+      } else if (door.correct) {
+        TX.fillStyle = "rgba(100,255,100,.9)";
+        TX.fillText("✓ UNLOCKED", door.x + door.w / 2, door.y - 8);
+      } else {
+        TX.fillStyle = "rgba(255,100,100,.9)";
+        TX.fillText("✕ SEALED", door.x + door.w / 2, door.y - 8);
+      }
+    }
+
+    TX.textAlign = "left";
+    TX.restore();
+  });
 }
 
 function drawChamberDepth(H) {
@@ -2281,7 +2367,6 @@ function drawHammer() {
   }
 }
 
-
 function getThrowLandingY(x) {
   var best = FLOOR_Y;
   var feet = PL.y + PL.sh - 8;
@@ -2345,7 +2430,8 @@ function handleThrowInput() {
     MAP.gold.collected = true;
     MAP.gold.visible = true;
   }
-  if (typeof updateTutorialInventoryUI === "function") updateTutorialInventoryUI();
+  if (typeof updateTutorialInventoryUI === "function")
+    updateTutorialInventoryUI();
   if (typeof renderInventoryHUD === "function") renderInventoryHUD();
   if (typeof showBadge === "function") showBadge("Golden Thread thrown!");
   startThrownItem(icon);
@@ -2369,7 +2455,11 @@ function updateThrowFx() {
       MAP.gold.collected = false;
       MAP.gold.visible = true;
       MAP.gold.bobTimer = 0;
-      if (typeof spawnGoldPtcls === "function") spawnGoldPtcls(MAP.gold.x + MAP.gold.w / 2, MAP.gold.y + MAP.gold.h / 2);
+      if (typeof spawnGoldPtcls === "function")
+        spawnGoldPtcls(
+          MAP.gold.x + MAP.gold.w / 2,
+          MAP.gold.y + MAP.gold.h / 2,
+        );
     }
     GS.throwFx = null;
   }
@@ -2387,7 +2477,12 @@ function drawThrowFx() {
     TX.lineCap = "round";
     TX.beginPath();
     TX.moveTo(handX - PL.dir * 18, handY + 16);
-    TX.quadraticCurveTo(handX + PL.dir * 18, handY - 6, handX + PL.dir * 52, handY - 18);
+    TX.quadraticCurveTo(
+      handX + PL.dir * 18,
+      handY - 6,
+      handX + PL.dir * 52,
+      handY - 18,
+    );
     TX.stroke();
     TX.restore();
   }
@@ -2401,7 +2496,12 @@ function drawThrowFx() {
   TX.lineCap = "round";
   TX.beginPath();
   TX.moveTo(fx.sx, fx.sy);
-  TX.quadraticCurveTo((fx.sx + fx.x) / 2, Math.min(fx.sy, fx.y) - 64, fx.x, fx.y);
+  TX.quadraticCurveTo(
+    (fx.sx + fx.x) / 2,
+    Math.min(fx.sy, fx.y) - 64,
+    fx.x,
+    fx.y,
+  );
   TX.stroke();
   TX.globalAlpha = 1;
   TX.shadowBlur = 18;
@@ -2481,151 +2581,22 @@ function drawGold() {
   TX.textAlign = "left";
 }
 
-function drawArmorPickups() {
-  [MAP.helmet, MAP.chestplate].forEach(function(armor) {
-    if (!armor || armor.collected) return;
-    if (armor.x < CAM.x - 60 || armor.x > CAM.x + TC.width + 60) return;
-    
-    armor.bobTimer = (armor.bobTimer || 0) + 0.05;
-    var bob = Math.sin(armor.bobTimer) * 5;
-    var ax = armor.x + armor.w / 2;
-    var ay = armor.y + bob;
+/* ── GOLDEN THREAD PICKUP ── */
+if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
+  var g = MAP.gold;
+  var px6 = PL.x + PL_COX,
+    py6 = PL.y + PL_COY;
 
-    // Glow
-    var glowCol = armor.type === "helmet" ? "rgba(136,170,255," : "rgba(255,136,68,";
-    var gl = TX.createRadialGradient(ax, ay, 2, ax, ay, 35);
-    gl.addColorStop(0, glowCol + "0.35)");
-    gl.addColorStop(1, "transparent");
-    TX.fillStyle = gl;
-    TX.fillRect(ax - 40, ay - 40, 80, 80);
-
-    // Draw sprite
-    var spr = armor.type === "helmet" ? SPR.helmet : SPR.chestplate;
-    if (spr && spr.complete && spr.naturalWidth) {
-      TX.drawImage(spr, ax - armor.w / 2, ay - armor.h / 2, armor.w, armor.h);
-    } else {
-      // Fallback
-      TX.fillStyle = armor.type === "helmet" ? "#88aaff" : "#ff8844";
-      TX.fillRect(ax - armor.w / 2, ay - armor.h / 2, armor.w, armor.h);
-      TX.fillStyle = "#fff";
-      TX.font = "bold 10px serif";
-      TX.textAlign = "center";
-      TX.fillText(armor.type === "helmet" ? "H" : "C", ax, ay + 4);
-      TX.textAlign = "left";
-    }
-
-    // Label
-    TX.fillStyle = armor.type === "helmet" ? "rgba(136,170,255,0.9)" : "rgba(255,136,68,0.9)";
-    TX.font = "bold 9px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText(armor.label, ax, ay - armor.h / 2 - 8);
-    TX.textAlign = "left";
-  });
-}
-
-function drawDoors() {
-  MAP.doors.forEach(function (door, i) {
-    if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
-    var lit = false;
-    var pulse = 1;
-
-    TX.save();
-    TX.fillStyle = "rgba(0,0,0,.22)";
-    TX.beginPath();
-    TX.ellipse(
-      door.x + door.w / 2,
-      door.y + door.h + 10,
-      door.w * 0.56,
-      10,
-      0,
-      0,
-      Math.PI * 2,
-    );
-    TX.fill();
-    TX.fillStyle = "rgba(32,18,18,.88)";
-    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
-    TX.fillStyle = "rgba(232,194,106,.18)";
-    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 2);
-    TX.restore();
-
-    // Glow for correct door
-    if (lit) {
-      TX.save();
-      TX.shadowBlur = 30;
-      TX.shadowColor = "#ffd700";
-      var glowG = TX.createRadialGradient(
-        door.x + door.w / 2,
-        door.y + door.h / 2,
-        10,
-        door.x + door.w / 2,
-        door.y + door.h / 2,
-        80,
-      );
-      glowG.addColorStop(0, "rgba(255,215,0,.35)");
-      glowG.addColorStop(1, "transparent");
-      TX.fillStyle = glowG;
-      TX.fillRect(door.x - 40, door.y - 20, door.w + 80, door.h + 40);
-      TX.restore();
-    }
-
-    var frame = SPR.decor.doorFrame;
-    if (frame && frame.complete && frame.naturalWidth) {
-      var cropX = frame.naturalWidth * 0.5;
-      var cropW = frame.naturalWidth * 0.5;
-      var cropY = frame.naturalHeight * 0.255;
-      var cropH = frame.naturalHeight * 0.745;
-      var drawY = door.y + 12;
-      var drawH = door.h - 4;
-      TX.globalAlpha = lit ? pulse : 0.88;
-      TX.drawImage(
-        frame,
-        cropX,
-        cropY,
-        cropW,
-        cropH,
-        door.x - 2,
-        drawY,
-        door.w + 4,
-        drawH,
-      );
-      TX.globalAlpha = 1;
-    } else {
-      var img = lit ? SPR.door2 : SPR.door1;
-      if (img && img.complete && img.naturalWidth) {
-        TX.globalAlpha = lit ? pulse : 0.75;
-        TX.drawImage(img, door.x, door.y, door.w, door.h);
-        TX.globalAlpha = 1;
-      } else {
-        // Fallback drawn door
-        TX.fillStyle = lit ? "#8a6a20" : "#3a2010";
-        TX.fillRect(door.x, door.y, door.w, door.h);
-        TX.fillStyle = lit ? "#ffd700" : "#5a3818";
-        TX.fillRect(door.x + 4, door.y + 4, door.w - 8, door.h - 8);
-        if (lit) {
-          TX.fillStyle = "#ffd700";
-          TX.font = "bold 18px serif";
-          TX.textAlign = "center";
-          TX.fillText("✓", door.x + door.w / 2, door.y + door.h / 2 + 6);
-          TX.textAlign = "left";
-        }
-        TX.strokeStyle = lit ? "#ffd700" : "#5a3818";
-        TX.lineWidth = 3;
-        TX.strokeRect(door.x, door.y, door.w, door.h);
-      }
-    }
-    // Labels
-    if (GS.activeDoorIndex === i) {
-      if (!GS.hasGold) {
-        TX.fillStyle = "rgba(255,180,40,.95)";
-        TX.fillText("🪙 Need Gold Thread", door.x + door.w / 2, door.y - 20);
-        TX.fillText("to unlock!", door.x + door.w / 2, door.y - 8);
-      } else {
-        TX.fillStyle = "rgba(255,215,0,.95)";
-        TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
-      }
-    }
-    TX.textAlign = "left";
-  });
+  // Auto-pickup on proximity (no E key needed, just walk near it)
+  if (
+    Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 70 &&
+    Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 70
+  ) {
+    MAP.gold.collected = true;
+    GS.hasGold = true;
+    showBadge("✨ Golden Thread collected! Doors are now unlocked!");
+    spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
+  }
 }
 
 function drawMobs() {
@@ -2805,7 +2776,6 @@ function drawPlayer() {
   }
 
   // Gold item indicator above head
-    // Gold item indicator above head
   if (GS.hasGold) {
     TX.globalAlpha = 1;
     TX.font = "18px serif";
@@ -2814,20 +2784,63 @@ function drawPlayer() {
     TX.textAlign = "left";
   }
 
-  // ARMOR INDICATORS above player
-  if (GS.armorPieces > 0) {
-    TX.globalAlpha = 1;
-    TX.font = "14px serif";
-    TX.textAlign = "center";
-    var armorY = PL.y - 22;
-    if (GS.hasHelmet) {
-      TX.fillText("🪖", PL.x + PL.sw / 2 - 10, armorY);
+  // ── SWORD DRAW ──
+  if (GS.hasSword && !GS.deathFx) {
+    var swingProgress = GS.sword.active ? 1 - GS.sword.timer / 18 : 0;
+    var handX = PL.x + PL.sw / 2 + PL.dir * 10;
+    var handY = PL.y + PL_COY + PL.h * 0.38;
+    var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
+    var raiseAngle = PL.dir === 1 ? -Math.PI * 0.75 : Math.PI * 1.75;
+    var swingAngle =
+      PL.dir === 1
+        ? raiseAngle + Math.PI * 0.9 * swingProgress
+        : raiseAngle - Math.PI * 0.9 * swingProgress;
+    var angle = GS.sword.active ? swingAngle : idleAngle;
+    var swordLen = 44,
+      swordW = 7;
+
+    TX.save();
+    TX.translate(handX, handY);
+    TX.rotate(angle);
+
+    if (GS.sword.active && swingProgress < 0.85) {
+      TX.save();
+      TX.globalAlpha = 0.18 * (1 - swingProgress);
+      TX.strokeStyle = "#ffe066";
+      TX.lineWidth = swordW * 2.2;
+      TX.lineCap = "round";
+      TX.beginPath();
+      TX.moveTo(0, 0);
+      TX.lineTo(0, swordLen);
+      TX.stroke();
+      TX.restore();
     }
-    if (GS.hasChestplate) {
-      TX.fillText("👕", PL.x + PL.sw / 2 + 10, armorY);
+
+    var swordImg = SPR.sword;
+    if (swordImg && swordImg.complete && swordImg.naturalWidth) {
+      TX.drawImage(swordImg, -swordW / 2, -4, swordW + 6, swordLen + 8);
+    } else {
+      var bG = TX.createLinearGradient(-swordW / 2, 0, swordW / 2, 0);
+      bG.addColorStop(0, "#b8bcc8");
+      bG.addColorStop(0.5, "#e8eaf0");
+      bG.addColorStop(1, "#7a7e8a");
+      TX.fillStyle = bG;
+      TX.fillRect(-swordW / 2, 0, swordW, swordLen);
+      TX.fillStyle = "#dde0ea";
+      TX.beginPath();
+      TX.moveTo(-swordW / 2, swordLen);
+      TX.lineTo(swordW / 2, swordLen);
+      TX.lineTo(0, swordLen + 12);
+      TX.closePath();
+      TX.fill();
+      TX.fillStyle = "#d4a843";
+      TX.fillRect(-10, -4, 20, 5);
+      TX.fillStyle = "#5a3010";
+      TX.fillRect(-3, -14, 6, 14);
     }
-    TX.textAlign = "left";
+    TX.restore();
   }
+
   TX.restore();
 }
 
@@ -2915,21 +2928,130 @@ function spawnGoldPtcls(gx, gy) {
     });
 }
 
-function spawnArmorBreakPtcls(x, y, type) {
-  var col = type === "helmet" ? "#88aaff" : "#ff8844";
+/* ── DROPPED ITEMS SYSTEM ── */
+var DROPPED_ITEMS = [];
+
+function spawnDroppedItem(x, y, type) {
+  DROPPED_ITEMS.push({
+    x: x,
+    y: y,
+    type: type,
+    bobTimer: Math.random() * Math.PI * 2,
+    active: true,
+    spawnTime: Date.now(),
+  });
+}
+
+function clearDroppedItems() {
+  DROPPED_ITEMS = [];
+}
+
+function checkDroppedItemPickup() {
+  if (GS.hasGold) return;
+  for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
+    var item = DROPPED_ITEMS[i];
+    if (!item.active) continue;
+    var px = PL.x + PL_COX + PL.w / 2;
+    var py = PL.y + PL_COY + PL.h / 2;
+    var dist = Math.hypot(px - item.x, py - item.y);
+    if (dist < 60 || (JP["KeyE"] && dist < 100)) {
+      item.active = false;
+      GS.hasGold = true;
+      showBadge("✨ Golden Thread recovered!");
+      spawnGoldPtcls(item.x, item.y);
+      JP["KeyE"] = false;
+      break;
+    }
+  }
+}
+
+function drawDroppedItems() {
+  DROPPED_ITEMS.forEach(function (item) {
+    if (!item.active) return;
+    if (item.x < CAM.x - 60 || item.x > CAM.x + TC.width + 60) return;
+    item.bobTimer += 0.05;
+    var bob = Math.sin(item.bobTimer) * 6;
+    var ix = item.x,
+      iy = item.y + bob;
+    var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 35);
+    gl.addColorStop(0, "rgba(255,215,0,.35)");
+    gl.addColorStop(1, "transparent");
+    TX.fillStyle = gl;
+    TX.fillRect(ix - 40, iy - 40, 80, 80);
+    var itemImg = SPR.gold || SPR.decor.threadPaper;
+    if (itemImg && itemImg.complete && itemImg.naturalWidth) {
+      TX.drawImage(itemImg, ix - 20, iy - 20, 40, 40);
+    } else {
+      TX.save();
+      TX.shadowBlur = 15;
+      TX.shadowColor = "#ffd700";
+      TX.fillStyle = "#ffd700";
+      TX.beginPath();
+      TX.arc(ix, iy, 14, 0, Math.PI * 2);
+      TX.fill();
+      TX.restore();
+    }
+    TX.fillStyle = "rgba(255,215,0,.7)";
+    TX.font = "bold 9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText("Golden Thread", ix, iy - 22);
+    TX.fillText("[E] Pick up", ix, iy - 12);
+    TX.textAlign = "left";
+  });
+}
+
+function spawnPotShards(cx, cy) {
   for (var i = 0; i < 14; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var speed = Math.random() * 5 + 2;
     GS.ptcls.push({
-      x: x + (Math.random() - 0.5) * 24,
-      y: y + (Math.random() - 0.5) * 16,
-      vx: (Math.random() - 0.5) * 5,
-      vy: -(Math.random() * 3 + 1),
+      x: cx + (Math.random() - 0.5) * 20,
+      y: cy + (Math.random() - 0.5) * 20,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3,
       life: 1,
-      dec: 0.03 + Math.random() * 0.02,
+      dec: 0.04 + Math.random() * 0.03,
       sz: Math.random() * 5 + 3,
-      col: col,
-      type: "ember",
+      col: Math.random() < 0.5 ? "#8B6955" : "#C4A882",
+      type: "dust",
     });
   }
+}
+
+function drawPots() {
+  if (!MAP.pots) return;
+  MAP.pots.forEach(function (pot) {
+    if (pot.x + pot.w < CAM.x - 60 || pot.x > CAM.x + TC.width + 60) return;
+    if (pot.broken) return;
+    TX.save();
+    var potImg = SPR.pot;
+    if (potImg && potImg.complete && potImg.naturalWidth) {
+      TX.drawImage(potImg, pot.x, pot.y, pot.w, pot.h);
+    } else {
+      TX.fillStyle = "#8B6955";
+      TX.beginPath();
+      TX.ellipse(
+        pot.x + pot.w / 2,
+        pot.y + pot.h * 0.72,
+        pot.w * 0.42,
+        pot.h * 0.28,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      TX.fill();
+      TX.fillStyle = "#A0785A";
+      TX.fillRect(
+        pot.x + pot.w * 0.18,
+        pot.y + pot.h * 0.1,
+        pot.w * 0.64,
+        pot.h * 0.65,
+      );
+      TX.fillStyle = "#C4A882";
+      TX.fillRect(pot.x + pot.w * 0.14, pot.y + pot.h * 0.08, pot.w * 0.72, 8);
+    }
+    TX.restore();
+  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2981,6 +3103,16 @@ function showBadge(msg) {
 
 /* ── SCREENS ────────────────────────────────────────────────────── */
 function showScreen(id) {
+  if (id === "screen-win" && !window.__minosStageSaved) {
+    window.__minosStageSaved = true;
+    import("../progress-service.js")
+      .then(function (service) {
+        return service.markStageComplete(3);
+      })
+      .catch(function (error) {
+        console.warn("Firebase stage progress save failed.", error);
+      });
+  }
   var el = document.getElementById(id);
   if (el) el.classList.remove("hidden");
 }

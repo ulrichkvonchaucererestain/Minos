@@ -1,134 +1,171 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Labyrinth of Minos - Stage VII</title>
-  <meta name="theme-color" content="#050308">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Minos">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="manifest" href="/manifest.webmanifest?v=mobile-20260428-4">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="stage1.css?v=mobile-20260428-4">
-  <link rel="stylesheet" href="../mobile-controls.css?v=mobile-20260428-4">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>Labyrinth of Minos - Stage VII</title>
+    <meta name="theme-color" content="#050308" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Minos" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <link rel="manifest" href="/manifest.webmanifest?v=mobile-20260428-4" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="stage1.css?v=mobile-20260428-4" />
+    <link rel="stylesheet" href="../mobile-controls.css?v=mobile-20260428-4" />
+  </head>
+  <body>
+    <div id="scanlines"></div>
+    <div id="vignette"></div>
+    <div id="wrong-flash"></div>
 
-<div id="scanlines"></div>
-<div id="vignette"></div>
-<div id="wrong-flash"></div>
+    <canvas id="tutCanvas"></canvas>
 
-<canvas id="tutCanvas"></canvas>
-
-<div id="hud-top">
-  <div id="hud-top-left">
-    <a id="tutorial-menu-btn" href="../index.html">Back Menu</a>
-    <div class="hud-box">
-      <div class="hud-lbl">Icarus</div>
-      <div class="hud-hearts" id="hud-hearts"></div>
+    <div id="hud-top">
+      <div id="hud-top-left">
+        <a id="tutorial-menu-btn" href="../index.html">Back Menu</a>
+        <div class="hud-box">
+          <div class="hud-lbl">Icarus</div>
+          <div class="hud-hearts" id="hud-hearts"></div>
+        </div>
+      </div>
+      <div class="hud-box" style="text-align: right; min-width: 110px">
+        <div class="hud-lbl">Time</div>
+        <div id="hud-timer">00:00</div>
+      </div>
     </div>
-  </div>
-  <div class="hud-box" style="text-align:right; min-width:110px;">
-    <div class="hud-lbl">Time</div>
-    <div id="hud-timer">00:00</div>
-  </div>
-</div>
 
-<div id="hud-bottom">
-  <div id="ctrl-hint">
-    [D] Walk &nbsp;&middot;&nbsp; [A] Back &nbsp;&middot;&nbsp; [W/Space] Jump &nbsp;&middot;&nbsp; [Shift] Dash &nbsp;&middot;&nbsp; [E] Pick Up &nbsp;&middot;&nbsp; [P] Pause
-  </div>
-</div>
+    <div id="hud-bottom">
+      <div id="ctrl-hint">
+        [D] Walk &nbsp;&middot;&nbsp; [A] Back &nbsp;&middot;&nbsp; [W/Space]
+        Jump &nbsp;&middot;&nbsp; [Shift] Dash &nbsp;&middot;&nbsp; [E] Pick Up
+        &nbsp;&middot;&nbsp; [P] Pause
+      </div>
+    </div>
 
-<div id="stam-wrap">
-  STAMINA
-  <div id="stam-track">
-    <div id="stam-fill" style="width:100%"></div>
-  </div>
-  <span id="dash-ready"></span>
-</div>
+    <div id="stam-wrap">
+      STAMINA
+      <div id="stam-track">
+        <div id="stam-fill" style="width: 100%"></div>
+      </div>
+      <span id="dash-ready"></span>
+    </div>
 
-<div id="screen-pause" class="overlay-screen hidden">
-  <div class="panel">
-    <div class="p-icon">||</div>
-    <div class="p-title">Stage Paused</div>
-    <div class="p-divider"></div>
-    <button class="btn" onclick="document.getElementById('screen-pause').classList.add('hidden'); GS.paused=false;">
-      Resume
-    </button>
-    <button class="btn" onclick="resetToStart();">
-      Restart Stage VII
-    </button>
-    <button class="btn btn-danger" onclick="window.location.href='../index.html';">
-      Main Menu
-    </button>
-  </div>
-</div>
+    <div id="screen-pause" class="overlay-screen hidden">
+      <div class="panel">
+        <div class="p-icon">||</div>
+        <div class="p-title">Stage Paused</div>
+        <div class="p-divider"></div>
+        <button
+          class="btn"
+          onclick="
+            document.getElementById('screen-pause').classList.add('hidden');
+            GS.paused = false;
+          "
+        >
+          Resume
+        </button>
+        <button class="btn" onclick="resetToStart()">Restart Stage VII</button>
+        <button
+          class="btn btn-danger"
+          onclick="window.location.href = '../index.html'"
+        >
+          Main Menu
+        </button>
+      </div>
+    </div>
 
-<div id="screen-win" class="overlay-screen hidden">
-  <div class="panel">
-    <div class="p-icon">WIN</div>
-    <div class="p-title">Stage VII Complete!</div>
-    <div class="p-divider"></div>
-    <p class="p-desc">
-      <strong style="color:#f0c060;">You crossed the Temple Descent.</strong><br><br>
-      The seventh chamber demands cleaner movement as the temple descent grows denser with hazards and roaming creatures.<br>
-      The labyrinth keeps tightening around you.<br><br>
-      <span style="color:#d4a843;">Stage VIII awaits...</span>
-    </p>
-    <button class="btn" style="background:linear-gradient(180deg,#1a3a10,#0e2208);border-color:#4a9030;color:#88dd60;"
-      onclick="window.location.href='stage4.html';">
-      Begin Stage IV
-    </button>
-    <button class="btn" onclick="resetToStart(); document.getElementById('screen-win').classList.add('hidden');">
-      Replay Stage VII
-    </button>
-  </div>
-</div>
+    <div id="screen-win" class="overlay-screen hidden">
+      <div class="panel">
+        <div class="p-icon">WIN</div>
+        <div class="p-title">Stage VII Complete!</div>
+        <div class="p-divider"></div>
+        <p class="p-desc">
+          <strong style="color: #f0c060">You crossed the Temple Descent.</strong
+          ><br /><br />
+          The seventh chamber demands cleaner movement as the temple descent
+          grows denser with hazards and roaming creatures.<br />
+          The labyrinth keeps tightening around you.<br /><br />
+          <span style="color: #d4a843">Stage VIII awaits...</span>
+        </p>
+        <button
+          class="btn"
+          style="
+            background: linear-gradient(180deg, #1a3a10, #0e2208);
+            border-color: #4a9030;
+            color: #88dd60;
+          "
+          onclick="window.location.href = 'stage4.html'"
+        >
+          Begin Stage IV
+        </button>
+        <button
+          class="btn"
+          onclick="
+            resetToStart();
+            document.getElementById('screen-win').classList.add('hidden');
+          "
+        >
+          Replay Stage VII
+        </button>
+      </div>
+    </div>
 
-<div id="screen-dead" class="overlay-screen hidden">
-  <div class="panel">
-    <div class="p-icon">X</div>
-    <div class="p-title">You Fell!</div>
-    <div class="p-divider"></div>
-    <p class="p-desc" style="text-align:center;">Respawning at the chamber entrance...</p>
-  </div>
-</div>
+    <div id="screen-dead" class="overlay-screen hidden">
+      <div class="panel">
+        <div class="p-icon">X</div>
+        <div class="p-title">You Fell!</div>
+        <div class="p-divider"></div>
+        <p class="p-desc" style="text-align: center">
+          Respawning at the chamber entrance...
+        </p>
+      </div>
+    </div>
 
-<script src="../sprite.js"></script>
-<script src="../jumpsprite.js"></script>
-<script src="stage7.js?v=mobile-20260428-4"></script>
-<script src="../map-sprite/door.js"></script>
-<script src="../map-sprite/drops.js"></script>
-<script src="../map-sprite/hammer.js"></script>
-<script src="../map-sprite/mino.js"></script>
-<script src="../map-sprite/spikes.js"></script>
-<script src="../mobile-controls.js?v=mobile-20260428-4"></script>
+    <script src="../sprite.js"></script>
+    <script src="../jumpsprite.js"></script>
+    <script src="stage7.js?v=mobile-20260428-4"></script>
+    <script src="../map-sprite/door.js"></script>
+    <script src="../map-sprite/drops.js"></script>
+    <script src="../map-sprite/hammer.js"></script>
+    <script src="../map-sprite/mino.js"></script>
+    <script src="../map-sprite/spikes.js"></script>
+    <script src="../stages/pot-sprite.js"></script>
+    <script src="../stages/sword.js"></script>
+    <script src="../mobile-controls.js?v=mobile-20260428-4"></script>
 
-<script>
-window.addEventListener('load', function(){
-  tutInit();
-});
+    <script>
+      window.addEventListener("load", function () {
+        tutInit();
+      });
 
-window.addEventListener('keydown', function(e){
-  if(e.code==='KeyP' || e.code==='Escape'){
-    if(typeof GS === 'undefined') return;
-    GS.paused = !GS.paused;
-    var ps = document.getElementById('screen-pause');
-    if(GS.paused){ ps.classList.remove('hidden'); }
-    else          { ps.classList.add('hidden'); }
-  }
-});
-</script>
+      window.addEventListener("keydown", function (e) {
+        if (e.code === "KeyP" || e.code === "Escape") {
+          if (typeof GS === "undefined") return;
+          GS.paused = !GS.paused;
+          var ps = document.getElementById("screen-pause");
+          if (GS.paused) {
+            ps.classList.remove("hidden");
+          } else {
+            ps.classList.add("hidden");
+          }
+        }
+      });
+    </script>
 
-
-<style>
-  canvas {
-    filter: brightness(1.2) contrast(1.05);
-  }
-</style>
-
-</body>
+    <style>
+      canvas {
+        filter: brightness(1.2) contrast(1.05);
+      }
+    </style>
+  </body>
 </html>
