@@ -99,8 +99,6 @@ var SPR = {
   jump: [],
   door1: null,
   door2: null,
-  hammerLeft: [],
-  hammerRight: [],
   gold: null,
   spike: null,
   decor: {},
@@ -108,26 +106,6 @@ var SPR = {
   mapTheme: { map: null, roof: null, fall: null },
 };
 var sprOK = false;
-var HAMMER_LEFT_PATHS = [
-  "../hammer_animation_swing_to_the_left1.png",
-  "../hammer_animation_swing_to_the_left2.png",
-  "../hammer_animation_swing_to_the_left3.png",
-  "../hammer_animation_swing_to_the_left4.png",
-  "../hammer_animation_swing_to_the_left5.png",
-  "../hammer_animation_swing_to_the_left6.png",
-];
-var HAMMER_RIGHT_PATHS = [
-  "../hammer_animation_swing_to_the_right1.png",
-  "../hammer_aniamtion_swing_to_the_right2.png",
-  "../hammer_animation_swing_to_the_right3.png",
-  "../hammer_animation_swing_to_the_right4.png",
-  "../hammer_animation_swing_to_the_right5.png",
-  "../hammer_animation_swing_to_the_right6.png",
-  "../hammer_animation_swing_to_the_right7.png",
-  "../hammer_animation_swing_to_the_right8.png",
-  "../hammer_animation_swing_to_the_right9.png",
-];
-var HAMMER_SWING_FRAMES = [0, 1, 2, 3, 4];
 var JUMP_PATHS = [
   "../jump_animation1.png",
   "../jump_animation2.png",
@@ -202,8 +180,6 @@ async function loadSpr() {
   if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
   SPR.torch = await li(TORCH_ASSET);
-  SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
-  SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
   var decorKeys = Object.keys(DECOR_PATHS);
   for (var i = 0; i < decorKeys.length; i++) {
     SPR.decor[decorKeys[i]] = await li(DECOR_PATHS[decorKeys[i]]);
@@ -231,7 +207,10 @@ function getSelectedMapTheme() {
 var CAM = { x: 0, y: 0 }; // horizontal only
 
 function isMobileViewport() {
-  return window.matchMedia && window.matchMedia("(max-width: 900px), (max-height: 520px)").matches;
+  return (
+    window.matchMedia &&
+    window.matchMedia("(max-width: 900px), (max-height: 520px)").matches
+  );
 }
 
 function getCanvasRenderScale() {
@@ -358,21 +337,12 @@ function buildMap() {
     h: TILE,
   };
 
-  /* ── HAMMER TRAP ── */
-  MAP.hammer = {
-    anchorX: 5230,
-    anchorY: FLOOR_Y - TILE * 3.55,
-    length: 144,
-    angle: 0,
-    swingMax: 1.22,
-    swingSpeed: 0.035,
-    swingTimer: 0,
-    hw: 60,
-    hh: 36,
-    frameIdx: 0,
-    hitCooldown: 0,
+  //Fireballs
+  MAP.fireballLauncher = {
+    x: 5230, // world-space X of the launcher
+    intervalFrames: Math.round(1.8 * 60), // 1.8s at 60fps = 108 frames
+    timer: 0,
   };
-
 
   /* ── GOLD THREW (item) ── */
   MAP.gold = {
@@ -401,19 +371,54 @@ function buildMap() {
     { key: "banner", x: 136, y: FLOOR_Y - 324, w: 170, h: 270, alpha: 0.56 },
     { key: "muralShade", x: 250, y: FLOOR_Y - 286, w: 180, h: 136, alpha: 0.1 },
     { key: "cage", x: 560, y: FLOOR_Y - 252, w: 112, h: 90, alpha: 0.18 },
-    { key: "vinesGreenWide", x: 318, y: FLOOR_Y - 230, w: 150, h: 54, alpha: 0.16 },
+    {
+      key: "vinesGreenWide",
+      x: 318,
+      y: FLOOR_Y - 230,
+      w: 150,
+      h: 54,
+      alpha: 0.16,
+    },
     { key: "web", x: 710, y: FLOOR_Y - 278, w: 126, h: 44, alpha: 0.22 },
     { key: "web", x: 1220, y: upperY - 82, w: 180, h: 64, alpha: 0.44 },
-    { key: "muralSeeker", x: 1485, y: FLOOR_Y - 272, w: 186, h: 148, alpha: 0.18 },
-    { key: "vinesGreenWide", x: 2140, y: lowerY - 222, w: 180, h: 64, alpha: 0.14 },
+    {
+      key: "muralSeeker",
+      x: 1485,
+      y: FLOOR_Y - 272,
+      w: 186,
+      h: 148,
+      alpha: 0.18,
+    },
+    {
+      key: "vinesGreenWide",
+      x: 2140,
+      y: lowerY - 222,
+      w: 180,
+      h: 64,
+      alpha: 0.14,
+    },
     { key: "vinesGreen", x: 2450, y: lowerY - 174, w: 112, h: 34, alpha: 0.16 },
     { key: "vinesRed3", x: 3980, y: lowerY - 252, w: 86, h: 252, alpha: 0.44 },
     { key: "vinesRed4", x: 4550, y: FLOOR_Y - 262, w: 88, h: 264, alpha: 0.36 },
     { key: "cage", x: 5160, y: FLOOR_Y - 260, w: 126, h: 102, alpha: 0.22 },
     { key: "writing", x: 5470, y: FLOOR_Y - 264, w: 182, h: 82, alpha: 0.34 },
-    { key: "muralLady", x: 6065, y: FLOOR_Y - 122, w: 138, h: 112, alpha: 0.14 },
+    {
+      key: "muralLady",
+      x: 6065,
+      y: FLOOR_Y - 122,
+      w: 138,
+      h: 112,
+      alpha: 0.14,
+    },
     { key: "web", x: 6468, y: FLOOR_Y - 246, w: 126, h: 46, alpha: 0.26 },
-    { key: "vinesGreenWide", x: 6660, y: FLOOR_Y - 234, w: 174, h: 56, alpha: 0.16 },
+    {
+      key: "vinesGreenWide",
+      x: 6660,
+      y: FLOOR_Y - 234,
+      w: 174,
+      h: 56,
+      alpha: 0.16,
+    },
     { key: "roman", x: 6905, y: FLOOR_Y - 250, w: 90, h: 42, alpha: 0.24 },
     { key: "web", x: 7170, y: FLOOR_Y - 236, w: 118, h: 42, alpha: 0.22 },
     { key: "bossRoom", x: 6520, y: FLOOR_Y - 252, w: 470, h: 346, alpha: 0.18 },
@@ -473,6 +478,7 @@ var GS = {
   deathFlash: 0,
   badgeTimer: null,
   stepCardTimer: null,
+  fireballs: [],
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -483,7 +489,8 @@ var STEPS = [
     icon: "🏃",
     title: "Movement",
     desc: "Use W or Space to jump. Use D to walk forward, A to walk backward.",
-    mobileDesc: "Use the left pad to walk. Tap Jump to leap over gaps and hazards.",
+    mobileDesc:
+      "Use the left pad to walk. Tap Jump to leap over gaps and hazards.",
     keys: ["W / Space → Jump", "D → Walk forward", "A → Walk back"],
     mobileKeys: ["Left pad -> Walk", "Jump -> Leap"],
     trigger: function () {
@@ -494,7 +501,8 @@ var STEPS = [
     icon: "⬆",
     title: "Advance",
     desc: "Move forward toward the first trap.",
-    mobileDesc: "Hold the right side of the left pad to move toward the first trap.",
+    mobileDesc:
+      "Hold the right side of the left pad to move toward the first trap.",
     keys: ["D → Walk forward"],
     mobileKeys: ["Drag joystick right -> Walk forward"],
     trigger: function () {
@@ -516,7 +524,8 @@ var STEPS = [
     icon: "💨",
     title: "Dash!",
     desc: "You fell into a shaft. A row of spikes blocks the path. Press Shift to DASH through the gap!",
-    mobileDesc: "You fell into a shaft. Tap Dash to burst through the spike gap.",
+    mobileDesc:
+      "You fell into a shaft. Tap Dash to burst through the spike gap.",
     keys: ["Shift -> Dash"],
     mobileKeys: ["Dash -> Burst forward"],
     trigger: function () {
@@ -524,21 +533,23 @@ var STEPS = [
     },
   },
   {
-    icon: "🔨",
-    title: "Dodge the Hammer!",
-    desc: "A swinging hammer guards the corridor. Time your movement to get past it.",
-    mobileDesc: "A swinging hammer guards the corridor. Time your left-pad movement to get past it.",
-    keys: ["Time your run!"],
-    mobileKeys: ["Left pad -> Time your run"],
+    icon: "🔥",
+    title: "Dodge the Fireballs!",
+    desc: "Fireballs rain from above and below. Keep moving to avoid them!",
+    mobileDesc:
+      "Fireballs rain from above and below. Keep moving to avoid them!",
+    keys: ["Move and dodge!"],
+    mobileKeys: ["Move and dodge!"],
     trigger: function () {
-      return PL.x > MAP.hammer.anchorX + 200;
+      return PL.x > MAP.fireballLauncher.x + 200;
     },
   },
   {
     icon: "✨",
     title: "Golden Thread!",
     desc: "Pick up the Golden Thread. Carry it to the doors — it will light the correct door!",
-    mobileDesc: "Pick up the Golden Thread with E. Carry it to the doors and follow its glow.",
+    mobileDesc:
+      "Pick up the Golden Thread with E. Carry it to the doors and follow its glow.",
     keys: ["E → Pick up item"],
     mobileKeys: ["E -> Pick up item"],
     trigger: function () {
@@ -549,7 +560,8 @@ var STEPS = [
     icon: "🚪",
     title: "Choose the Right Door!",
     desc: "Three doors stand ahead. The Golden Thread lights the correct one. Press E at the chosen door to escape!",
-    mobileDesc: "Three doors stand ahead. Stand by the glowing door and tap E to escape.",
+    mobileDesc:
+      "Three doors stand ahead. Stand by the glowing door and tap E to escape.",
     keys: ["E → Enter chosen door"],
     mobileKeys: ["E -> Enter chosen door"],
     trigger: function () {
@@ -619,9 +631,8 @@ function resetToStart() {
     s.active = false;
     s.riseTimer = 0;
   });
-  MAP.hammer.angle = 0;
-  MAP.hammer.swingTimer = 0;
-  MAP.hammer.hitCooldown = 0;
+  MAP.fireballLauncher.timer = 0;
+  GS.fireballs = [];
   MAP.gold.collected = false;
   GS.hasGold = false;
   GS.activeDoorIndex = -1;
@@ -694,7 +705,12 @@ function tutUpdate() {
   }
 
   // Dash
-  if ((JP["ShiftLeft"] || JP["ShiftRight"]) && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
+  if (
+    (JP["ShiftLeft"] || JP["ShiftRight"]) &&
+    PL.dcd <= 0 &&
+    PL.stamina >= DASH_COST &&
+    !PL.dashing
+  ) {
     PL.dashing = true;
     PL.dtmr = DASH_DUR;
     PL.ddir = PL.dir;
@@ -772,7 +788,7 @@ function tutUpdate() {
       }
     }
   }
-  
+
   // Clamp right edge of world
   if (PL.x + PL.sw > WORLD) {
     PL.x = WORLD - PL.sw;
@@ -823,37 +839,45 @@ function tutUpdate() {
     }
   }
 
-  /* ── HAMMER ── */
-  var hm = MAP.hammer;
-  var swingMax = hm.swingMax;
-  hm.swingTimer += hm.swingSpeed;
-  hm.angle = Math.sin(hm.swingTimer) * swingMax;
-  // Pick a frame from the left/right swing sets based on the current arc.
-  var swingRatio = Math.min(Math.abs(hm.angle) / swingMax, 1);
-  hm.frameIdx = Math.round(
-    swingRatio * Math.max(HAMMER_SWING_FRAMES.length - 1, 0),
-  );
-  // Hit detection
-  if (hm.hitCooldown > 0) hm.hitCooldown--;
-  if (PL.iframes <= 0 && hm.hitCooldown <= 0) {
-    var hx = hm.anchorX + Math.sin(hm.angle) * hm.length;
-    var hy2 = hm.anchorY + Math.cos(hm.angle) * hm.length;
-    var px5 = PL.x + PL_COX,
-      py5 = PL.y + PL_COY;
-    // Head center is hm.hh below the handle pivot (hx, hy2) in pendulum direction
-    var headCX = hx + Math.sin(hm.angle) * hm.hh;
-    var headCY = hy2 + Math.cos(hm.angle) * hm.hh;
-    var hL = headCX - hm.hw / 2,
-      hR = headCX + hm.hw / 2,
-      hT = headCY - hm.hh / 2,
-      hB = headCY + hm.hh / 2;
-    if (px5 < hR && px5 + PL.w > hL && py5 < hB && py5 + PL.h > hT) {
-      var kd = PL.x + PL.sw / 2 < hx ? -1 : 1;
-      PL.vx = kd * 10;
-      PL.vy = -9;
-      PL.grounded = false;
-      hm.hitCooldown = 80;
-      takeDamage("hammer");
+  /* ── FIREBALL LAUNCHER ── */
+  var launcher = MAP.fireballLauncher;
+  launcher.timer++;
+  if (launcher.timer >= launcher.intervalFrames) {
+    launcher.timer = 0;
+    // Randomly choose top or bottom
+    var fromTop = Math.random() < 0.5;
+    GS.fireballs.push({
+      x: launcher.x,
+      y: fromTop ? 0 : TC.height,
+      vy: fromTop ? 4 : -4, // moves down if from top, up if from bottom
+      w: 32,
+      h: 32,
+      hitCooldown: 0,
+    });
+  }
+
+  /* ── FIREBALL MOVEMENT & COLLISION ── */
+  for (var fi = GS.fireballs.length - 1; fi >= 0; fi--) {
+    var fb = GS.fireballs[fi];
+    fb.y += fb.vy;
+    // Remove if off-screen
+    if (fb.y < -fb.h || fb.y > TC.height + fb.h) {
+      GS.fireballs.splice(fi, 1);
+      continue;
+    }
+    // Hit detection
+    if (PL.iframes <= 0) {
+      var px5 = PL.x + PL_COX,
+        py5 = PL.y + PL_COY;
+      if (
+        px5 < fb.x + fb.w &&
+        px5 + PL.w > fb.x &&
+        py5 < fb.y + fb.h &&
+        py5 + PL.h > fb.y
+      ) {
+        takeDamage("fireball");
+        GS.fireballs.splice(fi, 1);
+      }
     }
   }
 
@@ -955,15 +979,13 @@ function tutUpdate() {
   /* ── CAMERA ── */
   var targetCamX = PL.x + PL.sw / 2 - TC.width / 2;
   var targetCamY = PL.y + PL.sh / 2 - TC.height / 2;
-  
+
   // Clamp to world bounds
   targetCamX = Math.max(0, Math.min(WORLD - TC.width, targetCamX));
   targetCamY = Math.max(0, Math.min(TC.height * 2 - TC.height, targetCamY)); // Adjust vertical bounds as needed
-  
+
   CAM.x += (targetCamX - CAM.x) * 0.12;
   CAM.y += (targetCamY - CAM.y) * 0.12;
-
-
 
   /* ── PARTICLES ── */
   updateParticles();
@@ -1025,8 +1047,12 @@ function spawnImpactPtcls(x, y, count) {
       dec: 0.035 + Math.random() * 0.03,
       sz: Math.random() * (isEmber ? 4 : 3) + 2,
       col: isEmber
-        ? (Math.random() < 0.5 ? "#ffd36c" : "#ffb347")
-        : (Math.random() < 0.5 ? "#9b1f2d" : "#67202a"),
+        ? Math.random() < 0.5
+          ? "#ffd36c"
+          : "#ffb347"
+        : Math.random() < 0.5
+          ? "#9b1f2d"
+          : "#67202a",
       type: isEmber ? "ember" : "dust",
     });
   }
@@ -1046,13 +1072,10 @@ function startDeathSequence(source) {
   GS.deathFx = {
     x: PL.x,
     y: PL.y,
-    vx:
-      source === "hammer"
-        ? (PL.x + PL.sw / 2 < MAP.hammer.anchorX ? -2.8 : 2.8)
-        : PL.dir * 1.2,
+    vx: PL.dir * 1.2,
     vy: -6.4,
-    rot: source === "hammer" ? 0.18 * PL.dir : 0,
-    rotV: source === "hammer" ? 0.14 * PL.dir : 0.08 * PL.dir,
+    rot: 0,
+    rotV: 0.08 * PL.dir,
     scale: 1,
     alpha: 1,
     glow: 1,
@@ -1085,7 +1108,7 @@ function updateDeathFx() {
   fx.vx *= 0.95;
   fx.rot += fx.rotV;
   fx.rotV *= 0.985;
-  fx.scale = 1 + Math.sin(Math.min(fx.t, 16) / 16 * Math.PI) * 0.07;
+  fx.scale = 1 + Math.sin((Math.min(fx.t, 16) / 16) * Math.PI) * 0.07;
   fx.glow = Math.max(0, 1 - fx.t / 22);
   fx.alpha = fx.t < 12 ? 1 : Math.max(0, 1 - (fx.t - 12) / 28);
   GS.deathFlash = Math.max(0, 1 - fx.t / 20);
@@ -1119,7 +1142,7 @@ function wrongDoor() {
     "background:#000",
     "opacity:0",
     "transition:opacity 0.05s",
-    "overflow:hidden"
+    "overflow:hidden",
   ].join(";");
 
   var img = new Image();
@@ -1131,7 +1154,7 @@ function wrongDoor() {
     "object-fit:cover",
     "transform:scale(1.08)",
     "image-rendering:pixelated",
-    "filter:brightness(1.3) contrast(1.4)"
+    "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
   // Use SPRITE_MINO if available, otherwise a red fallback
@@ -1142,7 +1165,8 @@ function wrongDoor() {
     overlay.style.background = "#cc0000";
     var txt = document.createElement("div");
     txt.textContent = "YOU CHOSE WRONG";
-    txt.style.cssText = "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
+    txt.style.cssText =
+      "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
     overlay.appendChild(txt);
   }
 
@@ -1153,7 +1177,9 @@ function wrongDoor() {
   var fl = document.getElementById("wrong-flash");
   if (fl) {
     fl.classList.add("show");
-    setTimeout(function () { fl.classList.remove("show"); }, 200);
+    setTimeout(function () {
+      fl.classList.remove("show");
+    }, 200);
   }
 
   // Screen shake
@@ -1205,8 +1231,7 @@ function tutDraw() {
   TX.clearRect(0, 0, W, H);
 
   TX.save();
-TX.translate(-CAM.x, -CAM.y);
-
+  TX.translate(-CAM.x, -CAM.y);
 
   drawBG(W, H);
   drawChamberDepth(H);
@@ -1217,7 +1242,7 @@ TX.translate(-CAM.x, -CAM.y);
   drawSpikes();
   drawReadySpike();
   drawShaft(H);
-  drawHammer();
+  drawFireballs();
   drawGold();
   drawThrowFx();
   drawDoors();
@@ -1253,7 +1278,14 @@ function drawBG(W, H) {
     TX.drawImage(SPR.mapTheme.roof, 0, 0, WORLD, H * 0.18);
     TX.restore();
   }
-  var haze = TX.createRadialGradient(CAM.x + W * 0.5, H * 0.18, 10, CAM.x + W * 0.5, H * 0.42, W * 0.7);
+  var haze = TX.createRadialGradient(
+    CAM.x + W * 0.5,
+    H * 0.18,
+    10,
+    CAM.x + W * 0.5,
+    H * 0.42,
+    W * 0.7,
+  );
   haze.addColorStop(0, "rgba(214,187,128,0.11)");
   haze.addColorStop(1, "transparent");
   TX.fillStyle = haze;
@@ -1297,10 +1329,23 @@ function drawBG(W, H) {
     var torchH = 34;
     var torchBaseY = ty - 6;
     if (torch) {
-      TX.drawImage(torch, tx - torchW * 0.5, torchBaseY - torchH, torchW, torchH);
+      TX.drawImage(
+        torch,
+        tx - torchW * 0.5,
+        torchBaseY - torchH,
+        torchW,
+        torchH,
+      );
     }
 
-    var emberGlow = TX.createRadialGradient(tx, torchBaseY - 28, 0, tx, torchBaseY - 28, 34);
+    var emberGlow = TX.createRadialGradient(
+      tx,
+      torchBaseY - 28,
+      0,
+      tx,
+      torchBaseY - 28,
+      34,
+    );
     emberGlow.addColorStop(0, "rgba(255,240,184,.48)");
     emberGlow.addColorStop(0.3, "rgba(255,170,70,.26)");
     emberGlow.addColorStop(1, "transparent");
@@ -1314,13 +1359,23 @@ function drawBG(W, H) {
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 45 - flameWobble * 0.12);
     TX.quadraticCurveTo(tx + 10, torchBaseY - 30, tx, torchBaseY - 12);
-    TX.quadraticCurveTo(tx - 12, torchBaseY - 30, tx, torchBaseY - 45 - flameWobble * 0.12);
+    TX.quadraticCurveTo(
+      tx - 12,
+      torchBaseY - 30,
+      tx,
+      torchBaseY - 45 - flameWobble * 0.12,
+    );
     TX.fill();
     TX.fillStyle = "rgba(255,241,190,.96)";
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 38 - flameWobble * 0.08);
     TX.quadraticCurveTo(tx + 5, torchBaseY - 28, tx, torchBaseY - 18);
-    TX.quadraticCurveTo(tx - 6, torchBaseY - 28, tx, torchBaseY - 38 - flameWobble * 0.08);
+    TX.quadraticCurveTo(
+      tx - 6,
+      torchBaseY - 28,
+      tx,
+      torchBaseY - 38 - flameWobble * 0.08,
+    );
     TX.fill();
     TX.restore();
   }
@@ -1337,7 +1392,12 @@ function drawChamberDepth(H) {
     TX.fillStyle = "rgba(10,8,14,.22)";
     TX.fillRect(zone.x, zone.y, zone.w, zone.h);
 
-    var archG = TX.createLinearGradient(zone.x, zone.y, zone.x, zone.y + zone.h);
+    var archG = TX.createLinearGradient(
+      zone.x,
+      zone.y,
+      zone.x,
+      zone.y + zone.h,
+    );
     archG.addColorStop(0, "rgba(26,18,22,.44)");
     archG.addColorStop(0.25, "rgba(10,7,12,.1)");
     archG.addColorStop(1, "rgba(0,0,0,0)");
@@ -1369,7 +1429,7 @@ function drawChamberDepth(H) {
     TX.save();
     var cg = TX.createLinearGradient(col.x, col.y, col.x + col.w, col.y);
     cg.addColorStop(0, "rgba(14,10,16," + col.alpha + ")");
-    cg.addColorStop(0.5, "rgba(42,30,34," + (col.alpha * 1.2) + ")");
+    cg.addColorStop(0.5, "rgba(42,30,34," + col.alpha * 1.2 + ")");
     cg.addColorStop(1, "rgba(12,8,12," + col.alpha + ")");
     TX.fillStyle = cg;
     TX.fillRect(col.x, col.y, col.w, col.h);
@@ -1385,7 +1445,8 @@ function drawDecorLayer(list) {
   if (!list) return;
   list.forEach(function (item) {
     var img = SPR.decor[item.key];
-    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40) return;
+    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40)
+      return;
     TX.save();
     TX.globalAlpha = item.alpha == null ? 1 : item.alpha;
     TX.drawImage(img, item.x, item.y, item.w, item.h);
@@ -1499,7 +1560,12 @@ function drawSpikeRack(x, y, w, spikeH, gap) {
     TX.closePath();
     TX.fill();
 
-    var bladeG = TX.createLinearGradient(tipX, y - spikeH, tipX, rackTop + rackHeight);
+    var bladeG = TX.createLinearGradient(
+      tipX,
+      y - spikeH,
+      tipX,
+      rackTop + rackHeight,
+    );
     bladeG.addColorStop(0, "#f3e5d5");
     bladeG.addColorStop(0.18, "#d8d1c8");
     bladeG.addColorStop(0.55, "#8a8c93");
@@ -1540,7 +1606,8 @@ function drawSpikeRack(x, y, w, spikeH, gap) {
 
 function drawPlates() {
   MAP.plates.forEach(function (plate) {
-    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20) return;
+    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20)
+      return;
 
     TX.save();
     TX.fillStyle = plate.active ? "rgba(156,104,28,.95)" : "rgba(106,74,24,.9)";
@@ -1600,65 +1667,25 @@ function drawShaft(H) {
   }
   TX.fillStyle = "rgba(0,0,0,.26)";
   TX.fillRect(sh.x + 10, sh.y + 6, sh.w - 20, sh.bottom - sh.y - 6);
-
 }
 
-function drawHammer() {
-  var hm = MAP.hammer;
-  if (hm.anchorX < CAM.x - 300 || hm.anchorX > CAM.x + TC.width + 300) return;
-  var hx = hm.anchorX + Math.sin(hm.angle) * hm.length;
-  var hy2 = hm.anchorY + Math.cos(hm.angle) * hm.length;
-
-  var hmImg = SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
-  if (hmImg && hmImg.complete && hmImg.naturalWidth) {
+function drawFireballs() {
+  GS.fireballs.forEach(function (fb) {
+    if (fb.x < CAM.x - 60 || fb.x > CAM.x + TC.width + 60) return;
     TX.save();
-    // Rotate one hammer asset around the pointer/ball for a genuinely steady swing.
-    var scale = 0.72;
-    var sprW = hmImg.naturalWidth * scale;
-    var sprH = hmImg.naturalHeight * scale;
-    var pivot = { x: 0.86, y: 0.5 };
-    TX.translate(hm.anchorX, hm.anchorY);
-    TX.rotate(hm.angle);
-    TX.drawImage(hmImg, -sprW * pivot.x, -sprH * pivot.y, sprW, sprH);
+    TX.shadowBlur = 20;
+    TX.shadowColor = "rgba(255,100,0,0.9)";
+    TX.fillStyle = "#ff6600";
+    TX.beginPath();
+    TX.arc(fb.x + fb.w / 2, fb.y + fb.h / 2, fb.w / 2, 0, Math.PI * 2);
+    TX.fill();
+    TX.fillStyle = "#ffcc00";
+    TX.beginPath();
+    TX.arc(fb.x + fb.w / 2, fb.y + fb.h / 2, fb.w / 4, 0, Math.PI * 2);
+    TX.fill();
     TX.restore();
-  } else {
-    TX.save();
-    TX.translate(hm.anchorX, hm.anchorY);
-    TX.rotate(hm.angle);
-    // Fallback rectangle if no sprite
-    var hg = TX.createLinearGradient(-hm.hw / 2, -hm.hh / 2, hm.hw / 2, hm.hh / 2);
-    hg.addColorStop(0, "#909090");
-    hg.addColorStop(0.4, "#c0c0c8");
-    hg.addColorStop(1, "#484858");
-    TX.fillStyle = hg;
-    TX.fillRect(-hm.hw / 2, -hm.hh / 2, hm.hw, hm.hh);
-    TX.strokeStyle = "#282830";
-    TX.lineWidth = 2;
-    TX.strokeRect(-hm.hw / 2, -hm.hh / 2, hm.hw, hm.hh);
-    TX.fillStyle = "rgba(255,255,255,.2)";
-    TX.fillRect(-hm.hw / 2 + 2, -hm.hh / 2 + 2, hm.hw - 4, 4);
-    TX.restore();
-  }
-
-  // Warning
-  var dist = Math.hypot(
-    PL.x + PL.sw / 2 - hm.anchorX,
-    PL.y + PL.sh / 2 - hm.anchorY,
-  );
-  if (dist < 300) {
-    var alp =
-      Math.max(0, (300 - dist) / 300) *
-      (0.5 + 0.4 * Math.abs(Math.sin(Date.now() * 0.01)));
-    TX.save();
-    TX.globalAlpha = alp;
-    TX.font = "bold 16px serif";
-    TX.fillStyle = "#ff3300";
-    TX.textAlign = "center";
-    TX.fillText("⚠", hm.anchorX, hm.anchorY - 20);
-    TX.restore();
-  }
+  });
 }
-
 
 function getThrowLandingY(x) {
   var best = FLOOR_Y;
@@ -1723,7 +1750,8 @@ function handleThrowInput() {
     MAP.gold.collected = true;
     MAP.gold.visible = true;
   }
-  if (typeof updateTutorialInventoryUI === "function") updateTutorialInventoryUI();
+  if (typeof updateTutorialInventoryUI === "function")
+    updateTutorialInventoryUI();
   if (typeof renderInventoryHUD === "function") renderInventoryHUD();
   if (typeof showBadge === "function") showBadge("Golden Thread thrown!");
   startThrownItem(icon);
@@ -1747,7 +1775,11 @@ function updateThrowFx() {
       MAP.gold.collected = false;
       MAP.gold.visible = true;
       MAP.gold.bobTimer = 0;
-      if (typeof spawnGoldPtcls === "function") spawnGoldPtcls(MAP.gold.x + MAP.gold.w / 2, MAP.gold.y + MAP.gold.h / 2);
+      if (typeof spawnGoldPtcls === "function")
+        spawnGoldPtcls(
+          MAP.gold.x + MAP.gold.w / 2,
+          MAP.gold.y + MAP.gold.h / 2,
+        );
     }
     GS.throwFx = null;
   }
@@ -1765,7 +1797,12 @@ function drawThrowFx() {
     TX.lineCap = "round";
     TX.beginPath();
     TX.moveTo(handX - PL.dir * 18, handY + 16);
-    TX.quadraticCurveTo(handX + PL.dir * 18, handY - 6, handX + PL.dir * 52, handY - 18);
+    TX.quadraticCurveTo(
+      handX + PL.dir * 18,
+      handY - 6,
+      handX + PL.dir * 52,
+      handY - 18,
+    );
     TX.stroke();
     TX.restore();
   }
@@ -1779,7 +1816,12 @@ function drawThrowFx() {
   TX.lineCap = "round";
   TX.beginPath();
   TX.moveTo(fx.sx, fx.sy);
-  TX.quadraticCurveTo((fx.sx + fx.x) / 2, Math.min(fx.sy, fx.y) - 64, fx.x, fx.y);
+  TX.quadraticCurveTo(
+    (fx.sx + fx.x) / 2,
+    Math.min(fx.sy, fx.y) - 64,
+    fx.x,
+    fx.y,
+  );
   TX.stroke();
   TX.globalAlpha = 1;
   TX.shadowBlur = 18;
@@ -1867,7 +1909,15 @@ function drawDoors() {
     TX.save();
     TX.fillStyle = "rgba(0,0,0,.22)";
     TX.beginPath();
-    TX.ellipse(door.x + door.w / 2, door.y + door.h + 10, door.w * 0.56, 10, 0, 0, Math.PI * 2);
+    TX.ellipse(
+      door.x + door.w / 2,
+      door.y + door.h + 10,
+      door.w * 0.56,
+      10,
+      0,
+      0,
+      Math.PI * 2,
+    );
     TX.fill();
     TX.fillStyle = "rgba(32,18,18,.88)";
     TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
@@ -1984,7 +2034,7 @@ function drawPlayer() {
     TX.globalAlpha = fx.alpha;
     TX.shadowBlur = 24 * fx.glow;
     TX.shadowColor = "rgba(255,180,90,.85)";
-    TX.fillStyle = "rgba(0,0,0," + (0.18 * fx.alpha) + ")";
+    TX.fillStyle = "rgba(0,0,0," + 0.18 * fx.alpha + ")";
     TX.beginPath();
     TX.ellipse(
       fx.x + PL.sw / 2,
@@ -1999,7 +2049,10 @@ function drawPlayer() {
 
     TX.translate(fx.x + PL.sw / 2, fx.y + PL.sh * 0.56);
     TX.rotate(fx.rot);
-    TX.scale((PL.dir === -1 ? -1 : 1) * fx.scale, Math.max(0.78, 1 - fx.t * 0.01));
+    TX.scale(
+      (PL.dir === -1 ? -1 : 1) * fx.scale,
+      Math.max(0.78, 1 - fx.t * 0.01),
+    );
 
     if (img && img.complete && img.naturalWidth) {
       TX.drawImage(img, -PL.sw / 2, -PL.sh * 0.56, PL.sw, PL.sh);
