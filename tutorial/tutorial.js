@@ -179,6 +179,7 @@ async function loadSpr() {
   if (typeof SPRITE_DOOR2 !== "undefined") SPR.door2 = await li(SPRITE_DOOR2);
   if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
+  if (typeof SPRITE_FIRE !== "undefined") SPR.fireball = await li(SPRITE_FIRE);
   SPR.torch = await li(TORCH_ASSET);
   var decorKeys = Object.keys(DECOR_PATHS);
   for (var i = 0; i < decorKeys.length; i++) {
@@ -337,12 +338,14 @@ function buildMap() {
     h: TILE,
   };
 
-  //Fireballs
-  MAP.fireballLauncher = {
-    x: 5230, // world-space X of the launcher
-    intervalFrames: Math.round(1.8 * 60), // 1.8s at 60fps = 108 frames
-    timer: 0,
-  };
+  /* ── FIREBALL LAUNCHER ── */
+// Spawns fireballs from the ground aimed at the player, every 1.8s
+MAP.fireballLauncher = {
+  x: 5230,                               // world-space X of the corridor
+  rangeW: 1540,                          // width of the danger zone (matches platform width)
+  intervalFrames: Math.round(1.8 * 60), // 108 frames = 1.8s at 60fps
+  timer: 0,
+};
 
   /* ── GOLD THREW (item) ── */
   MAP.gold = {
@@ -840,46 +843,54 @@ function tutUpdate() {
   }
 
   /* ── FIREBALL LAUNCHER ── */
-  var launcher = MAP.fireballLauncher;
+// Only active when player is inside the danger corridor
+var launcher = MAP.fireballLauncher;
+var plCX = PL.x + PL_COX + PL.w / 2;
+var inZone = plCX >= launcher.x && plCX <= launcher.x + launcher.rangeW;
+if (inZone) {
   launcher.timer++;
   if (launcher.timer >= launcher.intervalFrames) {
     launcher.timer = 0;
-    // Randomly choose top or bottom
-    var fromTop = Math.random() < 0.5;
+    // Spawn from ground at a random X inside the zone, aimed upward
+    var spawnX = launcher.x + Math.random() * launcher.rangeW;
     GS.fireballs.push({
-      x: launcher.x,
-      y: fromTop ? 0 : TC.height,
-      vy: fromTop ? 4 : -4, // moves down if from top, up if from bottom
-      w: 32,
-      h: 32,
-      hitCooldown: 0,
+      x: spawnX,
+      y: FLOOR_Y,      // starts at ground level
+      vx: 0,
+      vy: -6,          // shoots straight up
+      w: 48,
+      h: 48,
     });
   }
+} else {
+  launcher.timer = 0;  // reset timer when player leaves the zone
+}
 
-  /* ── FIREBALL MOVEMENT & COLLISION ── */
-  for (var fi = GS.fireballs.length - 1; fi >= 0; fi--) {
-    var fb = GS.fireballs[fi];
-    fb.y += fb.vy;
-    // Remove if off-screen
-    if (fb.y < -fb.h || fb.y > TC.height + fb.h) {
+/* ── FIREBALL MOVEMENT & COLLISION ── */
+for (var fi = GS.fireballs.length - 1; fi >= 0; fi--) {
+  var fb = GS.fireballs[fi];
+  fb.vy += 0.12;       // slight gravity so it arcs and falls back down
+  fb.y += fb.vy;
+  // Remove if it falls back below the floor or goes way off-screen top
+  if (fb.y > FLOOR_Y + 80 || fb.y < -200) {
+    GS.fireballs.splice(fi, 1);
+    continue;
+  }
+  // Hit detection — 1 heart per hit (takeDamage does GS.lives - 1)
+  if (PL.iframes <= 0) {
+    var px5 = PL.x + PL_COX,
+      py5 = PL.y + PL_COY;
+    if (
+      px5 < fb.x + fb.w &&
+      px5 + PL.w > fb.x &&
+      py5 < fb.y + fb.h &&
+      py5 + PL.h > fb.y
+    ) {
+      takeDamage("fireball");  // removes exactly 1 heart (GS.lives - 1)
       GS.fireballs.splice(fi, 1);
-      continue;
-    }
-    // Hit detection
-    if (PL.iframes <= 0) {
-      var px5 = PL.x + PL_COX,
-        py5 = PL.y + PL_COY;
-      if (
-        px5 < fb.x + fb.w &&
-        px5 + PL.w > fb.x &&
-        py5 < fb.y + fb.h &&
-        py5 + PL.h > fb.y
-      ) {
-        takeDamage("fireball");
-        GS.fireballs.splice(fi, 1);
-      }
     }
   }
+}
 
   /* ── GOLD THREW PICKUP ── */
   if (!MAP.gold.collected && !GS.hasGold) {
@@ -1671,18 +1682,28 @@ function drawShaft(H) {
 
 function drawFireballs() {
   GS.fireballs.forEach(function (fb) {
-    if (fb.x < CAM.x - 60 || fb.x > CAM.x + TC.width + 60) return;
+    if (fb.x < CAM.x - 80 || fb.x > CAM.x + TC.width + 80) return;
     TX.save();
-    TX.shadowBlur = 20;
-    TX.shadowColor = "rgba(255,100,0,0.9)";
-    TX.fillStyle = "#ff6600";
-    TX.beginPath();
-    TX.arc(fb.x + fb.w / 2, fb.y + fb.h / 2, fb.w / 2, 0, Math.PI * 2);
-    TX.fill();
-    TX.fillStyle = "#ffcc00";
-    TX.beginPath();
-    TX.arc(fb.x + fb.w / 2, fb.y + fb.h / 2, fb.w / 4, 0, Math.PI * 2);
-    TX.fill();
+
+    if (SPR.fireball && SPR.fireball.complete && SPR.fireball.naturalWidth) {
+      // Draw the SPRITE_FIRE image, centered on the fireball hitbox
+      TX.shadowBlur = 18;
+      TX.shadowColor = "rgba(255,120,0,0.85)";
+      TX.drawImage(SPR.fireball, fb.x - fb.w * 0.1, fb.y - fb.h * 0.1, fb.w * 1.2, fb.h * 1.2);
+    } else {
+      // Fallback: draw a glowing orange circle if sprite not loaded
+      TX.shadowBlur = 22;
+      TX.shadowColor = "rgba(255,100,0,0.9)";
+      TX.fillStyle = "#ff6600";
+      TX.beginPath();
+      TX.arc(fb.x + fb.w / 2, fb.y + fb.h / 2, fb.w / 2, 0, Math.PI * 2);
+      TX.fill();
+      TX.fillStyle = "#ffee44";
+      TX.beginPath();
+      TX.arc(fb.x + fb.w / 2, fb.y + fb.h / 2, fb.w / 4, 0, Math.PI * 2);
+      TX.fill();
+    }
+
     TX.restore();
   });
 }
