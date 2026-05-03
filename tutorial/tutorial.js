@@ -339,13 +339,16 @@ function buildMap() {
   };
 
   /* ── FIREBALL LAUNCHER ── */
-// Spawns fireballs from the ground aimed at the player, every 1.8s
-MAP.fireballLauncher = {
-  x: 5230,                               // world-space X of the corridor
-  rangeW: 1540,                          // width of the danger zone (matches platform width)
-  intervalFrames: Math.round(1.8 * 60), // 108 frames = 1.8s at 60fps
-  timer: 0,
-};
+  // Invisible pressure plate at corridor entrance — step on it to activate
+  MAP.fireballLauncher = {
+    x: 5230,
+    rangeW: 1540,
+    intervalFrames: Math.round(1.8 * 60),
+    timer: 0,
+    triggered: false,
+    plateX: 5230,
+    plateW: 120,
+  };
 
   /* ── GOLD THREW (item) ── */
   MAP.gold = {
@@ -635,6 +638,7 @@ function resetToStart() {
     s.riseTimer = 0;
   });
   MAP.fireballLauncher.timer = 0;
+  MAP.fireballLauncher.triggered = false;
   GS.fireballs = [];
   MAP.gold.collected = false;
   GS.hasGold = false;
@@ -842,55 +846,87 @@ function tutUpdate() {
     }
   }
 
-  /* ── FIREBALL LAUNCHER ── */
-// Only active when player is inside the danger corridor
-var launcher = MAP.fireballLauncher;
-var plCX = PL.x + PL_COX + PL.w / 2;
-var inZone = plCX >= launcher.x && plCX <= launcher.x + launcher.rangeW;
-if (inZone) {
-  launcher.timer++;
-  if (launcher.timer >= launcher.intervalFrames) {
-    launcher.timer = 0;
-    // Spawn from ground at a random X inside the zone, aimed upward
-    var spawnX = launcher.x + Math.random() * launcher.rangeW;
-    GS.fireballs.push({
-      x: spawnX,
-      y: FLOOR_Y,      // starts at ground level
-      vx: 0,
-      vy: -6,          // shoots straight up
-      w: 48,
-      h: 48,
-    });
-  }
-} else {
-  launcher.timer = 0;  // reset timer when player leaves the zone
-}
+  /* ── FIREBALL PRESSURE PLATE TRIGGER ── */
+  var launcher = MAP.fireballLauncher;
+  var plFeetX = PL.x + PL_COX;
+  var plFeetX2 = plFeetX + PL.w;
+  var plFeetY = PL.y + PL_COY + PL.h;
+  var onFloor = PL.grounded && plFeetY >= FLOOR_Y - 4;
+  var onPlate =
+    plFeetX2 > launcher.plateX &&
+    plFeetX < launcher.plateX + launcher.plateW &&
+    onFloor;
 
-/* ── FIREBALL MOVEMENT & COLLISION ── */
-for (var fi = GS.fireballs.length - 1; fi >= 0; fi--) {
-  var fb = GS.fireballs[fi];
-  fb.vy += 0.12;       // slight gravity so it arcs and falls back down
-  fb.y += fb.vy;
-  // Remove if it falls back below the floor or goes way off-screen top
-  if (fb.y > FLOOR_Y + 80 || fb.y < -200) {
-    GS.fireballs.splice(fi, 1);
-    continue;
+  if (onPlate && !launcher.triggered) {
+    launcher.triggered = true; // latch — stays on for the rest of the zone
   }
-  // Hit detection — 1 heart per hit (takeDamage does GS.lives - 1)
-  if (PL.iframes <= 0) {
-    var px5 = PL.x + PL_COX,
-      py5 = PL.y + PL_COY;
-    if (
-      px5 < fb.x + fb.w &&
-      px5 + PL.w > fb.x &&
-      py5 < fb.y + fb.h &&
-      py5 + PL.h > fb.y
-    ) {
-      takeDamage("fireball");  // removes exactly 1 heart (GS.lives - 1)
-      GS.fireballs.splice(fi, 1);
+
+  /* ── FIREBALL SPAWNING (only after plate is triggered) ── */
+  if (launcher.triggered) {
+    launcher.timer++;
+    if (launcher.timer >= launcher.intervalFrames) {
+      launcher.timer = 0;
+      var spawnX = launcher.plateX + launcher.plateW / 2;
+      GS.fireballs.push({
+        x: spawnX,
+        y: FLOOR_Y,
+        vx: 0,
+        vy: -6,
+        w: 48,
+        h: 48,
+      });
     }
   }
-}
+
+  /* ── FIREBALL MOVEMENT & COLLISION ── */
+  for (var fi = GS.fireballs.length - 1; fi >= 0; fi--) {
+    var fb = GS.fireballs[fi];
+    fb.vy += 0.12;
+    fb.y += fb.vy;
+    if (fb.y > FLOOR_Y + 80 || fb.y < -200) {
+      GS.fireballs.splice(fi, 1);
+      continue;
+    }
+    if (PL.iframes <= 0) {
+      var px5 = PL.x + PL_COX,
+        py5 = PL.y + PL_COY;
+      if (
+        px5 < fb.x + fb.w &&
+        px5 + PL.w > fb.x &&
+        py5 < fb.y + fb.h &&
+        py5 + PL.h > fb.y
+      ) {
+        takeDamage("fireball");
+        GS.fireballs.splice(fi, 1);
+      }
+    }
+  }
+
+  /* ── FIREBALL MOVEMENT & COLLISION ── */
+  for (var fi = GS.fireballs.length - 1; fi >= 0; fi--) {
+    var fb = GS.fireballs[fi];
+    fb.vy += 0.12; // slight gravity so it arcs and falls back down
+    fb.y += fb.vy;
+    // Remove if it falls back below the floor or goes way off-screen top
+    if (fb.y > FLOOR_Y + 80 || fb.y < -200) {
+      GS.fireballs.splice(fi, 1);
+      continue;
+    }
+    // Hit detection — 1 heart per hit (takeDamage does GS.lives - 1)
+    if (PL.iframes <= 0) {
+      var px5 = PL.x + PL_COX,
+        py5 = PL.y + PL_COY;
+      if (
+        px5 < fb.x + fb.w &&
+        px5 + PL.w > fb.x &&
+        py5 < fb.y + fb.h &&
+        py5 + PL.h > fb.y
+      ) {
+        takeDamage("fireball"); // removes exactly 1 heart (GS.lives - 1)
+        GS.fireballs.splice(fi, 1);
+      }
+    }
+  }
 
   /* ── GOLD THREW PICKUP ── */
   if (!MAP.gold.collected && !GS.hasGold) {
@@ -1689,7 +1725,13 @@ function drawFireballs() {
       // Draw the SPRITE_FIRE image, centered on the fireball hitbox
       TX.shadowBlur = 18;
       TX.shadowColor = "rgba(255,120,0,0.85)";
-      TX.drawImage(SPR.fireball, fb.x - fb.w * 0.1, fb.y - fb.h * 0.1, fb.w * 1.2, fb.h * 1.2);
+      TX.drawImage(
+        SPR.fireball,
+        fb.x - fb.w * 0.1,
+        fb.y - fb.h * 0.1,
+        fb.w * 1.2,
+        fb.h * 1.2,
+      );
     } else {
       // Fallback: draw a glowing orange circle if sprite not loaded
       TX.shadowBlur = 22;

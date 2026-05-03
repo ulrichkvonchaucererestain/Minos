@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   LABYRINTH OF MINOS — STAGE III   stage3.js
+   LABYRINTH OF MINOS — TUTORIAL 2   tutorial2.js
    Faithfully implements the hand-drawn sketch:
    START → 1.5-block obstacle → pressure-plate spike1 → platform →
    pressure-plate spike2 → fall-down shaft → ready spike (DASH) →
@@ -30,92 +30,6 @@ var MAP_THEME_ASSETS = {
   },
 };
 
-/* ── SPACE QUESTIONS DATABASE ─────────────────────────────────── */
-var SPACE_QUESTIONS = [
-  {
-    q: "Which planet is closest to the Sun?",
-    options: ["Venus", "Mercury", "Mars", "Earth"],
-    correct: 1, // Mercury
-  },
-  {
-    q: "What is the largest planet in our solar system?",
-    options: ["Saturn", "Neptune", "Jupiter", "Uranus"],
-    correct: 2, // Jupiter
-  },
-  {
-    q: "Which planet is known as the Red Planet?",
-    options: ["Venus", "Jupiter", "Mars", "Mercury"],
-    correct: 2, // Mars
-  },
-  {
-    q: "What is the name of the galaxy that contains our Solar System?",
-    options: ["Andromeda", "Triangulum", "Whirlpool", "Milky Way"],
-    correct: 3, // Milky Way
-  },
-  {
-    q: "Which planet has the most extensive ring system?",
-    options: ["Jupiter", "Uranus", "Saturn", "Neptune"],
-    correct: 2, // Saturn
-  },
-  {
-    q: "What is the hottest planet in our solar system?",
-    options: ["Mercury", "Venus", "Mars", "Jupiter"],
-    correct: 1, // Venus
-  },
-  {
-    q: "Who was the first person to walk on the Moon?",
-    options: ["Buzz Aldrin", "Yuri Gagarin", "Neil Armstrong", "John Glenn"],
-    correct: 2, // Neil Armstrong
-  },
-  {
-    q: "What is the Great Red Spot on Jupiter?",
-    options: ["A volcano", "A massive storm", "A crater", "A lake"],
-    correct: 1, // A massive storm
-  },
-  {
-    q: "Which two planets have no moons?",
-    options: [
-      "Earth & Mars",
-      "Mercury & Venus",
-      "Jupiter & Saturn",
-      "Uranus & Neptune",
-    ],
-    correct: 1, // Mercury & Venus
-  },
-  {
-    q: "How long does light take to travel from the Sun to Earth?",
-    options: ["8 minutes", "1 hour", "1 day", "1 second"],
-    correct: 0, // 8 minutes
-  },
-  {
-    q: "What is a light-year a measure of?",
-    options: ["Time", "Distance", "Speed", "Brightness"],
-    correct: 1, // Distance
-  },
-  {
-    q: "Which dwarf planet was reclassified from a planet in 2006?",
-    options: ["Ceres", "Eris", "Pluto", "Haumea"],
-    correct: 2, // Pluto
-  },
-];
-
-function getRandomQuestion() {
-  var idx = Math.floor(Math.random() * SPACE_QUESTIONS.length);
-  return SPACE_QUESTIONS[idx];
-}
-
-function getRandomQuestions(count) {
-  var shuffled = SPACE_QUESTIONS.slice();
-  // Fisher-Yates shuffle
-  for (var i = shuffled.length - 1; i > 0; i--) {
-    var j = Math.floor(Math.random() * (i + 1));
-    var temp = shuffled[i];
-    shuffled[i] = shuffled[j];
-    shuffled[j] = temp;
-  }
-  return shuffled.slice(0, count);
-}
-
 /* ── PHYSICS CONSTANTS ─────────────────────────────────────────── */
 var PX = 3.0; // base walk speed
 var SPR_MULT = 1.22; // sprint multiplier
@@ -132,8 +46,8 @@ var STAM_MAX = 100,
   STAM_MIN = 15;
 
 /* ── WORLD DIMENSIONS ──────────────────────────────────────────── */
-// Stage III extends Stage II with denser hazards, tighter climbs, and roaming mobs.
-var WORLD = 9100;
+// Stage II stretches through a reworked webbed route with tighter staggered jumps.
+var WORLD = 8450;
 var TILE = 48; // 1 game tile = 48px
 
 /* ── PLAYER ─────────────────────────────────────────────────────── */
@@ -189,15 +103,12 @@ var SPR = {
   hammerRight: [],
   gold: null,
   spike: null,
+  pot: null,
+  sword: null,
   decor: {},
   torch: null,
   mapTheme: { map: null, roof: null, fall: null },
-  rat: [],
-  bat: null,
-  pot: null,
-  sword: null,
 };
-
 var sprOK = false;
 var HAMMER_LEFT_PATHS = [
   "../hammer_animation_swing_to_the_left1.png",
@@ -264,14 +175,6 @@ var DECOR_PATHS = {
   vinesRed4: "../adds_assets/redvines4.png",
 };
 
-var MOB_RAT_PATHS = [
-  "../MOBS/rat1.png",
-  "../MOBS/rat2.png",
-  "../MOBS/rat3.png",
-  "../MOBS/rat4.png",
-];
-var MOB_BAT_PATH = "../MOBS/bats.png";
-
 async function loadSpr() {
   function li(src) {
     return new Promise(function (r) {
@@ -300,14 +203,11 @@ async function loadSpr() {
   if (typeof SPRITE_DOOR2 !== "undefined") SPR.door2 = await li(SPRITE_DOOR2);
   if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
-
-  SPR.torch = await li(TORCH_ASSET);
-  SPR.rat = await Promise.all(MOB_RAT_PATHS.map(li));
-  SPR.bat = await li(MOB_BAT_PATH);
-  SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
-  SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
   if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
   if (typeof SPRITE_SWORD !== "undefined") SPR.sword = await li(SPRITE_SWORD);
+  SPR.torch = await li(TORCH_ASSET);
+  SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
+  SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
   var decorKeys = Object.keys(DECOR_PATHS);
   for (var i = 0; i < decorKeys.length; i++) {
     SPR.decor[decorKeys[i]] = await li(DECOR_PATHS[decorKeys[i]]);
@@ -362,9 +262,9 @@ window.addEventListener("keydown", function (e) {
       "KeyD",
       "KeyE",
       "KeyR",
+      "KeyF",
       "ShiftLeft",
       "ShiftRight",
-      "ShiftLeft",
     ].indexOf(e.code) !== -1
   )
     e.preventDefault();
@@ -391,116 +291,64 @@ function buildMap() {
 
   /* ── PLATFORMS ─────────────────────────────────────────────── */
   var ph = TILE * 1.5;
-  var mezzY = FLOOR_Y - TILE * 0.35;
-  var loftY = FLOOR_Y - TILE * 0.95;
-  var galleryY = FLOOR_Y - TILE * 1.35;
-  var lowerY = FLOOR_Y + TILE * 2.7;
-  var trenchY = FLOOR_Y + TILE * 3.7;
-  var rise1Y = FLOOR_Y + TILE * 1.8;
-  var rise2Y = FLOOR_Y + TILE * 0.95;
+  var mezzY = FLOOR_Y - TILE * 0.7;
+  var loftY = FLOOR_Y - TILE * 1.75;
+  var galleryY = FLOOR_Y - TILE * 2.8;
+  var lowerY = FLOOR_Y + TILE * 3.2;
+  var rise1Y = FLOOR_Y + TILE * 2.2;
+  var rise2Y = FLOOR_Y + TILE * 1.2;
   var rise3Y = FLOOR_Y + TILE * 0.2;
 
   MAP.platforms = [
-    { x: 0, y: FLOOR_Y, w: 560, h: ph },
-    { x: 760, y: mezzY, w: 220, h: TILE },
-    { x: 1070, y: mezzY, w: 250, h: TILE },
-    { x: 1460, y: FLOOR_Y, w: 360, h: ph },
-    { x: 1980, y: loftY, w: 240, h: TILE },
-    { x: 2320, y: mezzY, w: 200, h: TILE },
-    { x: 2620, y: FLOOR_Y, w: 360, h: ph },
-    { x: 3060, y: trenchY, w: 170, h: ph },
-    { x: 3350, y: lowerY, w: 260, h: ph },
-    { x: 3730, y: rise1Y, w: 230, h: TILE },
-    { x: 4040, y: rise2Y, w: 210, h: TILE },
-    { x: 4330, y: rise3Y, w: 240, h: TILE },
-    { x: 4680, y: mezzY, w: 260, h: TILE },
-    { x: 5040, y: FLOOR_Y, w: 340, h: ph },
-    { x: 5530, y: rise1Y, w: 220, h: TILE },
-    { x: 5840, y: rise2Y, w: 210, h: TILE },
-    { x: 6150, y: mezzY, w: 230, h: TILE },
-    { x: 6490, y: FLOOR_Y, w: 360, h: ph },
-    { x: 7000, y: mezzY, w: 230, h: TILE },
-    { x: 7360, y: FLOOR_Y, w: 1060, h: ph },
+    { x: 0, y: FLOOR_Y, w: 640, h: ph },
+    { x: 790, y: mezzY, w: 260, h: TILE },
+    { x: 1160, y: loftY, w: 300, h: TILE },
+    { x: 1580, y: galleryY, w: 280, h: TILE },
+    { x: 1985, y: loftY, w: 300, h: TILE },
+    { x: 2405, y: mezzY, w: 240, h: TILE },
+    { x: 2760, y: loftY, w: 420, h: TILE },
+    { x: 3330, y: FLOOR_Y, w: 290, h: ph },
+    { x: 3820, y: lowerY, w: 430, h: ph },
+    { x: 4380, y: lowerY, w: 320, h: ph },
+    { x: 4850, y: lowerY, w: 430, h: ph },
+    { x: 5420, y: rise1Y, w: 220, h: TILE },
+    { x: 5710, y: rise2Y, w: 200, h: TILE },
+    { x: 6000, y: rise3Y, w: 260, h: TILE },
+    { x: 6350, y: loftY, w: 390, h: TILE },
+    { x: 6890, y: mezzY, w: 260, h: TILE },
+    { x: 7280, y: FLOOR_Y, w: 1090, h: ph },
   ];
 
   MAP.obstacle = null;
   MAP.plates = [];
 
-  /* ── STAGE III SPIKE LAYOUT ── */
+  /* ── STAGE II SMALL SPIKE CHECKS ── */
   MAP.spikes = [
-    { x: 1238, y: mezzY, w: 64, triggerX: 1168, active: false, riseTimer: 0 },
-    { x: 2886, y: FLOOR_Y, w: 64, triggerX: 2808, active: false, riseTimer: 0 },
-    { x: 4406, y: rise3Y, w: 64, triggerX: 4340, active: false, riseTimer: 0 },
-    { x: 7485, y: FLOOR_Y, w: 96, triggerX: 7400, active: false, riseTimer: 0 },
-  ];
-
-  MAP.mobs = [
-    {
-      type: "rat",
-      x: 2065,
-      startX: 2065,
-      y: loftY,
-      w: 56,
-      h: 32,
-      minX: 1992,
-      maxX: 2160,
-      vx: 1.15,
-      tick: 0,
-      dead: false,
-      hitCooldown: 0,
-    },
-    {
-      type: "bat",
-      x: 4690,
-      startX: 4690,
-      y: mezzY - 128,
-      baseY: mezzY - 128,
-      w: 72,
-      h: 42,
-      minX: 4638,
-      maxX: 4912,
-      vx: 1.45,
-      bob: 0,
-      tick: 0,
-      dead: false,
-      hitCooldown: 0,
-    },
-    {
-      type: "rat",
-      x: 7055,
-      startX: 7055,
-      y: mezzY,
-      w: 56,
-      h: 32,
-      minX: 7012,
-      maxX: 7158,
-      vx: -1.25,
-      tick: 0,
-      dead: false,
-      hitCooldown: 0,
-    },
+    { x: 3000, y: loftY, w: 96, triggerX: 2870, active: false, riseTimer: 0 },
+    { x: 4510, y: lowerY, w: 64, triggerX: 4420, active: false, riseTimer: 0 },
   ];
 
   /* ── SHAFT ── */
   MAP.shaft = {
-    x: 3140,
+    x: 3470,
     y: FLOOR_Y + ph,
-    w: 120,
-    bottom: trenchY,
+    w: 180,
+    bottom: lowerY,
   };
 
   MAP.readySpike = null;
   MAP.hammer = null;
 
-  /* ── GOLDEN THREAD — hidden inside one of 3 pots ── */
-  MAP.gold = null;
+  /* ── POTS (3 random, one has the gold thread) ── */
+  MAP.gold = null; // gold thread is now inside a pot, not floating
 
   var potPositions = [
-    { x: 1520, y: mezzY - 72 },
-    { x: 4700, y: mezzY - 72 },
-    { x: 7420, y: FLOOR_Y - 72 },
+    { x: 920, y: mezzY - 68 }, // near early platform jar decor
+    { x: 5185, y: lowerY - 72 }, // mid-map lower section
+    { x: 7430, y: FLOOR_Y - 72 }, // near end corridor
   ];
   var goldPotIndex = Math.floor(Math.random() * 3);
+
   MAP.pots = potPositions.map(function (pos, i) {
     return {
       x: pos.x,
@@ -509,12 +357,11 @@ function buildMap() {
       h: 68,
       hasGold: i === goldPotIndex,
       broken: false,
-      breakTimer: 0,
+      breakTimer: 0, // counts up after breaking for shatter anim
     };
   });
 
-  /* ── THREE DOORS: 2 FAKE, 1 REAL ── */
-  /* ── THREE DOORS: 2 FAKE, 1 REAL ── */
+  /* ── STAGE II EXIT — 3 DOORS (2 fake, 1 real) ── */
   var dW = 118,
     dH = 154;
   var doorY = FLOOR_Y - dH;
@@ -524,146 +371,156 @@ function buildMap() {
 
   MAP.doors = [
     {
-      x: 1800,
-      y: doorY,
+      x: 2400, // scattered: mid-left area
+      y: loftY - dH,
       w: dW,
       h: dH,
       correct: correctDoorIndex === 0,
-      label: correctDoorIndex === 0 ? "EXIT" : "DOOR A",
-      answered: false,
-      question: null, // Will be set when player interacts
+      fake: correctDoorIndex !== 0,
+      label: correctDoorIndex === 0 ? "???" : "DOOR I",
+      hint: "The true path lies where shadows gather near the climb.",
     },
     {
-      x: 4500,
-      y: doorY,
+      x: 5200, // scattered: lower area
+      y: lowerY - dH,
       w: dW,
       h: dH,
       correct: correctDoorIndex === 1,
-      label: correctDoorIndex === 1 ? "EXIT" : "DOOR B",
-      answered: false,
-      question: null,
+      fake: correctDoorIndex !== 1,
+      label: correctDoorIndex === 1 ? "???" : "DOOR II",
+      hint: "Seek the threshold where the bones whisper warnings.",
     },
     {
-      x: 7200,
+      x: 7800, // scattered: near end
       y: doorY,
       w: dW,
       h: dH,
       correct: correctDoorIndex === 2,
-      label: correctDoorIndex === 2 ? "EXIT" : "DOOR C",
-      answered: false,
-      question: null,
+      fake: correctDoorIndex !== 2,
+      label: correctDoorIndex === 2 ? "???" : "DOOR III",
+      hint: "The exit breathes where the thread of gold was spun.",
     },
   ];
+
+  // Store correct index for hint system
+  MAP.correctDoorIndex = correctDoorIndex;
+
+  // Track which doors have been attempted
+  MAP.doors.forEach(function (d) {
+    d.attempted = false;
+  });
+
   MAP.doorFrameRect = null;
 
   MAP.decorBack = [
-    { key: "cage", x: 150, y: FLOOR_Y - 276, w: 104, h: 88, alpha: 0.18 },
-    { key: "web", x: 300, y: FLOOR_Y - 256, w: 132, h: 48, alpha: 0.24 },
+    { key: "cage", x: 168, y: FLOOR_Y - 268, w: 110, h: 90, alpha: 0.18 },
+    { key: "web", x: 352, y: FLOOR_Y - 258, w: 142, h: 52, alpha: 0.28 },
     {
       key: "vinesGreenWide",
-      x: 520,
-      y: FLOOR_Y - 216,
-      w: 170,
-      h: 56,
+      x: 540,
+      y: FLOOR_Y - 228,
+      w: 174,
+      h: 58,
       alpha: 0.15,
     },
-
-    { key: "web", x: 820, y: mezzY - 96, w: 126, h: 44, alpha: 0.26 },
-    { key: "writing", x: 1120, y: FLOOR_Y - 178, w: 142, h: 58, alpha: 0.16 },
-    { key: "vinesRed3", x: 1330, y: FLOOR_Y - 208, w: 80, h: 236, alpha: 0.22 },
-
-    { key: "web", x: 2010, y: loftY - 94, w: 128, h: 46, alpha: 0.26 },
     {
       key: "muralShade",
-      x: 2230,
+      x: 760,
       y: FLOOR_Y - 292,
-      w: 188,
-      h: 146,
-      alpha: 0.1,
+      w: 198,
+      h: 154,
+      alpha: 0.12,
     },
-
-    { key: "web", x: 3110, y: trenchY - 118, w: 132, h: 46, alpha: 0.26 },
-    { key: "vinesGreen", x: 3350, y: lowerY - 142, w: 82, h: 96, alpha: 0.16 },
-    { key: "web", x: 3770, y: rise1Y - 96, w: 138, h: 48, alpha: 0.24 },
+    { key: "web", x: 1110, y: loftY - 92, w: 122, h: 44, alpha: 0.22 },
+    { key: "vinesRed3", x: 1320, y: loftY - 130, w: 84, h: 244, alpha: 0.24 },
+    { key: "web", x: 1568, y: galleryY - 102, w: 144, h: 52, alpha: 0.34 },
+    { key: "web", x: 1885, y: galleryY - 96, w: 130, h: 48, alpha: 0.24 },
+    { key: "vinesGreen", x: 2060, y: loftY - 112, w: 86, h: 30, alpha: 0.18 },
+    { key: "writing", x: 2320, y: loftY - 188, w: 148, h: 64, alpha: 0.18 },
+    { key: "web", x: 2630, y: loftY - 88, w: 122, h: 44, alpha: 0.24 },
+    { key: "web", x: 3010, y: loftY - 98, w: 136, h: 48, alpha: 0.28 },
+    { key: "web", x: 3390, y: FLOOR_Y - 250, w: 146, h: 54, alpha: 0.22 },
     {
       key: "vinesGreenWide",
-      x: 4010,
-      y: rise2Y - 156,
-      w: 162,
-      h: 52,
+      x: 3650,
+      y: FLOOR_Y - 238,
+      w: 166,
+      h: 54,
       alpha: 0.16,
     },
-    { key: "web", x: 4350, y: rise3Y - 104, w: 132, h: 46, alpha: 0.28 },
-
-    {
-      key: "muralLady",
-      x: 4560,
-      y: FLOOR_Y - 286,
-      w: 138,
-      h: 112,
-      alpha: 0.12,
-    },
-    { key: "web", x: 4720, y: mezzY - 96, w: 132, h: 46, alpha: 0.24 },
+    { key: "web", x: 3960, y: lowerY - 108, w: 132, h: 46, alpha: 0.3 },
+    { key: "muralLady", x: 4140, y: lowerY - 198, w: 130, h: 108, alpha: 0.13 },
     {
       key: "vinesGreenWide",
-      x: 5060,
-      y: FLOOR_Y - 212,
-      w: 170,
-      h: 56,
-      alpha: 0.15,
+      x: 4460,
+      y: lowerY - 234,
+      w: 176,
+      h: 58,
+      alpha: 0.16,
     },
-
-    { key: "cage", x: 5590, y: rise1Y - 178, w: 104, h: 88, alpha: 0.18 },
-    { key: "writing", x: 5870, y: FLOOR_Y - 188, w: 146, h: 60, alpha: 0.16 },
-    { key: "web", x: 6180, y: mezzY - 96, w: 126, h: 44, alpha: 0.24 },
-    { key: "vinesRed4", x: 6740, y: FLOOR_Y - 212, w: 88, h: 244, alpha: 0.22 },
-    { key: "web", x: 7030, y: mezzY - 96, w: 132, h: 48, alpha: 0.28 },
-
+    { key: "web", x: 4740, y: lowerY - 110, w: 124, h: 42, alpha: 0.28 },
+    { key: "cage", x: 5035, y: lowerY - 266, w: 112, h: 92, alpha: 0.2 },
+    { key: "writing", x: 5205, y: lowerY - 260, w: 154, h: 66, alpha: 0.2 },
+    { key: "web", x: 5450, y: rise1Y - 92, w: 126, h: 44, alpha: 0.24 },
+    { key: "web", x: 5735, y: rise2Y - 90, w: 122, h: 42, alpha: 0.24 },
+    { key: "vinesRed4", x: 5950, y: rise3Y - 204, w: 92, h: 250, alpha: 0.24 },
+    { key: "web", x: 6310, y: loftY - 94, w: 138, h: 50, alpha: 0.3 },
     {
       key: "muralSeeker",
-      x: 7410,
-      y: FLOOR_Y - 284,
-      w: 176,
-      h: 138,
-      alpha: 0.12,
+      x: 6555,
+      y: FLOOR_Y - 286,
+      w: 178,
+      h: 140,
+      alpha: 0.13,
     },
     {
       key: "vinesGreenWide",
-      x: 7720,
-      y: FLOOR_Y - 160,
+      x: 6845,
+      y: mezzY - 154,
       w: 180,
       h: 60,
       alpha: 0.18,
     },
-    { key: "web", x: 7995, y: FLOOR_Y - 88, w: 120, h: 42, alpha: 0.22 },
+    { key: "web", x: 7070, y: mezzY - 86, w: 120, h: 42, alpha: 0.22 },
+    { key: "web", x: 7395, y: FLOOR_Y - 242, w: 134, h: 48, alpha: 0.22 },
+    {
+      key: "vinesGreenWide",
+      x: 7640,
+      y: FLOOR_Y - 232,
+      w: 170,
+      h: 56,
+      alpha: 0.16,
+    },
+    { key: "web", x: 7920, y: FLOOR_Y - 240, w: 138, h: 50, alpha: 0.24 },
+    { key: "web", x: 8195, y: FLOOR_Y - 238, w: 126, h: 44, alpha: 0.2 },
   ];
 
   MAP.decorFront = [
-    { key: "jar", x: 812, y: mezzY - 58, w: 52, h: 62, alpha: 0.76 },
-    { key: "bonesSmall", x: 2038, y: loftY - 4, w: 72, h: 30, alpha: 0.22 },
-    { key: "bonesWide", x: 3390, y: lowerY + 10, w: 114, h: 52, alpha: 0.24 },
-    { key: "jar", x: 5105, y: FLOOR_Y - 60, w: 58, h: 68, alpha: 0.78 },
-    { key: "bonesSmall", x: 6540, y: FLOOR_Y - 6, w: 76, h: 32, alpha: 0.2 },
-    { key: "blood", x: 6988, y: FLOOR_Y - 108, w: 108, h: 62, alpha: 0.2 },
-    { key: "clueMarker", x: 7628, y: FLOOR_Y - 204, w: 68, h: 40, alpha: 0.64 },
-    { key: "bonesHuge", x: 7905, y: FLOOR_Y - 18, w: 148, h: 92, alpha: 0.28 },
+    { key: "jar", x: 920, y: mezzY - 54, w: 58, h: 68, alpha: 0.78 },
+    { key: "bonesSmall", x: 2940, y: loftY - 6, w: 76, h: 34, alpha: 0.22 },
+    { key: "bonesWide", x: 4070, y: lowerY + 8, w: 118, h: 56, alpha: 0.24 },
+    { key: "jar", x: 5185, y: lowerY - 58, w: 62, h: 72, alpha: 0.82 },
+    { key: "bonesSmall", x: 5970, y: rise3Y - 6, w: 78, h: 34, alpha: 0.2 },
+    { key: "blood", x: 6720, y: FLOOR_Y - 112, w: 112, h: 66, alpha: 0.22 },
+    { key: "clueMarker", x: 7430, y: FLOOR_Y - 210, w: 72, h: 44, alpha: 0.68 },
+    { key: "bonesHuge", x: 7880, y: FLOOR_Y - 18, w: 150, h: 96, alpha: 0.3 },
   ];
   cleanStageDecor();
 
   MAP.roomLights = [
-    { x: 30, y: FLOOR_Y - 280, w: 880, h: 350, glow: 0.08 },
-    { x: 930, y: FLOOR_Y - 330, w: 1650, h: 410, glow: 0.1 },
-    { x: 2710, y: lowerY - 240, w: 980, h: 430, glow: 0.11 },
-    { x: 3730, y: FLOOR_Y - 280, w: 2050, h: 360, glow: 0.09 },
-    { x: 5900, y: FLOOR_Y - 260, w: 2600, h: 330, glow: 0.1 },
+    { x: 30, y: FLOOR_Y - 280, w: 920, h: 350, glow: 0.08 },
+    { x: 1060, y: FLOOR_Y - 330, w: 2250, h: 410, glow: 0.1 },
+    { x: 3820, y: lowerY - 220, w: 1600, h: 360, glow: 0.11 },
+    { x: 6230, y: FLOOR_Y - 280, w: 1120, h: 340, glow: 0.09 },
+    { x: 7300, y: FLOOR_Y - 260, w: 1180, h: 330, glow: 0.1 },
   ];
 
   MAP.roomColumns = [
-    { x: 610, y: 120, w: 22, h: FLOOR_Y - 28, alpha: 0.11 },
-    { x: 1700, y: 126, w: 22, h: FLOOR_Y - 22, alpha: 0.12 },
-    { x: 3240, y: 138, w: 22, h: trenchY - 34, alpha: 0.13 },
-    { x: 5110, y: 120, w: 24, h: FLOOR_Y - 26, alpha: 0.11 },
-    { x: 7410, y: 120, w: 24, h: FLOOR_Y - 24, alpha: 0.13 },
+    { x: 710, y: 120, w: 22, h: FLOOR_Y - 28, alpha: 0.11 },
+    { x: 2280, y: 126, w: 22, h: FLOOR_Y - 22, alpha: 0.12 },
+    { x: 4630, y: 138, w: 22, h: lowerY - 34, alpha: 0.13 },
+    { x: 6510, y: 120, w: 24, h: FLOOR_Y - 26, alpha: 0.11 },
+    { x: 8010, y: 120, w: 24, h: FLOOR_Y - 24, alpha: 0.13 },
   ];
 
   /* ── SPAWN POINT ── */
@@ -703,47 +560,401 @@ var GS = {
   },
 };
 
+/* ── DROPPED ITEMS SYSTEM ── */
+var DROPPED_ITEMS = []; // Array of {x, y, type, bobTimer, active}
+
+function spawnDroppedItem(x, y, type) {
+  DROPPED_ITEMS.push({
+    x: x,
+    y: y,
+    type: type, // "gold"
+    bobTimer: Math.random() * Math.PI * 2,
+    active: true,
+    spawnTime: Date.now(),
+  });
+}
+
+function clearDroppedItems() {
+  DROPPED_ITEMS = [];
+}
+
+function drawDroppedItems() {
+  DROPPED_ITEMS.forEach(function (item) {
+    if (!item.active) return;
+    if (item.x < CAM.x - 60 || item.x > CAM.x + TC.width + 60) return;
+
+    item.bobTimer += 0.05;
+    var bob = Math.sin(item.bobTimer) * 6;
+    var ix = item.x,
+      iy = item.y + bob;
+
+    // Glow
+    var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 35);
+    gl.addColorStop(0, "rgba(255,215,0,.35)");
+    gl.addColorStop(1, "transparent");
+    TX.fillStyle = gl;
+    TX.fillRect(ix - 40, iy - 40, 80, 80);
+
+    var itemImg = SPR.gold || SPR.decor.threadPaper;
+    if (itemImg && itemImg.complete && itemImg.naturalWidth) {
+      TX.drawImage(itemImg, ix - 20, iy - 20, 40, 40);
+    } else {
+      TX.save();
+      TX.shadowBlur = 15;
+      TX.shadowColor = "#ffd700";
+      TX.fillStyle = "#ffd700";
+      TX.beginPath();
+      TX.arc(ix, iy, 14, 0, Math.PI * 2);
+      TX.fill();
+      TX.fillStyle = "#ffaa00";
+      TX.beginPath();
+      TX.arc(ix, iy, 10, 0, Math.PI * 2);
+      TX.fill();
+      TX.restore();
+    }
+
+    // Label
+    TX.fillStyle = "rgba(255,215,0,.7)";
+    TX.font = "bold 9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText("Dropped Key", ix, iy - 22);
+    TX.fillText("[E] Pick up", ix, iy - 12);
+    TX.textAlign = "left";
+  });
+}
+
+function checkDroppedItemPickup() {
+  if (GS.hasGold) return; // Already has gold
+
+  for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
+    var item = DROPPED_ITEMS[i];
+    if (!item.active) continue;
+
+    var px = PL.x + PL_COX + PL.w / 2;
+    var py = PL.y + PL_COY + PL.h / 2;
+    var dist = Math.hypot(px - item.x, py - item.y);
+
+    if (dist < 60 || (JP["KeyE"] && dist < 100)) {
+      // Pick up
+      item.active = false;
+      GS.hasGold = true;
+      showBadge("✨ Golden Thread recovered!");
+      spawnGoldPtcls(item.x, item.y);
+      JP["KeyE"] = false;
+      break;
+    }
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    TUTORIAL STEPS
 ═══════════════════════════════════════════════════════════════════ */
 var STEPS = [
   {
-    icon: "🕸",
-    title: "Stage III — Infested Climb",
-    desc: "Find the Golden Thread to unlock the mysterious doors. Beware: only one door leads to freedom!",
-    keys: ["Find the Golden Thread", "Choose wisely among 3 doors"],
+    icon: "🏛",
+    title: "Webbed Galleries",
+    desc: "Stage II keeps the same chamber language as Stage I, but the route now breaks into staggered ledges and tighter reads.",
+    keys: ["D → Advance", "W / Space → Jump"],
     trigger: function () {
-      return PL.x > 700;
+      return PL.x > 640;
     },
   },
   {
-    icon: "☠",
-    title: "The Golden Thread",
-    desc: "The Golden Thread lies hidden in the chamber. Without it, the doors remain sealed.",
-    keys: ["Search thoroughly"],
+    icon: "⚖",
+    title: "Split Route",
+    desc: "Cross the lofted openings and keep your rhythm. The early room now asks for cleaner jump spacing than Stage I.",
+    keys: ["Jump the breaks"],
     trigger: function () {
-      return PL.x > 2400;
+      return PL.x > 1500;
     },
   },
   {
-    icon: "🦇",
-    title: "The Three Doors",
-    desc: "Two doors lead to doom, one to salvation. Each requires answering space riddles correctly.",
-    keys: ["Answer 4/6 questions correctly", "Choose the right door"],
+    icon: "⚠",
+    title: "Watch the Floor",
+    desc: "Small spike groups now guard both the upper lane and the recovery floor. Read them early and keep moving.",
+    keys: ["Read proximity traps"],
     trigger: function () {
-      return PL.x > 5200;
+      return PL.x > 2200;
+    },
+  },
+  {
+    icon: "💨",
+    title: "Drop and Recover",
+    desc: "The gallery drops into a lower recovery path. Land cleanly, cross the second spike read, then climb back to the main floor.",
+    keys: ["Recover from the shaft"],
+    trigger: function () {
+      return PL.x > 4800;
     },
   },
   {
     icon: "🚪",
-    title: "Final Choice",
-    desc: "Use your knowledge of the cosmos to unlock the true exit. Wrong answers cost health!",
-    keys: ["Space knowledge required", "Hearts are limited"],
+    title: "Exit Hall",
+    desc: "The final corridor opens into a single gate. Clear the last span and close the chamber behind you.",
+    keys: ["Reach the exit"],
     trigger: function () {
-      return PL.x > 7900;
+      return PL.x > 7400;
     },
   },
 ];
+
+/* ═══════════════════════════════════════════════════════════════════
+   MATH QUIZ SYSTEM
+═══════════════════════════════════════════════════════════════════ */
+var QUIZ_QUESTIONS = [
+  {
+    q: "What is 17 × 4?",
+    choices: ["58", "68", "72", "64"],
+    answer: 1, // index of correct choice (68)
+    hint: "10×4 = 40, 7×4 = 28, 40+28 = 68",
+  },
+  {
+    q: "Solve: 144 ÷ 12",
+    choices: ["10", "11", "12", "14"],
+    answer: 2,
+    hint: "12 × 12 = 144",
+  },
+  {
+    q: "What is 8² + 6²?",
+    choices: ["100", "96", "110", "98"],
+    answer: 0,
+    hint: "64 + 36 = 100",
+  },
+  {
+    q: "If 3x + 7 = 22, what is x?",
+    choices: ["4", "5", "6", "7"],
+    answer: 1,
+    hint: "3x = 15, so x = 5",
+  },
+  {
+    q: "What is the remainder when 97 is divided by 8?",
+    choices: ["0", "1", "2", "3"],
+    answer: 1,
+    hint: "8 × 12 = 96, 97 − 96 = 1",
+  },
+  {
+    q: "Simplify: (15 + 9) ÷ 4 × 2",
+    choices: ["10", "12", "8", "14"],
+    answer: 1,
+    hint: "24 ÷ 4 = 6, 6 × 2 = 12",
+  },
+];
+
+function getRandomQuestion() {
+  var idx = Math.floor(Math.random() * QUIZ_QUESTIONS.length);
+  return QUIZ_QUESTIONS[idx];
+}
+
+function buildQuizModal() {
+  // Create modal if it doesn't exist
+  if (document.getElementById("quiz-modal")) return;
+
+  var modal = document.createElement("div");
+  modal.id = "quiz-modal";
+  modal.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "z-index:9000",
+    "display:none",
+    "align-items:center",
+    "justify-content:center",
+    "background:rgba(0,0,0,0.85)",
+    "backdrop-filter:blur(4px)",
+  ].join(";");
+
+  var card = document.createElement("div");
+  card.id = "quiz-card";
+  card.style.cssText = [
+    "background:linear-gradient(180deg,#1a1210 0%,#0d0908 100%)",
+    "border:2px solid #d4a843",
+    "border-radius:8px",
+    "padding:32px 28px",
+    "max-width:420px",
+    "width:90%",
+    "box-shadow:0 0 40px rgba(212,168,67,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
+    "text-align:center",
+    "font-family:Cinzel,serif",
+  ].join(";");
+
+  var title = document.createElement("div");
+  title.id = "quiz-title";
+  title.textContent = "🔒 THE LABYRINTH ASKS";
+  title.style.cssText = [
+    "color:#d4a843",
+    "font-size:18px",
+    "font-weight:bold",
+    "margin-bottom:20px",
+    "letter-spacing:1px",
+  ].join(";");
+
+  var question = document.createElement("div");
+  question.id = "quiz-question";
+  question.style.cssText = [
+    "color:#e8dcc8",
+    "font-size:16px",
+    "margin-bottom:24px",
+    "line-height:1.5",
+    "min-height:48px",
+  ].join(";");
+
+  var choicesDiv = document.createElement("div");
+  choicesDiv.id = "quiz-choices";
+  choicesDiv.style.cssText = [
+    "display:flex",
+    "flex-direction:column",
+    "gap:10px",
+    "margin-bottom:20px",
+  ].join(";");
+
+  var feedback = document.createElement("div");
+  feedback.id = "quiz-feedback";
+  feedback.style.cssText = [
+    "color:#ff6644",
+    "font-size:13px",
+    "min-height:20px",
+    "margin-bottom:12px",
+    "font-style:italic",
+  ].join(";");
+
+  var hintDiv = document.createElement("div");
+  hintDiv.id = "quiz-hint";
+  hintDiv.style.cssText = [
+    "color:#88bb88",
+    "font-size:12px",
+    "min-height:18px",
+    "display:none",
+    "font-style:italic",
+    "border-top:1px solid rgba(212,168,67,0.2)",
+    "padding-top:10px",
+    "margin-top:10px",
+  ].join(";");
+
+  card.appendChild(title);
+  card.appendChild(question);
+  card.appendChild(choicesDiv);
+  card.appendChild(feedback);
+  card.appendChild(hintDiv);
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+}
+
+function showQuizModal(doorIndex) {
+  buildQuizModal();
+  var modal = document.getElementById("quiz-modal");
+  var questionEl = document.getElementById("quiz-question");
+  var choicesEl = document.getElementById("quiz-choices");
+  var feedbackEl = document.getElementById("quiz-feedback");
+  var hintEl = document.getElementById("quiz-hint");
+
+  // Pick one random question
+  var qData = getRandomQuestion();
+  GS.currentQuiz = {
+    doorIndex: doorIndex,
+    data: qData,
+    answered: false,
+  };
+
+  questionEl.textContent = qData.q;
+  feedbackEl.textContent = "";
+  hintEl.style.display = "none";
+  hintEl.textContent = "";
+  choicesEl.innerHTML = "";
+
+  qData.choices.forEach(function (choice, idx) {
+    var btn = document.createElement("button");
+    btn.textContent = choice;
+    btn.style.cssText = [
+      "background:linear-gradient(180deg,#2a1e18 0%,#1a1210 100%)",
+      "border:1px solid #5a3a20",
+      "color:#d4c4a8",
+      "padding:12px 16px",
+      "border-radius:4px",
+      "cursor:pointer",
+      "font-family:Cinzel,serif",
+      "font-size:14px",
+      "transition:all 0.15s",
+      "width:100%",
+    ].join(";");
+
+    btn.onmouseenter = function () {
+      btn.style.borderColor = "#d4a843";
+      btn.style.background = "linear-gradient(180deg,#3a2a20 0%,#2a1e18 100%)";
+    };
+    btn.onmouseleave = function () {
+      btn.style.borderColor = "#5a3a20";
+      btn.style.background = "linear-gradient(180deg,#2a1e18 0%,#1a1210 100%)";
+    };
+
+    btn.onclick = function () {
+      if (GS.currentQuiz.answered) return;
+      handleQuizAnswer(idx);
+    };
+
+    choicesEl.appendChild(btn);
+  });
+
+  modal.style.display = "flex";
+  GS.paused = true;
+}
+
+function handleQuizAnswer(choiceIndex) {
+  if (!GS.currentQuiz) return;
+  var quiz = GS.currentQuiz;
+  var feedbackEl = document.getElementById("quiz-feedback");
+  var hintEl = document.getElementById("quiz-hint");
+  var choicesEl = document.getElementById("quiz-choices");
+
+  quiz.answered = true;
+
+  // Disable all buttons
+  var buttons = choicesEl.querySelectorAll("button");
+  buttons.forEach(function (btn, idx) {
+    btn.style.pointerEvents = "none";
+    btn.style.opacity = "0.6";
+    if (idx === quiz.data.answer) {
+      btn.style.borderColor = "#44aa44";
+      btn.style.background = "linear-gradient(180deg,#1a3018 0%,#102010 100%)";
+      btn.style.color = "#88ff88";
+    }
+  });
+
+  if (choiceIndex === quiz.data.answer) {
+    // CORRECT — proceed to next stage
+    feedbackEl.textContent = "✓ Correct! The door yields...";
+    feedbackEl.style.color = "#88ff88";
+
+    setTimeout(function () {
+      closeQuizModal();
+      GS.won = true;
+      showScreen("screen-win");
+    }, 1200);
+  } else {
+    // WRONG — 1 heart damage + hint
+    feedbackEl.textContent = "✗ Wrong! The labyrinth tightens its grip...";
+    feedbackEl.style.color = "#ff6644";
+
+    // Show hint about correct door
+    hintEl.textContent =
+      "💡 Hint: " +
+      quiz.data.hint +
+      " | " +
+      MAP.doors[MAP.correctDoorIndex].hint;
+    hintEl.style.display = "block";
+
+    // Damage
+    setTimeout(function () {
+      closeQuizModal();
+      takeDamage("quiz");
+      MAP.doors[quiz.doorIndex].attempted = true;
+    }, 2200);
+  }
+}
+
+function closeQuizModal() {
+  var modal = document.getElementById("quiz-modal");
+  if (modal) modal.style.display = "none";
+  GS.paused = false;
+  GS.currentQuiz = null;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    INIT
@@ -754,6 +965,7 @@ async function tutInit() {
   tutResize();
   window.addEventListener("resize", tutResize);
   buildHUD();
+  buildQuizModal();
   await loadSpr();
   spawnPlayer();
   GS.startTime = Date.now();
@@ -792,50 +1004,37 @@ function spawnPlayer() {
   PL.moving = false;
   PL.sprinting = false;
   CAM.x = 0;
-  GS.hasGold = false;
+  // Don't reset hasGold here — dropped items persist until picked up or void death
   GS.activeDoorIndex = -1;
   GS.hasSword = true;
-  if (MAP.mobs) {
-    MAP.mobs.forEach(function (m) {
-      m.dead = false;
-      m.hitCooldown = 0;
-      if (typeof m.startX === "undefined") m.startX = m.x;
-      m.x = m.startX;
-      m.tick = 0;
-      if (m.type === "bat") m.bob = m.bob || 0;
-    });
-  }
 }
 
 function resetToStart() {
   // Reset all traps
-  MAP.spikes.forEach(function (s) {
-    s.active = false;
-    s.riseTimer = 0;
-  });
+  // Re-randomize correct door on reset
+  if (MAP.doors && MAP.doors.length === 3) {
+    var newCorrect = Math.floor(Math.random() * 3);
+    MAP.correctDoorIndex = newCorrect;
+    MAP.doors.forEach(function (d, i) {
+      d.correct = i === newCorrect;
+      d.fake = i !== newCorrect;
+      d.label = i === newCorrect ? "???" : "DOOR " + ["I", "II", "III"][i];
+      d.attempted = false;
+    });
+  }
+
+  // Clear quiz state
+  GS.currentQuiz = null;
+  closeQuizModal();
   if (MAP.hammer) {
     MAP.hammer.angle = 0;
     MAP.hammer.swingTimer = 0;
     MAP.hammer.hitCooldown = 0;
   }
-  if (MAP.mobs) {
-    MAP.mobs.forEach(function (m) {
-      m.dead = false;
-      m.hitCooldown = 0;
-      if (typeof m.startX !== "undefined") m.x = m.startX;
-      m.tick = 0;
-    });
-  }
+  // Clear dropped items on full reset
+  clearDroppedItems();
   GS.hasGold = false;
   GS.activeDoorIndex = -1;
-  if (MAP.pots) {
-    var newGoldPot = Math.floor(Math.random() * MAP.pots.length);
-    MAP.pots.forEach(function (pot, i) {
-      pot.hasGold = i === newGoldPot;
-      pot.broken = false;
-      pot.breakTimer = 0;
-    });
-  }
   GS.dead = false;
   GS.won = false;
   GS.jumpscareActive = false;
@@ -848,196 +1047,16 @@ function resetToStart() {
   spawnPlayer();
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
-}
 
-/* ── DOOR QUIZ SYSTEM (Single Question) ───────────────────────── */
-var currentQuiz = null;
-
-function startDoorQuiz(door, doorIndex) {
-  GS.paused = true;
-  currentQuiz = {
-    door: door,
-    doorIndex: doorIndex,
-    question: door.question,
-  };
-
-  buildQuizUI();
-  showQuizQuestion();
-}
-
-function buildQuizUI() {
-  var existing = document.getElementById("quiz-overlay");
-  if (existing) existing.remove();
-
-  var overlay = document.createElement("div");
-  overlay.id = "quiz-overlay";
-  overlay.style.cssText = [
-    "position:fixed",
-    "inset:0",
-    "z-index:10000",
-    "display:flex",
-    "align-items:center",
-    "justify-content:center",
-    "background:rgba(0,0,0,0.85)",
-    "font-family:Cinzel,serif",
-  ].join(";");
-
-  var container = document.createElement("div");
-  container.id = "quiz-container";
-  container.style.cssText = [
-    "background:linear-gradient(180deg,#1a0f0a 0%,#0d0705 100%)",
-    "border:2px solid #d4a843",
-    "border-radius:8px",
-    "padding:32px",
-    "max-width:560px",
-    "width:90%",
-    "color:#e8c26a",
-    "box-shadow:0 0 40px rgba(212,168,67,0.3)",
-  ].join(";");
-
-  var title = document.createElement("h2");
-  title.id = "quiz-title";
-  title.style.cssText =
-    "margin:0 0 20px 0;color:#ffd700;font-size:24px;text-align:center;";
-  title.textContent = "🔮 Oracle's Riddle";
-
-  var subtitle = document.createElement("div");
-  subtitle.style.cssText =
-    "text-align:center;margin-bottom:16px;font-size:13px;color:#a08050;";
-  subtitle.textContent = "Answer correctly to unlock the door...";
-
-  var question = document.createElement("div");
-  question.id = "quiz-question";
-  question.style.cssText =
-    "font-size:20px;margin-bottom:28px;line-height:1.4;color:#f0e6d2;text-align:center;";
-
-  var options = document.createElement("div");
-  options.id = "quiz-options";
-  options.style.cssText = "display:flex;flex-direction:column;gap:12px;";
-
-  var feedback = document.createElement("div");
-  feedback.id = "quiz-feedback";
-  feedback.style.cssText =
-    "margin-top:20px;text-align:center;font-size:18px;min-height:28px;";
-
-  container.appendChild(title);
-  container.appendChild(subtitle);
-  container.appendChild(question);
-  container.appendChild(options);
-  container.appendChild(feedback);
-  overlay.appendChild(container);
-  document.body.appendChild(overlay);
-}
-
-function showQuizQuestion() {
-  if (!currentQuiz) return;
-
-  var q = currentQuiz.question;
-
-  document.getElementById("quiz-question").textContent = q.q;
-
-  var optionsDiv = document.getElementById("quiz-options");
-  optionsDiv.innerHTML = "";
-
-  q.options.forEach(function (opt, idx) {
-    var btn = document.createElement("button");
-    btn.style.cssText = [
-      "background:linear-gradient(180deg,#2a1a10 0%,#1a0f0a 100%)",
-      "border:1px solid #8a6a3a",
-      "color:#e8c26a",
-      "padding:16px 20px",
-      "font-size:17px",
-      "cursor:pointer",
-      "border-radius:4px",
-      "font-family:Cinzel,serif",
-      "transition:all 0.2s",
-      "text-align:left",
-    ].join(";");
-
-    btn.onmouseover = function () {
-      this.style.borderColor = "#d4a843";
-      this.style.background = "linear-gradient(180deg,#3a2a1a 0%,#2a1a10 100%)";
-    };
-    btn.onmouseout = function () {
-      this.style.borderColor = "#8a6a3a";
-      this.style.background = "linear-gradient(180deg,#2a1a10 0%,#1a0f0a 100%)";
-    };
-
-    btn.textContent = String.fromCharCode(65 + idx) + ". " + opt;
-    btn.onclick = function () {
-      handleQuizAnswer(idx);
-    };
-    optionsDiv.appendChild(btn);
-  });
-
-  document.getElementById("quiz-feedback").textContent = "";
-}
-
-function handleQuizAnswer(selectedIndex) {
-  if (!currentQuiz) return;
-
-  var q = currentQuiz.question;
-  var isCorrect = selectedIndex === q.correct;
-  var feedback = document.getElementById("quiz-feedback");
-  var door = currentQuiz.door;
-
-  // Disable all buttons
-  var buttons = document
-    .getElementById("quiz-options")
-    .getElementsByTagName("button");
-  for (var i = 0; i < buttons.length; i++) {
-    buttons[i].disabled = true;
-    if (i === q.correct) {
-      buttons[i].style.borderColor = "#4a8a4a";
-      buttons[i].style.background =
-        "linear-gradient(180deg,#2a4a2a 0%,#1a3a1a 100%)";
-    } else if (i === selectedIndex && !isCorrect) {
-      buttons[i].style.borderColor = "#8a2a2a";
-      buttons[i].style.background =
-        "linear-gradient(180deg,#4a1a1a 0%,#3a1010 100%)";
-    }
+  // Re-randomize which pot has the gold
+  if (MAP.pots) {
+    var newGoldPot = Math.floor(Math.random() * MAP.pots.length);
+    MAP.pots.forEach(function (pot, i) {
+      pot.hasGold = i === newGoldPot;
+      pot.broken = false;
+      pot.breakTimer = 0;
+    });
   }
-
-  door.answered = true;
-
-  if (isCorrect) {
-    feedback.innerHTML =
-      '<span style="color:#4aff4a;">✓ Correct! The door unlocks...</span>';
-
-    setTimeout(function () {
-      closeQuizUI();
-
-      if (door.correct) {
-        // Right door + right answer = proceed to stage 4
-        showBadge("🌟 The path opens! Proceeding to Stage IV...");
-        setTimeout(function () {
-          window.location.href = "stage4.html";
-        }, 1500);
-      } else {
-        // Wrong door but right answer = damage, door seals
-        takeDamage("wrongDoor");
-        showBadge("✕ Right answer, but wrong door! -1 Heart");
-      }
-    }, 1200);
-  } else {
-    feedback.innerHTML =
-      '<span style="color:#ff4a4a;">✗ Wrong! The answer was: ' +
-      q.options[q.correct] +
-      "</span>";
-
-    setTimeout(function () {
-      closeQuizUI();
-      takeDamage("quizFail");
-      showBadge("✕ Wrong answer! -1 Heart");
-    }, 1500);
-  }
-}
-
-function closeQuizUI() {
-  var overlay = document.getElementById("quiz-overlay");
-  if (overlay) overlay.remove();
-  currentQuiz = null;
-  GS.paused = false;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1263,6 +1282,30 @@ function tutUpdate() {
     }
   }
 
+  /* ── GOLD THREW PICKUP ── */
+  if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
+    var g = MAP.gold;
+    var px6 = PL.x + PL_COX,
+      py6 = PL.y + PL_COY;
+    if (
+      JP["KeyE"] ||
+      (Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 80 &&
+        Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 80 &&
+        (JP["KeyE"] || KEYS["KeyE"]))
+    ) {
+      // Auto-pickup on proximity
+      if (
+        Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 70 &&
+        Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 70
+      ) {
+        MAP.gold.collected = true;
+        GS.hasGold = true;
+        showBadge("✨ Golden Thread collected!");
+        spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
+      }
+    }
+  }
+
   /* ── SWORD SWING ── */
   if (GS.hasSword) {
     if (GS.sword.cooldown > 0) GS.sword.cooldown--;
@@ -1307,18 +1350,15 @@ function tutUpdate() {
     }
   }
 
+  handleThrowInput();
+  updateThrowFx();
+
   /* ── POT BREAK TIMER ── */
   if (MAP.pots) {
     MAP.pots.forEach(function (pot) {
       if (pot.broken) pot.breakTimer++;
     });
   }
-
-  handleThrowInput();
-  updateThrowFx();
-
-  checkDroppedItemPickup();
-  JP["KeyE"] = false;
 
   /* ── DOOR INTERACTION ── */
   GS.activeDoorIndex = -1;
@@ -1332,39 +1372,28 @@ function tutUpdate() {
       py7 < door.y + door.h
     ) {
       GS.activeDoorIndex = i;
-
       if (JP["KeyE"]) {
-        // Check if player has the golden thread
         if (!GS.hasGold) {
-          showBadge("🔒 Locked! Find the Golden Thread first!");
+          showBadge("🔒 Locked! Find the Golden Thread first...");
           JP["KeyE"] = false;
+          /* ── DROPPED ITEM PICKUP ── */
+          checkDroppedItemPickup();
           return;
         }
 
-        // If door already answered correctly, proceed to stage 4
-        if (door.answered && door.correct) {
-          window.location.href = "stage4.html";
-          return;
+        if (door.fake) {
+          // Wrong door — jumpscare + reset
+          wrongDoor();
+        } else {
+          // Right door — quiz time
+          showQuizModal(i);
         }
-
-        // If door already answered wrong, don't allow retry
-        if (door.answered && !door.correct) {
-          showBadge("✕ This door is sealed!");
-          JP["KeyE"] = false;
-          return;
-        }
-
-        // Assign random question if not already assigned
-        if (!door.question) {
-          door.question = getRandomQuestion();
-        }
-
-        // Start single question quiz for this door
-        startDoorQuiz(door, i);
         JP["KeyE"] = false;
       }
     }
   });
+  checkDroppedItemPickup();
+  JP["KeyE"] = false;
 
   /* ── VOID DEATH (fall off bottom) ── */
   if (PL.y > TC.height + 80) {
@@ -1407,7 +1436,6 @@ function tutUpdate() {
 
   /* ── PARTICLES ── */
   updateParticles();
-  updateMobs();
 
   /* ── TIMER ── */
   var t = document.getElementById("hud-timer");
@@ -1423,16 +1451,37 @@ function tutUpdate() {
   updateHUD();
 }
 
-/* ── DAMAGE / DEATH ─────────────────────────────────────────────── */
 function takeDamage(source) {
   if (PL.iframes > 0) return;
+
   if (source === "void") {
+    // VOID DEATH: respawn items, reset lives, no item drop
     GS.lives = 0;
     PL.iframes = 0;
+
+    // Clear any previously dropped items (they respawn at original location)
+    clearDroppedItems();
+
+    // Reset gold to map spawn location (respawn)
+    if (MAP.gold) {
+      MAP.gold.collected = false;
+    }
+    GS.hasGold = false;
+
     updateHUD();
     startDeathSequence(source);
     return;
   }
+
+  // NORMAL DEATH (spike, hammer, quiz wrong): drop items where player died
+  if (GS.hasGold && MAP.gold) {
+    // Drop the gold at player's death location
+    spawnDroppedItem(PL.x + PL.sw / 2, PL.y + PL.sh * 0.5, "gold");
+    MAP.gold.collected = true; // Mark original as gone
+    GS.hasGold = false;
+    showBadge("💔 Golden Thread dropped!");
+  }
+
   GS.lives = Math.max(0, GS.lives - 1);
   PL.iframes = 12;
   PL.vy = -10;
@@ -1441,40 +1490,6 @@ function takeDamage(source) {
   if (GS.lives <= 0) {
     startDeathSequence(source);
   }
-}
-
-function updateMobs() {
-  if (!MAP.mobs) return;
-  MAP.mobs.forEach(function (m) {
-    if (m.dead) return;
-    if (m.hitCooldown > 0) m.hitCooldown--;
-    m.tick = (m.tick || 0) + 1;
-    if (m.type === "bat") {
-      m.x += m.vx;
-      if (m.x < m.minX || m.x + m.w > m.maxX) {
-        m.vx *= -1;
-        m.x = Math.max(m.minX, Math.min(m.maxX - m.w, m.x));
-      }
-      m.bob = (m.bob || 0) + 0.08;
-      m.y = m.baseY + Math.sin(m.bob) * 18;
-    } else {
-      m.x += m.vx;
-      if (m.x < m.minX || m.x + m.w > m.maxX) {
-        m.vx *= -1;
-        m.x = Math.max(m.minX, Math.min(m.maxX - m.w, m.x));
-      }
-    }
-
-    if (PL.iframes > 0) return;
-    var px = PL.x + PL_COX,
-      py = PL.y + PL_COY;
-    var my = m.type === "rat" ? m.y - m.h : m.y;
-    if (px < m.x + m.w && px + PL.w > m.x && py < my + m.h && py + PL.h > my) {
-      PL.vx = px + PL.w * 0.5 < m.x + m.w * 0.5 ? -8 : 8;
-      PL.vy = -8;
-      takeDamage("mob");
-    }
-  });
 }
 
 function updateParticles() {
@@ -1582,7 +1597,7 @@ function updateDeathFx() {
 }
 
 function wrongDoor() {
-  // This is now handled by the quiz system, but keep for compatibility
+  // Prevent re-triggering while jumpscare is active
   if (GS.jumpscareActive) return;
   GS.jumpscareActive = true;
   GS.paused = true;
@@ -1615,9 +1630,11 @@ function wrongDoor() {
     "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
+  // Use SPRITE_MINO if available, otherwise a red fallback
   if (typeof SPRITE_MINO !== "undefined") {
     img.src = SPRITE_MINO;
   } else {
+    // Fallback: red screen with text
     overlay.style.background = "#cc0000";
     var txt = document.createElement("div");
     txt.textContent = "YOU CHOSE WRONG";
@@ -1629,6 +1646,7 @@ function wrongDoor() {
   overlay.appendChild(img);
   document.body.appendChild(overlay);
 
+  // Red flash on canvas first
   var fl = document.getElementById("wrong-flash");
   if (fl) {
     fl.classList.add("show");
@@ -1637,6 +1655,7 @@ function wrongDoor() {
     }, 200);
   }
 
+  // Screen shake
   TC.style.transition = "transform 0s";
   var shakeCount = 0;
   var shakeInterval = setInterval(function () {
@@ -1650,15 +1669,18 @@ function wrongDoor() {
     }
   }, 40);
 
+  // Slam the overlay visible
   requestAnimationFrame(function () {
     overlay.style.opacity = "1";
   });
 
+  // Animate the image: scale up for extra scare
   setTimeout(function () {
     img.style.transition = "transform 0.4s ease-out";
     img.style.transform = "scale(1.22)";
   }, 60);
 
+  // Fade out and reset after the scare
   setTimeout(function () {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
@@ -1666,9 +1688,9 @@ function wrongDoor() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
-      // Don't reset everything, just damage
-      takeDamage("wrongDoor");
-      showBadge("✕ Wrong door! -1 Heart");
+      GS.lives = 3;
+      resetToStart();
+      showBadge("✕ Wrong door! Start again...");
     }, 380);
   }, 1100);
 }
@@ -1728,11 +1750,10 @@ function tutDraw() {
   drawHammer();
   drawGold();
   drawPots();
-  drawDroppedItems();
   drawThrowFx();
+  drawDroppedItems();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
-  drawMobs();
   drawParticles();
   drawPlayer();
 
@@ -1867,154 +1888,6 @@ function drawBG(W, H) {
   }
   TX.fillStyle = "rgba(0,0,0,.18)";
   TX.fillRect(0, H * 0.72, WORLD, H * 0.28);
-}
-
-function drawDoors() {
-  MAP.doors.forEach(function (door, i) {
-    if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
-
-    var locked = !GS.hasGold;
-    var lit = door.correct && GS.hasGold && !door.answered;
-    var pulse = 0.7 + Math.sin(Date.now() * 0.004 + i) * 0.3;
-
-    TX.save();
-
-    // Shadow
-    TX.fillStyle = "rgba(0,0,0,.22)";
-    TX.beginPath();
-    TX.ellipse(
-      door.x + door.w / 2,
-      door.y + door.h + 10,
-      door.w * 0.56,
-      10,
-      0,
-      0,
-      Math.PI * 2,
-    );
-    TX.fill();
-
-    // Base
-    TX.fillStyle = "rgba(32,18,18,.88)";
-    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
-    TX.fillStyle = "rgba(232,194,106,.18)";
-    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 2);
-
-    // Glow for correct/unlocked door
-    if (lit) {
-      TX.shadowBlur = 30;
-      TX.shadowColor = "#ffd700";
-      var glowG = TX.createRadialGradient(
-        door.x + door.w / 2,
-        door.y + door.h / 2,
-        10,
-        door.x + door.w / 2,
-        door.y + door.h / 2,
-        80,
-      );
-      glowG.addColorStop(0, "rgba(255,215,0," + 0.35 * pulse + ")");
-      glowG.addColorStop(1, "transparent");
-      TX.fillStyle = glowG;
-      TX.fillRect(door.x - 40, door.y - 20, door.w + 80, door.h + 40);
-    }
-
-    // Door frame/image
-    var frame = SPR.decor.doorFrame;
-    if (frame && frame.complete && frame.naturalWidth) {
-      var cropX = frame.naturalWidth * 0.5;
-      var cropW = frame.naturalWidth * 0.5;
-      var cropY = frame.naturalHeight * 0.255;
-      var cropH = frame.naturalHeight * 0.745;
-      var drawY = door.y + 12;
-      var drawH = door.h - 4;
-
-      if (locked) {
-        TX.globalAlpha = 0.5;
-      } else if (door.answered && !door.correct) {
-        TX.globalAlpha = 0.4;
-      } else {
-        TX.globalAlpha = lit ? pulse : 0.88;
-      }
-
-      TX.drawImage(
-        frame,
-        cropX,
-        cropY,
-        cropW,
-        cropH,
-        door.x - 2,
-        drawY,
-        door.w + 4,
-        drawH,
-      );
-      TX.globalAlpha = 1;
-    } else {
-      // Fallback drawn door
-      if (locked) {
-        TX.fillStyle = "#2a1a0a";
-      } else if (door.answered && !door.correct) {
-        TX.fillStyle = "#3a1010";
-      } else {
-        TX.fillStyle = lit ? "#8a6a20" : "#3a2010";
-      }
-
-      TX.fillRect(door.x, door.y, door.w, door.h);
-      TX.fillStyle = locked ? "#5a3818" : lit ? "#ffd700" : "#5a3818";
-      TX.fillRect(door.x + 4, door.y + 4, door.w - 8, door.h - 8);
-
-      if (lit) {
-        TX.fillStyle = "#ffd700";
-        TX.font = "bold 18px serif";
-        TX.textAlign = "center";
-        TX.fillText("✓", door.x + door.w / 2, door.y + door.h / 2 + 6);
-        TX.textAlign = "left";
-      }
-
-      if (locked) {
-        TX.fillStyle = "#8a6a3a";
-        TX.font = "bold 24px serif";
-        TX.textAlign = "center";
-        TX.fillText("🔒", door.x + door.w / 2, door.y + door.h / 2 + 8);
-        TX.textAlign = "left";
-      }
-
-      TX.strokeStyle = locked ? "#4a3020" : lit ? "#ffd700" : "#5a3818";
-      TX.lineWidth = 3;
-      TX.strokeRect(door.x, door.y, door.w, door.h);
-    }
-
-    // Labels
-    TX.fillStyle = locked
-      ? "rgba(120,100,80,0.6)"
-      : lit
-        ? "rgba(255,215,0,.9)"
-        : "rgba(212,168,67,.4)";
-    TX.font = "9px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText(
-      door.label || "EXIT",
-      door.x + door.w / 2,
-      door.y + door.h + 14,
-    );
-
-    if (GS.activeDoorIndex === i) {
-      if (locked) {
-        TX.fillStyle = "rgba(255,100,100,.9)";
-        TX.fillText("🔒 Need Golden Thread", door.x + door.w / 2, door.y - 8);
-      } else if (!door.answered) {
-        TX.fillStyle = "rgba(255,215,0,.95)";
-        TX.fillText("[E] ANSWER RIDDLE", door.x + door.w / 2, door.y - 8);
-      } else if (door.correct) {
-        TX.fillStyle = "rgba(100,255,100,.9)";
-        TX.fillText("✓ UNLOCKED", door.x + door.w / 2, door.y - 8);
-      } else {
-        TX.fillStyle = "rgba(255,100,100,.9)";
-        TX.fillText("✕ SEALED", door.x + door.w / 2, door.y - 8);
-      }
-    }
-
-    TX.textAlign = "left";
-    TX.restore();
-  });
 }
 
 function drawChamberDepth(H) {
@@ -2402,6 +2275,52 @@ function startThrownItem(icon) {
   PL.throwTimer = 18;
 }
 
+/* ── SWORD SWING ── */
+if (GS.hasSword) {
+  if (GS.sword.cooldown > 0) GS.sword.cooldown--;
+
+  if (JP["KeyF"] && !GS.sword.active && GS.sword.cooldown <= 0) {
+    GS.sword.active = true;
+    GS.sword.timer = 18; // swing lasts 18 frames
+    GS.sword.dir = PL.dir;
+    GS.sword.cooldown = 28;
+    JP["KeyF"] = false;
+
+    // Check pot collision during the swing
+    if (MAP.pots) {
+      var swingReach = 72; // horizontal reach of the swing
+      var swingCX = PL.x + PL_COX + PL.w / 2 + GS.sword.dir * swingReach * 0.5;
+      var swingCY = PL.y + PL_COY + PL.h * 0.45;
+
+      MAP.pots.forEach(function (pot) {
+        if (pot.broken) return;
+        var potCX = pot.x + pot.w / 2;
+        var potCY = pot.y + pot.h / 2;
+        var dx = Math.abs(swingCX - potCX);
+        var dy = Math.abs(swingCY - potCY);
+        if (dx < swingReach && dy < pot.h * 0.7) {
+          pot.broken = true;
+          pot.breakTimer = 0;
+          spawnPotShards(potCX, potCY);
+          if (pot.hasGold && !GS.hasGold) {
+            spawnDroppedItem(potCX, pot.y, "gold");
+            showBadge("⚔️ Pot smashed — Golden Thread found!");
+          } else {
+            showBadge("⚔️ Empty pot.");
+          }
+        }
+      });
+    }
+  }
+
+  if (GS.sword.active) {
+    GS.sword.timer--;
+    if (GS.sword.timer <= 0) {
+      GS.sword.active = false;
+    }
+  }
+}
+
 function handleThrowInput() {
   if (!JP["KeyR"]) return;
   JP["KeyR"] = false;
@@ -2581,61 +2500,184 @@ function drawGold() {
   TX.textAlign = "left";
 }
 
-/* ── GOLDEN THREAD PICKUP ── */
-if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
-  var g = MAP.gold;
-  var px6 = PL.x + PL_COX,
-    py6 = PL.y + PL_COY;
-
-  // Auto-pickup on proximity (no E key needed, just walk near it)
-  if (
-    Math.abs(px6 + PL.w / 2 - (g.x + g.w / 2)) < 70 &&
-    Math.abs(py6 + PL.h / 2 - (g.y + g.h / 2)) < 70
-  ) {
-    MAP.gold.collected = true;
-    GS.hasGold = true;
-    showBadge("✨ Golden Thread collected! Doors are now unlocked!");
-    spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
-  }
-}
-
-function drawMobs() {
-  if (!MAP.mobs) return;
-  MAP.mobs.forEach(function (m) {
-    if (m.dead) return;
-    var drawY = m.type === "rat" ? m.y - m.h : m.y;
-    if (m.x + m.w < CAM.x - 40 || m.x > CAM.x + TC.width + 40) return;
+function drawPots() {
+  if (!MAP.pots) return;
+  MAP.pots.forEach(function (pot) {
+    if (pot.x + pot.w < CAM.x - 60 || pot.x > CAM.x + TC.width + 60) return;
+    if (pot.broken) return; // don't draw after shattering
 
     TX.save();
-    if (m.vx < 0) {
-      TX.translate(m.x + m.w, drawY);
-      TX.scale(-1, 1);
-      var dx = 0;
-    } else {
-      TX.translate(m.x, drawY);
-      var dx = 0;
-    }
 
-    if (m.type === "rat" && SPR.rat && SPR.rat.length) {
-      var frame = SPR.rat[Math.floor((m.tick || 0) / 8) % SPR.rat.length];
-      if (frame && frame.complete && frame.naturalWidth) {
-        TX.drawImage(frame, dx, 0, m.w, m.h);
-      } else {
-        TX.fillStyle = "#7c6450";
-        TX.fillRect(dx, 0, m.w, m.h);
-      }
-    } else if (
-      m.type === "bat" &&
-      SPR.bat &&
-      SPR.bat.complete &&
-      SPR.bat.naturalWidth
-    ) {
-      TX.drawImage(SPR.bat, dx, 0, m.w, m.h);
+    var potImg = SPR.pot;
+    if (potImg && potImg.complete && potImg.naturalWidth) {
+      TX.drawImage(potImg, pot.x, pot.y, pot.w, pot.h);
     } else {
-      TX.fillStyle = m.type === "bat" ? "#5a485e" : "#7c6450";
-      TX.fillRect(dx, 0, m.w, m.h);
+      // Fallback drawn pot
+      TX.fillStyle = "#8B6955";
+      TX.beginPath();
+      TX.ellipse(
+        pot.x + pot.w / 2,
+        pot.y + pot.h * 0.72,
+        pot.w * 0.42,
+        pot.h * 0.28,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      TX.fill();
+      TX.fillStyle = "#A0785A";
+      TX.fillRect(
+        pot.x + pot.w * 0.18,
+        pot.y + pot.h * 0.1,
+        pot.w * 0.64,
+        pot.h * 0.65,
+      );
+      TX.fillStyle = "#C4A882";
+      TX.fillRect(pot.x + pot.w * 0.14, pot.y + pot.h * 0.08, pot.w * 0.72, 8);
     }
     TX.restore();
+  });
+}
+
+function drawDoors() {
+  MAP.doors.forEach(function (door, i) {
+    if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
+    // Only the CORRECT door glows when player has the gold key
+    var lit = door.correct && GS.hasGold;
+    var pulse = lit ? 0.7 + 0.3 * Math.sin(Date.now() * 0.004) : 1;
+    TX.save();
+    TX.fillStyle = "rgba(0,0,0,.22)";
+    TX.beginPath();
+    TX.ellipse(
+      door.x + door.w / 2,
+      door.y + door.h + 10,
+      door.w * 0.56,
+      10,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    TX.fill();
+    TX.fillStyle = "rgba(32,18,18,.88)";
+    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
+    TX.fillStyle = "rgba(232,194,106,.18)";
+    TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 2);
+    TX.restore();
+
+    // Glow for correct door
+    // Glow for correct door — golden ethereal aura
+    if (lit) {
+      TX.save();
+      TX.shadowBlur = 40 + 10 * Math.sin(Date.now() * 0.006);
+      TX.shadowColor = "rgba(255,215,0,0.6)";
+      var glowG = TX.createRadialGradient(
+        door.x + door.w / 2,
+        door.y + door.h / 2,
+        5,
+        door.x + door.w / 2,
+        door.y + door.h / 2,
+        100 + 15 * Math.sin(Date.now() * 0.003),
+      );
+      glowG.addColorStop(
+        0,
+        "rgba(255,215,0," + (0.25 + 0.1 * Math.sin(Date.now() * 0.005)) + ")",
+      );
+      glowG.addColorStop(
+        0.4,
+        "rgba(255,180,60," + (0.12 + 0.06 * Math.sin(Date.now() * 0.004)) + ")",
+      );
+      glowG.addColorStop(1, "transparent");
+      TX.fillStyle = glowG;
+      TX.fillRect(door.x - 60, door.y - 40, door.w + 120, door.h + 80);
+
+      // Floating sparkles around correct door
+      var sparkleCount = 5;
+      for (var spk = 0; spk < sparkleCount; spk++) {
+        var spkAngle = Date.now() * 0.002 + (spk / sparkleCount) * Math.PI * 2;
+        var spkRadius = 50 + 20 * Math.sin(Date.now() * 0.003 + spk);
+        var spkX = door.x + door.w / 2 + Math.cos(spkAngle) * spkRadius;
+        var spkY = door.y + door.h / 2 + Math.sin(spkAngle) * spkRadius * 0.6;
+        var spkAlpha = 0.4 + 0.4 * Math.sin(Date.now() * 0.005 + spk);
+        TX.fillStyle = "rgba(255,230,150," + spkAlpha + ")";
+        TX.beginPath();
+        TX.arc(
+          spkX,
+          spkY,
+          2 + Math.sin(Date.now() * 0.007 + spk),
+          0,
+          Math.PI * 2,
+        );
+        TX.fill();
+      }
+
+      TX.restore();
+    }
+
+    var frame = SPR.decor.doorFrame;
+    if (frame && frame.complete && frame.naturalWidth) {
+      var cropX = frame.naturalWidth * 0.5;
+      var cropW = frame.naturalWidth * 0.5;
+      var cropY = frame.naturalHeight * 0.255;
+      var cropH = frame.naturalHeight * 0.745;
+      var drawY = door.y + 12;
+      var drawH = door.h - 4;
+      TX.globalAlpha = lit ? pulse : 0.88;
+      TX.drawImage(
+        frame,
+        cropX,
+        cropY,
+        cropW,
+        cropH,
+        door.x - 2,
+        drawY,
+        door.w + 4,
+        drawH,
+      );
+      TX.globalAlpha = 1;
+    } else {
+      var img = lit ? SPR.door2 : SPR.door1;
+      if (img && img.complete && img.naturalWidth) {
+        TX.globalAlpha = lit ? pulse : 0.75;
+        TX.drawImage(img, door.x, door.y, door.w, door.h);
+        TX.globalAlpha = 1;
+      } else {
+        // Fallback drawn door
+        TX.fillStyle = lit ? "#8a6a20" : "#3a2010";
+        TX.fillRect(door.x, door.y, door.w, door.h);
+        TX.fillStyle = lit ? "#ffd700" : "#5a3818";
+        TX.fillRect(door.x + 4, door.y + 4, door.w - 8, door.h - 8);
+        if (lit) {
+          TX.fillStyle = "#ffd700";
+          TX.font = "bold 18px serif";
+          TX.textAlign = "center";
+          TX.fillText("✓", door.x + door.w / 2, door.y + door.h / 2 + 6);
+          TX.textAlign = "left";
+        }
+        TX.strokeStyle = lit ? "#ffd700" : "#5a3818";
+        TX.lineWidth = 3;
+        TX.strokeRect(door.x, door.y, door.w, door.h);
+      }
+    }
+    // Labels
+    TX.fillStyle = door.correct ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
+    TX.font = "9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText(
+      door.label || "EXIT",
+      door.x + door.w / 2,
+      door.y + door.h + 14,
+    );
+    if (GS.activeDoorIndex === i) {
+      TX.fillStyle = "rgba(255,215,0,.95)";
+      if (!GS.hasGold) {
+        TX.fillText("🔒 NEED KEY", door.x + door.w / 2, door.y - 8);
+      } else if (door.attempted) {
+        TX.fillText("[E] RETRY", door.x + door.w / 2, door.y - 8);
+      } else {
+        TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
+      }
+    }
+    TX.textAlign = "left";
   });
 }
 
@@ -2776,6 +2818,7 @@ function drawPlayer() {
   }
 
   // Gold item indicator above head
+  // Gold item indicator above head
   if (GS.hasGold) {
     TX.globalAlpha = 1;
     TX.font = "18px serif";
@@ -2786,23 +2829,30 @@ function drawPlayer() {
 
   // ── SWORD DRAW ──
   if (GS.hasSword && !GS.deathFx) {
-    var swingProgress = GS.sword.active ? 1 - GS.sword.timer / 18 : 0;
-    var handX = PL.x + PL.sw / 2 + PL.dir * 10;
-    var handY = PL.y + PL_COY + PL.h * 0.38;
+    var swingProgress = GS.sword.active
+      ? 1 - GS.sword.timer / 18 // 0 → 1 over the swing duration
+      : 0;
+
+    // Pivot from player's hand area
+    var handX = PL.x + PL.sw / 2 + PL.dir * 40;
+    var handY = PL.y + PL_COY + PL.h * 0.62;
+
+    // Idle angle: pointing down-forward. Swing: arc upward then forward.
     var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
-    var raiseAngle = PL.dir === 1 ? -Math.PI * 0.75 : Math.PI * 1.75;
     var swingAngle =
       PL.dir === 1
-        ? raiseAngle + Math.PI * 0.9 * swingProgress
-        : raiseAngle - Math.PI * 0.9 * swingProgress;
+        ? idleAngle - Math.PI * 0.9 * Math.sin(swingProgress * Math.PI)
+        : idleAngle + Math.PI * 0.9 * Math.sin(swingProgress * Math.PI);
+
     var angle = GS.sword.active ? swingAngle : idleAngle;
-    var swordLen = 44,
-      swordW = 7;
+    var swordLen = 62;
+    var swordW = 10;
 
     TX.save();
     TX.translate(handX, handY);
     TX.rotate(angle);
 
+    // Swing trail
     if (GS.sword.active && swingProgress < 0.85) {
       TX.save();
       TX.globalAlpha = 0.18 * (1 - swingProgress);
@@ -2810,34 +2860,45 @@ function drawPlayer() {
       TX.lineWidth = swordW * 2.2;
       TX.lineCap = "round";
       TX.beginPath();
-      TX.moveTo(0, 0);
-      TX.lineTo(0, swordLen);
+      TX.moveTo(0, 19);
+      TX.lineTo(0, 19 + swordLen);
       TX.stroke();
       TX.restore();
     }
 
     var swordImg = SPR.sword;
     if (swordImg && swordImg.complete && swordImg.naturalWidth) {
-      TX.drawImage(swordImg, -swordW / 2, -4, swordW + 6, swordLen + 8);
+      // Draw sprite: blade goes along the positive-Y axis from handle
+      TX.drawImage(swordImg, -swordW / 2, 0, swordW + 6, swordLen + 8);
     } else {
+      // Fallback — drawn sword
+      // Blade
       var bG = TX.createLinearGradient(-swordW / 2, 0, swordW / 2, 0);
       bG.addColorStop(0, "#b8bcc8");
       bG.addColorStop(0.5, "#e8eaf0");
       bG.addColorStop(1, "#7a7e8a");
+      // Grip — starts AT the hand (pivot = 0), goes down
+      TX.fillStyle = "#5a3010";
+      TX.fillRect(-3, 0, 6, 14);
+
+      // Guard — sits just below the grip
+      TX.fillStyle = "#d4a843";
+      TX.fillRect(-10, 14, 20, 5);
+
+      // Blade — extends from guard downward
       TX.fillStyle = bG;
-      TX.fillRect(-swordW / 2, 0, swordW, swordLen);
+      TX.fillRect(-swordW / 2, 19, swordW, swordLen);
+
+      // Tip
       TX.fillStyle = "#dde0ea";
       TX.beginPath();
-      TX.moveTo(-swordW / 2, swordLen);
-      TX.lineTo(swordW / 2, swordLen);
-      TX.lineTo(0, swordLen + 12);
+      TX.moveTo(-swordW / 2, 19 + swordLen);
+      TX.lineTo(swordW / 2, 19 + swordLen);
+      TX.lineTo(0, 19 + swordLen + 12);
       TX.closePath();
       TX.fill();
-      TX.fillStyle = "#d4a843";
-      TX.fillRect(-10, -4, 20, 5);
-      TX.fillStyle = "#5a3010";
-      TX.fillRect(-3, -14, 6, 14);
     }
+
     TX.restore();
   }
 
@@ -2882,6 +2943,33 @@ function drawStamBar(W, H) {
   var dr = document.getElementById("dash-ready");
   if (dr)
     dr.textContent = PL.dcd <= 0 && PL.stamina >= DASH_COST ? "READY" : "";
+
+  // Sword HUD indicator
+  var swordHud = document.getElementById("sword-hud");
+  if (!swordHud && GS.hasSword) {
+    swordHud = document.createElement("div");
+    swordHud.id = "sword-hud";
+    swordHud.style.cssText = [
+      "position:fixed",
+      "bottom:54px",
+      "right:18px",
+      "background:rgba(10,6,4,0.82)",
+      "border:1px solid #d4a843",
+      "border-radius:6px",
+      "padding:4px 10px",
+      "color:#e8dcc8",
+      "font-family:Cinzel,serif",
+      "font-size:11px",
+      "pointer-events:none",
+      "z-index:200",
+    ].join(";");
+    swordHud.textContent = "⚔️  [F] Swing";
+    document.body.appendChild(swordHud);
+  }
+  if (swordHud) {
+    var swReady = GS.sword && GS.sword.cooldown <= 0;
+    swordHud.style.opacity = swReady ? "1" : "0.45";
+  }
 }
 
 /* ── PARTICLES ──────────────────────────────────────────────────── */
@@ -2928,78 +3016,6 @@ function spawnGoldPtcls(gx, gy) {
     });
 }
 
-/* ── DROPPED ITEMS SYSTEM ── */
-var DROPPED_ITEMS = [];
-
-function spawnDroppedItem(x, y, type) {
-  DROPPED_ITEMS.push({
-    x: x,
-    y: y,
-    type: type,
-    bobTimer: Math.random() * Math.PI * 2,
-    active: true,
-    spawnTime: Date.now(),
-  });
-}
-
-function clearDroppedItems() {
-  DROPPED_ITEMS = [];
-}
-
-function checkDroppedItemPickup() {
-  if (GS.hasGold) return;
-  for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
-    var item = DROPPED_ITEMS[i];
-    if (!item.active) continue;
-    var px = PL.x + PL_COX + PL.w / 2;
-    var py = PL.y + PL_COY + PL.h / 2;
-    var dist = Math.hypot(px - item.x, py - item.y);
-    if (dist < 60 || (JP["KeyE"] && dist < 100)) {
-      item.active = false;
-      GS.hasGold = true;
-      showBadge("✨ Golden Thread recovered!");
-      spawnGoldPtcls(item.x, item.y);
-      JP["KeyE"] = false;
-      break;
-    }
-  }
-}
-
-function drawDroppedItems() {
-  DROPPED_ITEMS.forEach(function (item) {
-    if (!item.active) return;
-    if (item.x < CAM.x - 60 || item.x > CAM.x + TC.width + 60) return;
-    item.bobTimer += 0.05;
-    var bob = Math.sin(item.bobTimer) * 6;
-    var ix = item.x,
-      iy = item.y + bob;
-    var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 35);
-    gl.addColorStop(0, "rgba(255,215,0,.35)");
-    gl.addColorStop(1, "transparent");
-    TX.fillStyle = gl;
-    TX.fillRect(ix - 40, iy - 40, 80, 80);
-    var itemImg = SPR.gold || SPR.decor.threadPaper;
-    if (itemImg && itemImg.complete && itemImg.naturalWidth) {
-      TX.drawImage(itemImg, ix - 20, iy - 20, 40, 40);
-    } else {
-      TX.save();
-      TX.shadowBlur = 15;
-      TX.shadowColor = "#ffd700";
-      TX.fillStyle = "#ffd700";
-      TX.beginPath();
-      TX.arc(ix, iy, 14, 0, Math.PI * 2);
-      TX.fill();
-      TX.restore();
-    }
-    TX.fillStyle = "rgba(255,215,0,.7)";
-    TX.font = "bold 9px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText("Golden Thread", ix, iy - 22);
-    TX.fillText("[E] Pick up", ix, iy - 12);
-    TX.textAlign = "left";
-  });
-}
-
 function spawnPotShards(cx, cy) {
   for (var i = 0; i < 14; i++) {
     var angle = Math.random() * Math.PI * 2;
@@ -3016,42 +3032,6 @@ function spawnPotShards(cx, cy) {
       type: "dust",
     });
   }
-}
-
-function drawPots() {
-  if (!MAP.pots) return;
-  MAP.pots.forEach(function (pot) {
-    if (pot.x + pot.w < CAM.x - 60 || pot.x > CAM.x + TC.width + 60) return;
-    if (pot.broken) return;
-    TX.save();
-    var potImg = SPR.pot;
-    if (potImg && potImg.complete && potImg.naturalWidth) {
-      TX.drawImage(potImg, pot.x, pot.y, pot.w, pot.h);
-    } else {
-      TX.fillStyle = "#8B6955";
-      TX.beginPath();
-      TX.ellipse(
-        pot.x + pot.w / 2,
-        pot.y + pot.h * 0.72,
-        pot.w * 0.42,
-        pot.h * 0.28,
-        0,
-        0,
-        Math.PI * 2,
-      );
-      TX.fill();
-      TX.fillStyle = "#A0785A";
-      TX.fillRect(
-        pot.x + pot.w * 0.18,
-        pot.y + pot.h * 0.1,
-        pot.w * 0.64,
-        pot.h * 0.65,
-      );
-      TX.fillStyle = "#C4A882";
-      TX.fillRect(pot.x + pot.w * 0.14, pot.y + pot.h * 0.08, pot.w * 0.72, 8);
-    }
-    TX.restore();
-  });
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3107,7 +3087,7 @@ function showScreen(id) {
     window.__minosStageSaved = true;
     import("../progress-service.js")
       .then(function (service) {
-        return service.markStageComplete(3);
+        return service.markStageComplete(2);
       })
       .catch(function (error) {
         console.warn("Firebase stage progress save failed.", error);

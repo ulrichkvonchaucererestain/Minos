@@ -2834,8 +2834,8 @@ function drawPlayer() {
       : 0;
 
     // Pivot from player's hand area
-    var handX = PL.x + PL.sw / 2 + PL.dir * 10;
-    var handY = PL.y + PL_COY + PL.h * 0.38;
+    var handX = PL.x + PL.sw / 2 + PL.dir * 40;
+    var handY = PL.y + PL_COY + PL.h * 0.62;
 
     // Idle angle: pointing down-forward. Swing: arc upward then forward.
     var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
@@ -2845,8 +2845,8 @@ function drawPlayer() {
         : idleAngle + Math.PI * 0.9 * Math.sin(swingProgress * Math.PI);
 
     var angle = GS.sword.active ? swingAngle : idleAngle;
-    var swordLen = 44;
-    var swordW = 7;
+    var swordLen = 62;
+    var swordW = 10;
 
     TX.save();
     TX.translate(handX, handY);
@@ -2860,8 +2860,8 @@ function drawPlayer() {
       TX.lineWidth = swordW * 2.2;
       TX.lineCap = "round";
       TX.beginPath();
-      TX.moveTo(0, 0);
-      TX.lineTo(0, swordLen);
+      TX.moveTo(0, 19);
+      TX.lineTo(0, 19 + swordLen);
       TX.stroke();
       TX.restore();
     }
@@ -2869,7 +2869,7 @@ function drawPlayer() {
     var swordImg = SPR.sword;
     if (swordImg && swordImg.complete && swordImg.naturalWidth) {
       // Draw sprite: blade goes along the positive-Y axis from handle
-      TX.drawImage(swordImg, -swordW / 2, -4, swordW + 6, swordLen + 8);
+      TX.drawImage(swordImg, -swordW / 2, 0, swordW + 6, swordLen + 8);
     } else {
       // Fallback — drawn sword
       // Blade
@@ -2877,25 +2877,26 @@ function drawPlayer() {
       bG.addColorStop(0, "#b8bcc8");
       bG.addColorStop(0.5, "#e8eaf0");
       bG.addColorStop(1, "#7a7e8a");
+      // Grip — starts AT the hand (pivot = 0), goes down
+      TX.fillStyle = "#5a3010";
+      TX.fillRect(-3, 0, 6, 14);
+
+      // Guard — sits just below the grip
+      TX.fillStyle = "#d4a843";
+      TX.fillRect(-10, 14, 20, 5);
+
+      // Blade — extends from guard downward
       TX.fillStyle = bG;
-      TX.fillRect(-swordW / 2, 0, swordW, swordLen);
+      TX.fillRect(-swordW / 2, 19, swordW, swordLen);
 
       // Tip
       TX.fillStyle = "#dde0ea";
       TX.beginPath();
-      TX.moveTo(-swordW / 2, swordLen);
-      TX.lineTo(swordW / 2, swordLen);
-      TX.lineTo(0, swordLen + 12);
+      TX.moveTo(-swordW / 2, 19 + swordLen);
+      TX.lineTo(swordW / 2, 19 + swordLen);
+      TX.lineTo(0, 19 + swordLen + 12);
       TX.closePath();
       TX.fill();
-
-      // Guard
-      TX.fillStyle = "#d4a843";
-      TX.fillRect(-10, -4, 20, 5);
-
-      // Grip
-      TX.fillStyle = "#5a3010";
-      TX.fillRect(-3, -14, 6, 14);
     }
 
     TX.restore();
