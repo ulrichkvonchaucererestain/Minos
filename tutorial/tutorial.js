@@ -339,15 +339,16 @@ function buildMap() {
   };
 
   /* ── FIREBALL LAUNCHER ── */
-  // Invisible pressure plate at corridor entrance — step on it to activate
+  // Invisible pressure plate — step on it to trigger fireballs falling from above
   MAP.fireballLauncher = {
     x: 5230,
     rangeW: 1540,
-    intervalFrames: Math.round(1.8 * 60),
-    timer: 0,
+    intervalFrames: 60,
+    timer: 60,
     triggered: false,
     plateX: 5230,
     plateW: 120,
+    speed: Math.round(TC.height / (1.3 * 60)),
   };
 
   /* ── GOLD THREW (item) ── */
@@ -858,20 +859,21 @@ function tutUpdate() {
     onFloor;
 
   if (onPlate && !launcher.triggered) {
-    launcher.triggered = true; // latch — stays on for the rest of the zone
+    launcher.triggered = true; // latch — stays on for the rest of the run
   }
 
-  /* ── FIREBALL SPAWNING (only after plate is triggered) ── */
+  /* ── FIREBALL SPAWNING — falls from above, straight down ── */
   if (launcher.triggered) {
     launcher.timer++;
     if (launcher.timer >= launcher.intervalFrames) {
       launcher.timer = 0;
-      var spawnX = launcher.plateX + launcher.plateW / 2;
+      // Random X inside the danger zone, spawns above screen
+      var spawnX = launcher.x + Math.random() * launcher.rangeW - 24;
       GS.fireballs.push({
         x: spawnX,
-        y: FLOOR_Y,
+        y: -48, // starts above screen
         vx: 0,
-        vy: -6,
+        vy: launcher.speed, // straight down, fixed speed — no gravity
         w: 48,
         h: 48,
       });
@@ -881,9 +883,8 @@ function tutUpdate() {
   /* ── FIREBALL MOVEMENT & COLLISION ── */
   for (var fi = GS.fireballs.length - 1; fi >= 0; fi--) {
     var fb = GS.fireballs[fi];
-    fb.vy += 0.12;
-    fb.y += fb.vy;
-    if (fb.y > FLOOR_Y + 80 || fb.y < -200) {
+    fb.y += fb.vy; // straight trajectory — no gravity
+    if (fb.y > FLOOR_Y + 60) {
       GS.fireballs.splice(fi, 1);
       continue;
     }
@@ -896,33 +897,7 @@ function tutUpdate() {
         py5 < fb.y + fb.h &&
         py5 + PL.h > fb.y
       ) {
-        takeDamage("fireball");
-        GS.fireballs.splice(fi, 1);
-      }
-    }
-  }
-
-  /* ── FIREBALL MOVEMENT & COLLISION ── */
-  for (var fi = GS.fireballs.length - 1; fi >= 0; fi--) {
-    var fb = GS.fireballs[fi];
-    fb.vy += 0.12; // slight gravity so it arcs and falls back down
-    fb.y += fb.vy;
-    // Remove if it falls back below the floor or goes way off-screen top
-    if (fb.y > FLOOR_Y + 80 || fb.y < -200) {
-      GS.fireballs.splice(fi, 1);
-      continue;
-    }
-    // Hit detection — 1 heart per hit (takeDamage does GS.lives - 1)
-    if (PL.iframes <= 0) {
-      var px5 = PL.x + PL_COX,
-        py5 = PL.y + PL_COY;
-      if (
-        px5 < fb.x + fb.w &&
-        px5 + PL.w > fb.x &&
-        py5 < fb.y + fb.h &&
-        py5 + PL.h > fb.y
-      ) {
-        takeDamage("fireball"); // removes exactly 1 heart (GS.lives - 1)
+        takeDamage("fireball"); // 1 heart
         GS.fireballs.splice(fi, 1);
       }
     }
@@ -1720,29 +1695,38 @@ function drawFireballs() {
   GS.fireballs.forEach(function (fb) {
     if (fb.x < CAM.x - 80 || fb.x > CAM.x + TC.width + 80) return;
     TX.save();
+    TX.translate(fb.x + fb.w / 2, fb.y + fb.h / 2);
+    TX.rotate(Math.PI); // point downward — flame tail trails upward
 
     if (SPR.fireball && SPR.fireball.complete && SPR.fireball.naturalWidth) {
-      // Draw the SPRITE_FIRE image, centered on the fireball hitbox
       TX.shadowBlur = 18;
       TX.shadowColor = "rgba(255,120,0,0.85)";
       TX.drawImage(
         SPR.fireball,
-        fb.x - fb.w * 0.1,
-        fb.y - fb.h * 0.1,
+        -fb.w * 0.6,
+        -fb.h * 0.6,
         fb.w * 1.2,
         fb.h * 1.2,
       );
     } else {
-      // Fallback: draw a glowing orange circle if sprite not loaded
+      // Fallback: glowing circle with upward flame tail
       TX.shadowBlur = 22;
       TX.shadowColor = "rgba(255,100,0,0.9)";
       TX.fillStyle = "#ff6600";
       TX.beginPath();
-      TX.arc(fb.x + fb.w / 2, fb.y + fb.h / 2, fb.w / 2, 0, Math.PI * 2);
+      TX.arc(0, 0, fb.w / 2, 0, Math.PI * 2);
       TX.fill();
       TX.fillStyle = "#ffee44";
       TX.beginPath();
-      TX.arc(fb.x + fb.w / 2, fb.y + fb.h / 2, fb.w / 4, 0, Math.PI * 2);
+      TX.arc(0, 0, fb.w / 4, 0, Math.PI * 2);
+      TX.fill();
+      // Flame tail pointing upward (opposite travel direction)
+      TX.fillStyle = "rgba(255,80,0,0.6)";
+      TX.beginPath();
+      TX.moveTo(-8, -fb.h / 2);
+      TX.lineTo(8, -fb.h / 2);
+      TX.lineTo(0, -fb.h);
+      TX.closePath();
       TX.fill();
     }
 
