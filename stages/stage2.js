@@ -563,8 +563,8 @@ var GS = {
     timer: 0,
     cooldown: 0,
     dir: 1,
-    swingFrame: 0,   
-    swingTick: 0,    
+    swingFrame: 0,
+    swingTick: 0,
   },
 };
 
@@ -2803,8 +2803,13 @@ function drawPlayer() {
     }
   }
 
-// Skip drawing normal idle/walk sprite if sword swing is active
-  var suppressNormalSprite = GS.hasSword && GS.sword.active && SPR.swing && SPR.swing.complete && SPR.swing.naturalWidth;
+  // Skip drawing normal idle/walk sprite if sword swing is active
+  var suppressNormalSprite =
+    GS.hasSword &&
+    GS.sword.active &&
+    SPR.swing &&
+    SPR.swing.complete &&
+    SPR.swing.naturalWidth;
 
   if (!suppressNormalSprite) {
     if (img && img.complete && img.naturalWidth) {
@@ -2840,8 +2845,7 @@ function drawPlayer() {
     TX.textAlign = "left";
   }
 
-// ── SWORD / SWING ANIMATION DRAW ──
- // ── SWORD / SWING ANIMATION DRAW ──
+  // ── SWORD / SWING ANIMATION DRAW ──
   if (GS.hasSword && !GS.deathFx) {
     if (GS.sword.active) {
       // SWINGING — show SPRITE_SWING at exact same position/size as the player
@@ -2855,11 +2859,17 @@ function drawPlayer() {
       if (swingImg && swingImg.complete && swingImg.naturalWidth) {
         TX.save();
         if (PL.dir === -1) {
-          TX.translate(PL.x + PL.sw, PL.y);
+          TX.translate(PL.x + PL.sw, PL.y - PL.sh * 0.25);
           TX.scale(-1, 1);
-          TX.drawImage(swingImg, 0, 0, PL.sw, PL.sh);
+          TX.drawImage(swingImg, 0, 0, PL.sw * 1.5, PL.sh * 1.5);
         } else {
-          TX.drawImage(swingImg, PL.x, PL.y, PL.sw, PL.sh);
+          TX.drawImage(
+            swingImg,
+            PL.x - PL.sw * 0.25,
+            PL.y - PL.sh * 0.25,
+            PL.sw * 2.0,
+            PL.sh * 1.5,
+          );
         }
         TX.restore();
       } else {
@@ -2868,10 +2878,12 @@ function drawPlayer() {
         var handX = PL.x + PL.sw / 2 + PL.dir * 40;
         var handY = PL.y + PL_COY + PL.h * 0.62;
         var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
-        var swingAngle = PL.dir === 1
-          ? idleAngle - Math.PI * 0.9 * Math.sin(swingProgress * Math.PI)
-          : idleAngle + Math.PI * 0.9 * Math.sin(swingProgress * Math.PI);
-        var swordLen = 62, swordW = 10;
+        var swingAngle =
+          PL.dir === 1
+            ? idleAngle - Math.PI * 0.9 * Math.sin(swingProgress * Math.PI)
+            : idleAngle + Math.PI * 0.9 * Math.sin(swingProgress * Math.PI);
+        var swordLen = 62,
+          swordW = 10;
         TX.save();
         TX.translate(handX, handY);
         TX.rotate(swingAngle);

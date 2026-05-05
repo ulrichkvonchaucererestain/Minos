@@ -105,6 +105,9 @@ var SPR = {
   spike: null,
   pot: null,
   sword: null,
+  sword: null,
+  swingIdle: null,
+  swing: null,
   decor: {},
   torch: null,
   mapTheme: { map: null, roof: null, fall: null },
@@ -205,6 +208,9 @@ async function loadSpr() {
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
   if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
   if (typeof SPRITE_SWORD !== "undefined") SPR.sword = await li(SPRITE_SWORD);
+  if (typeof SPRITE_SWING_IDLE !== "undefined")
+    SPR.swingIdle = await li(SPRITE_SWING_IDLE);
+  if (typeof SPRITE_SWING !== "undefined") SPR.swing = await li(SPRITE_SWING);
   SPR.torch = await li(TORCH_ASSET);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
@@ -557,6 +563,8 @@ var GS = {
     timer: 0,
     cooldown: 0,
     dir: 1,
+    swingFrame: 0,
+    swingTick: 0,
   },
 };
 
@@ -2795,26 +2803,36 @@ function drawPlayer() {
     }
   }
 
-  if (img && img.complete && img.naturalWidth) {
-    if (PL.dir === -1) {
-      TX.translate(PL.x + PL.sw, PL.y);
-      TX.scale(-1, 1);
-      TX.drawImage(img, 0, 0, PL.sw, PL.sh);
+  // Skip drawing normal idle/walk sprite if sword swing is active
+  var suppressNormalSprite =
+    GS.hasSword &&
+    GS.sword.active &&
+    SPR.swing &&
+    SPR.swing.complete &&
+    SPR.swing.naturalWidth;
+
+  if (!suppressNormalSprite) {
+    if (img && img.complete && img.naturalWidth) {
+      if (PL.dir === -1) {
+        TX.translate(PL.x + PL.sw, PL.y);
+        TX.scale(-1, 1);
+        TX.drawImage(img, 0, 0, PL.sw, PL.sh);
+      } else {
+        TX.drawImage(img, PL.x, PL.y, PL.sw, PL.sh);
+      }
     } else {
-      TX.drawImage(img, PL.x, PL.y, PL.sw, PL.sh);
+      // Fallback block figure
+      if (PL.dir === -1) {
+        TX.translate((PL.x + PL.sw / 2) * 2, 0);
+        TX.scale(-1, 1);
+      }
+      TX.fillStyle = "#d4a843";
+      TX.fillRect(PL.x + 8, PL.y + 20, PL.sw - 16, PL.sh - 28);
+      TX.fillStyle = "#f0c080";
+      TX.fillRect(PL.x + 10, PL.y + 2, PL.sw - 20, 20);
+      TX.fillStyle = "#8a3020";
+      TX.fillRect(PL.x + 8, PL.y + 22, PL.sw - 16, 6);
     }
-  } else {
-    // Fallback block figure
-    if (PL.dir === -1) {
-      TX.translate((PL.x + PL.sw / 2) * 2, 0);
-      TX.scale(-1, 1);
-    }
-    TX.fillStyle = "#d4a843";
-    TX.fillRect(PL.x + 8, PL.y + 20, PL.sw - 16, PL.sh - 28);
-    TX.fillStyle = "#f0c080";
-    TX.fillRect(PL.x + 10, PL.y + 2, PL.sw - 20, 20);
-    TX.fillStyle = "#8a3020";
-    TX.fillRect(PL.x + 8, PL.y + 22, PL.sw - 16, 6);
   }
 
   // Gold item indicator above head
@@ -2827,79 +2845,73 @@ function drawPlayer() {
     TX.textAlign = "left";
   }
 
-  // ── SWORD DRAW ──
+  // ── SWORD / SWING ANIMATION DRAW ──
   if (GS.hasSword && !GS.deathFx) {
-    var swingProgress = GS.sword.active
-      ? 1 - GS.sword.timer / 18 // 0 → 1 over the swing duration
-      : 0;
+    if (GS.sword.active) {
+      // SWINGING — show SPRITE_SWING at exact same position/size as the player
+      GS.sword.swingTick++;
+      if (GS.sword.swingTick >= 3) {
+        GS.sword.swingTick = 0;
+        GS.sword.swingFrame++;
+      }
 
-    // Pivot from player's hand area
-    var handX = PL.x + PL.sw / 2 + PL.dir * 40;
-    var handY = PL.y + PL_COY + PL.h * 0.62;
-
-    // Idle angle: pointing down-forward. Swing: arc upward then forward.
-    var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
-    var swingAngle =
-      PL.dir === 1
-        ? idleAngle - Math.PI * 0.9 * Math.sin(swingProgress * Math.PI)
-        : idleAngle + Math.PI * 0.9 * Math.sin(swingProgress * Math.PI);
-
-    var angle = GS.sword.active ? swingAngle : idleAngle;
-    var swordLen = 62;
-    var swordW = 10;
-
-    TX.save();
-    TX.translate(handX, handY);
-    TX.rotate(angle);
-
-    // Swing trail
-    if (GS.sword.active && swingProgress < 0.85) {
-      TX.save();
-      TX.globalAlpha = 0.18 * (1 - swingProgress);
-      TX.strokeStyle = "#ffe066";
-      TX.lineWidth = swordW * 2.2;
-      TX.lineCap = "round";
-      TX.beginPath();
-      TX.moveTo(0, 19);
-      TX.lineTo(0, 19 + swordLen);
-      TX.stroke();
-      TX.restore();
-    }
-
-    var swordImg = SPR.sword;
-    if (swordImg && swordImg.complete && swordImg.naturalWidth) {
-      // Draw sprite: blade goes along the positive-Y axis from handle
-      TX.drawImage(swordImg, -swordW / 2, 0, swordW + 6, swordLen + 8);
+      var swingImg = SPR.swing;
+      if (swingImg && swingImg.complete && swingImg.naturalWidth) {
+        TX.save();
+        if (PL.dir === -1) {
+          TX.translate(PL.x + PL.sw, PL.y - PL.sh * 0.25);
+          TX.scale(-1, 1);
+          TX.drawImage(swingImg, 0, 0, PL.sw * 1.5, PL.sh * 1.5);
+        } else {
+          TX.drawImage(
+            swingImg,
+            PL.x - PL.sw * 0.25,
+            PL.y - PL.sh * 0.25,
+            PL.sw * 2.0,
+            PL.sh * 1.5,
+          );
+        }
+        TX.restore();
+      } else {
+        // Fallback — drawn swing arc
+        var swingProgress = 1 - GS.sword.timer / 18;
+        var handX = PL.x + PL.sw / 2 + PL.dir * 40;
+        var handY = PL.y + PL_COY + PL.h * 0.62;
+        var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
+        var swingAngle =
+          PL.dir === 1
+            ? idleAngle - Math.PI * 0.9 * Math.sin(swingProgress * Math.PI)
+            : idleAngle + Math.PI * 0.9 * Math.sin(swingProgress * Math.PI);
+        var swordLen = 62,
+          swordW = 10;
+        TX.save();
+        TX.translate(handX, handY);
+        TX.rotate(swingAngle);
+        if (swingProgress < 0.85) {
+          TX.save();
+          TX.globalAlpha = 0.18 * (1 - swingProgress);
+          TX.strokeStyle = "#ffe066";
+          TX.lineWidth = swordW * 2.2;
+          TX.lineCap = "round";
+          TX.beginPath();
+          TX.moveTo(0, 19);
+          TX.lineTo(0, 19 + swordLen);
+          TX.stroke();
+          TX.restore();
+        }
+        TX.fillStyle = "#5a3010";
+        TX.fillRect(-3, 0, 6, 14);
+        TX.fillStyle = "#d4a843";
+        TX.fillRect(-10, 14, 20, 5);
+        TX.fillStyle = "#e8eaf0";
+        TX.fillRect(-swordW / 2, 19, swordW, swordLen);
+        TX.restore();
+      }
     } else {
-      // Fallback — drawn sword
-      // Blade
-      var bG = TX.createLinearGradient(-swordW / 2, 0, swordW / 2, 0);
-      bG.addColorStop(0, "#b8bcc8");
-      bG.addColorStop(0.5, "#e8eaf0");
-      bG.addColorStop(1, "#7a7e8a");
-      // Grip — starts AT the hand (pivot = 0), goes down
-      TX.fillStyle = "#5a3010";
-      TX.fillRect(-3, 0, 6, 14);
-
-      // Guard — sits just below the grip
-      TX.fillStyle = "#d4a843";
-      TX.fillRect(-10, 14, 20, 5);
-
-      // Blade — extends from guard downward
-      TX.fillStyle = bG;
-      TX.fillRect(-swordW / 2, 19, swordW, swordLen);
-
-      // Tip
-      TX.fillStyle = "#dde0ea";
-      TX.beginPath();
-      TX.moveTo(-swordW / 2, 19 + swordLen);
-      TX.lineTo(swordW / 2, 19 + swordLen);
-      TX.lineTo(0, 19 + swordLen + 12);
-      TX.closePath();
-      TX.fill();
+      // IDLE — reset counters, no sprite drawn on top
+      GS.sword.swingFrame = 0;
+      GS.sword.swingTick = 0;
     }
-
-    TX.restore();
   }
 
   TX.restore();
