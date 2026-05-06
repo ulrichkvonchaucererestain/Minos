@@ -211,6 +211,11 @@ async function loadSpr() {
   if (typeof SPRITE_SWING_IDLE !== "undefined")
     SPR.swingIdle = await li(SPRITE_SWING_IDLE);
   if (typeof SPRITE_SWING !== "undefined") SPR.swing = await li(SPRITE_SWING);
+  // Armor indicator sprites
+  if (typeof SPRITE_ARMOR_WITH !== "undefined")
+    SPR.armorWith = await li(SPRITE_ARMOR_WITH);
+  if (typeof SPRITE_ARMOR_WITHOUT !== "undefined")
+    SPR.armorWithout = await li(SPRITE_ARMOR_WITHOUT);
   SPR.torch = await li(TORCH_ASSET);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
@@ -542,6 +547,7 @@ function buildMap() {
 var GS = {
   lives: 3,
   hasGold: false,
+  hasArmor: false,
   startTime: 0,
   timerSecs: 0,
   step: 0, // tutorial step index
@@ -1042,6 +1048,7 @@ function resetToStart() {
   // Clear dropped items on full reset
   clearDroppedItems();
   GS.hasGold = false;
+  GS.hasArmor = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -3078,8 +3085,27 @@ function updateHUD() {
       (full ? "#ff4444" : "#4a2020") +
       '" stroke-width="1.5"/></svg>';
   }
-}
 
+  // ── Armor indicator: 2 sprite pips below the hearts ──
+  var armorRow = document.getElementById("hud-armor");
+  if (!armorRow) {
+    armorRow = document.createElement("div");
+    armorRow.id = "hud-armor";
+    armorRow.style.cssText =
+      "display:flex;gap:4px;margin-top:5px;justify-content:center;";
+    hb.parentNode.appendChild(armorRow);
+  }
+  armorRow.innerHTML = "";
+  var armorSrc = GS.hasArmor
+    ? (SPR.armorWith ? SPR.armorWith.src : "")
+    : (SPR.armorWithout ? SPR.armorWithout.src : "");
+  for (var j = 0; j < 2; j++) {
+    armorRow.innerHTML +=
+      '<img src="' + armorSrc + '" width="22" height="22" ' +
+      'style="image-rendering:pixelated;opacity:' +
+      (GS.hasArmor ? "1" : "0.35") + '"/>';
+  }
+}
 /* ── STEPS ─────────────────────────────────────────────────────── */
 function showStep(idx) {
   return;
