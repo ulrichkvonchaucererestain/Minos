@@ -108,6 +108,7 @@ var SPR = {
   sword: null,
   swingIdle: null,
   swing: null,
+  fireball: null,
   decor: {},
   torch: null,
   mapTheme: { map: null, roof: null, fall: null },
@@ -211,6 +212,7 @@ async function loadSpr() {
   if (typeof SPRITE_SWING_IDLE !== "undefined")
     SPR.swingIdle = await li(SPRITE_SWING_IDLE);
   if (typeof SPRITE_SWING !== "undefined") SPR.swing = await li(SPRITE_SWING);
+  if (typeof SPRITE_FIRE !== "undefined") SPR.fireball = await li(SPRITE_FIRE);
   SPR.torch = await li(TORCH_ASSET);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
@@ -344,6 +346,21 @@ function buildMap() {
 
   MAP.readySpike = null;
   MAP.hammer = null;
+
+  /* ── FIREBALL LAUNCHER ── */
+  // Tripwire at x:4820 — middle-end of stage, after the shaft recovery section
+  MAP.fireballLauncher = {
+    tripwireX: 4820,
+    tripwireW: 20,
+    triggered: false,
+    intervalFrames: 60,
+    timer: 60,
+    rangeX: 4820,
+    rangeW: 3500,
+    speed: 0,
+  };
+  // Speed: travel full screen height in 1.3s
+  MAP.fireballLauncher.speed = Math.round(TC.height / (1.3 * 60));
 
   /* ── POTS (3 random, one has the gold thread) ── */
   MAP.gold = null; // gold thread is now inside a pot, not floating
@@ -566,6 +583,7 @@ var GS = {
     swingFrame: 0,
     swingTick: 0,
   },
+  fireballs: [],
 };
 
 /* ── DROPPED ITEMS SYSTEM ── */
@@ -1041,6 +1059,11 @@ function resetToStart() {
   }
   // Clear dropped items on full reset
   clearDroppedItems();
+  GS.fireballs = [];
+  if (MAP.fireballLauncher) {
+    MAP.fireballLauncher.triggered = false;
+    MAP.fireballLauncher.timer = 60;
+  }
   GS.hasGold = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
@@ -1289,6 +1312,60 @@ function tutUpdate() {
       }
     }
   }
+
+  /* ── FIREBALL TRIPWIRE & LAUNCHER ── */
+  var launcher = MAP.fireballLauncher;
+  var plCX = PL.x + PL_COX + PL.w / 2;
+
+  // Check if player crosses the invisible tripwire
+  if (
+    !launcher.triggered &&
+    plCX >= launcher.tripwireX &&
+    plCX <= launcher.tripwireX + launcher.tripwireW
+  ) {
+    launcher.triggered = true;
+  }
+
+  // Spawn and move fireballs only after tripwire is crossed
+  if (launcher.triggered) {
+    launcher.timer++;
+    if (launcher.timer >= launcher.intervalFrames) {
+      launcher.timer = 0;
+      var spawnX = launcher.rangeX + Math.random() * launcher.rangeW;
+      GS.fireballs.push({
+        x: spawnX,
+        y: -48, // spawn above the screen
+        vy: launcher.speed, // falls straight down
+        w: 48,
+        h: 48,
+      });
+    }
+  }
+
+  /* ── FIREBALL MOVEMENT & COLLISION ── */
+  for (var fbi = GS.fireballs.length - 1; fbi >= 0; fbi--) {
+    var fb = GS.fireballs[fbi];
+    fb.y += fb.vy;
+    if (fb.y > FLOOR_Y + 80) {
+      GS.fireballs.splice(fbi, 1);
+      continue;
+    }
+    if (PL.iframes <= 0) {
+      var fbPx = PL.x + PL_COX,
+        fbPy = PL.y + PL_COY;
+      if (
+        fbPx < fb.x + fb.w &&
+        fbPx + PL.w > fb.x &&
+        fbPy < fb.y + fb.h &&
+        fbPy + PL.h > fb.y
+      ) {
+        takeDamage("fireball");
+        GS.fireballs.splice(fbi, 1);
+      }
+    }
+  }
+
+  /* ── GOLD THREW PICKUP ── */
 
   /* ── GOLD THREW PICKUP ── */
   if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
@@ -1758,6 +1835,7 @@ function tutDraw() {
   drawHammer();
   drawGold();
   drawPots();
+  drawFireballs();
   drawThrowFx();
   drawDroppedItems();
   drawDoors();
@@ -2246,6 +2324,48 @@ function drawHammer() {
     TX.fillText("⚠", hm.anchorX, hm.anchorY - 20);
     TX.restore();
   }
+}
+
+function drawFireballs() {
+  if (!GS.fireballs || !GS.fireballs.length) return;
+  GS.fireballs.forEach(function (fb) {
+    if (fb.x < CAM.x - 80 || fb.x > CAM.x + TC.width + 80) return;
+    TX.save();
+    TX.translate(fb.x + fb.w / 2, fb.y + fb.h / 2);
+    TX.rotate(Math.PI); // flame tail trails upward
+
+    if (SPR.fireball && SPR.fireball.complete && SPR.fireball.naturalWidth) {
+      TX.shadowBlur = 18;
+      TX.shadowColor = "rgba(255,120,0,0.85)";
+      TX.drawImage(
+        SPR.fireball,
+        -fb.w * 0.6,
+        -fb.h * 0.6,
+        fb.w * 1.2,
+        fb.h * 1.2,
+      );
+    } else {
+      // Fallback glowing circle with upward flame tail
+      TX.shadowBlur = 22;
+      TX.shadowColor = "rgba(255,100,0,0.9)";
+      TX.fillStyle = "#ff6600";
+      TX.beginPath();
+      TX.arc(0, 0, fb.w / 2, 0, Math.PI * 2);
+      TX.fill();
+      TX.fillStyle = "#ffee44";
+      TX.beginPath();
+      TX.arc(0, 0, fb.w / 4, 0, Math.PI * 2);
+      TX.fill();
+      TX.fillStyle = "rgba(255,80,0,0.6)";
+      TX.beginPath();
+      TX.moveTo(-8, -fb.h / 2);
+      TX.lineTo(8, -fb.h / 2);
+      TX.lineTo(0, -fb.h);
+      TX.closePath();
+      TX.fill();
+    }
+    TX.restore();
+  });
 }
 
 function getThrowLandingY(x) {
