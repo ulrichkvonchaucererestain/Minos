@@ -350,6 +350,15 @@ function buildMap() {
   MAP.readySpike = null;
   MAP.hammer = null;
 
+  /* ── DROPPED SWORD ITEM ── */
+  MAP.swordItem = {
+    x: 480, // place it near the start, before the first gap
+    y: FLOOR_Y - 40,
+    w: 36,
+    h: 36,
+    collected: false,
+  };
+
   /* ── POTS (3 random, one has the gold thread) ── */
   MAP.gold = null; // gold thread is now inside a pot, not floating
 
@@ -548,6 +557,7 @@ var GS = {
   lives: 3,
   hasGold: false,
   hasArmor: false,
+  hasSword: false,
   startTime: 0,
   timerSecs: 0,
   step: 0, // tutorial step index
@@ -590,6 +600,51 @@ function spawnDroppedItem(x, y, type) {
 
 function clearDroppedItems() {
   DROPPED_ITEMS = [];
+}
+
+function drawSwordItem() {
+  if (!MAP.swordItem || MAP.swordItem.collected) return;
+  var s = MAP.swordItem;
+  if (s.x < CAM.x - 80 || s.x > CAM.x + TC.width + 80) return;
+
+  var bob = Math.sin(Date.now() * 0.003) * 5;
+  var ix = s.x - CAM.x;
+  var iy = s.y + bob;
+
+  // Glow
+  var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 32);
+  gl.addColorStop(0, "rgba(212,168,67,.4)");
+  gl.addColorStop(1, "transparent");
+  TX.fillStyle = gl;
+  TX.fillRect(ix - 40, iy - 40, 80, 80);
+
+  // Draw sword sprite or fallback
+  if (SPR.sword && SPR.sword.complete && SPR.sword.naturalWidth) {
+    TX.save();
+    TX.translate(ix, iy);
+    TX.rotate(-Math.PI / 4);
+    TX.drawImage(SPR.sword, -18, -18, 36, 36);
+    TX.restore();
+  } else {
+    TX.save();
+    TX.translate(ix, iy);
+    TX.rotate(-Math.PI / 4);
+    TX.fillStyle = "#5a3010";
+    TX.fillRect(-3, -18, 6, 10);
+    TX.fillStyle = "#d4a843";
+    TX.fillRect(-8, -8, 16, 4);
+    TX.fillStyle = "#e8eaf0";
+    TX.fillRect(-4, -4, 8, 40);
+    TX.restore();
+  }
+
+  // Label
+  TX.fillStyle = "rgba(212,168,67,.85)";
+  TX.font = "bold 9px Cinzel,serif";
+  TX.textAlign = "center";
+  TX.fillText("Sword", ix, iy - 26);
+  TX.fillText("[E] Pick up", ix, iy - 16);
+  TX.textAlign = "left";
 }
 
 function drawDroppedItems() {
@@ -637,6 +692,25 @@ function drawDroppedItems() {
   });
 }
 
+function checkSwordPickup() {
+  if (GS.hasSword) return;
+  if (!MAP.swordItem || MAP.swordItem.collected) return;
+
+  var px = PL.x + PL_COX + PL.w / 2;
+  var py = PL.y + PL_COY + PL.h / 2;
+  var sx = MAP.swordItem.x;
+  var sy = MAP.swordItem.y;
+  var dist = Math.hypot(px - sx, py - sy);
+
+  if (dist < 55 || (JP["KeyE"] && dist < 100)) {
+    MAP.swordItem.collected = true;
+    GS.hasSword = true;
+    JP["KeyE"] = false;
+    showBadge("⚔️ Sword equipped! Press [F] to swing.");
+    updateHUD();
+  }
+}
+
 function checkDroppedItemPickup() {
   if (GS.hasGold) return; // Already has gold
 
@@ -654,6 +728,7 @@ function checkDroppedItemPickup() {
       GS.hasGold = true;
       showBadge("✨ Golden Thread recovered!");
       spawnGoldPtcls(item.x, item.y);
+      updateHUD();
       JP["KeyE"] = false;
       break;
     }
@@ -1020,7 +1095,6 @@ function spawnPlayer() {
   CAM.x = 0;
   // Don't reset hasGold here — dropped items persist until picked up or void death
   GS.activeDoorIndex = -1;
-  GS.hasSword = true;
 }
 
 function resetToStart() {
@@ -1049,6 +1123,7 @@ function resetToStart() {
   clearDroppedItems();
   GS.hasGold = false;
   GS.hasArmor = false;
+  GS.hasSword = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -1060,6 +1135,7 @@ function resetToStart() {
   GS.startTime = Date.now();
   GS.timerSecs = 0;
   spawnPlayer();
+  if (MAP.swordItem) MAP.swordItem.collected = false;
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
 
@@ -1317,6 +1393,7 @@ function tutUpdate() {
         GS.hasGold = true;
         showBadge("✨ Golden Thread collected!");
         spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
+        updateHUD();
       }
     }
   }
@@ -1408,6 +1485,7 @@ function tutUpdate() {
     }
   });
   checkDroppedItemPickup();
+  checkSwordPickup();
   JP["KeyE"] = false;
 
   /* ── VOID DEATH (fall off bottom) ── */
@@ -1495,6 +1573,7 @@ function takeDamage(source) {
     MAP.gold.collected = true; // Mark original as gone
     GS.hasGold = false;
     showBadge("💔 Golden Thread dropped!");
+    updateHUD();
   }
 
   GS.lives = Math.max(0, GS.lives - 1);
@@ -1767,6 +1846,7 @@ function tutDraw() {
   drawPots();
   drawThrowFx();
   drawDroppedItems();
+  drawSwordItem();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
   drawParticles();
@@ -2986,8 +3066,13 @@ function drawStamBar(W, H) {
     document.body.appendChild(swordHud);
   }
   if (swordHud) {
-    var swReady = GS.sword && GS.sword.cooldown <= 0;
-    swordHud.style.opacity = swReady ? "1" : "0.45";
+    if (!GS.hasSword) {
+      swordHud.style.display = "none";
+    } else {
+      swordHud.style.display = "";
+      var swReady = GS.sword && GS.sword.cooldown <= 0;
+      swordHud.style.opacity = swReady ? "1" : "0.45";
+    }
   }
 }
 
@@ -3097,14 +3182,42 @@ function updateHUD() {
   }
   armorRow.innerHTML = "";
   var armorSrc = GS.hasArmor
-    ? (SPR.armorWith ? SPR.armorWith.src : "")
-    : (SPR.armorWithout ? SPR.armorWithout.src : "");
+    ? SPR.armorWith
+      ? SPR.armorWith.src
+      : ""
+    : SPR.armorWithout
+      ? SPR.armorWithout.src
+      : "";
   for (var j = 0; j < 2; j++) {
     armorRow.innerHTML +=
-      '<img src="' + armorSrc + '" width="22" height="22" ' +
+      '<img src="' +
+      armorSrc +
+      '" width="22" height="22" ' +
       'style="image-rendering:pixelated;opacity:' +
-      (GS.hasArmor ? "1" : "0.35") + '"/>';
+      (GS.hasArmor ? "1" : "0.35") +
+      '"/>';
   }
+
+  // ── Inventory text list ──
+  var invBox = document.getElementById("hud-inventory");
+  if (!invBox) {
+    invBox = document.createElement("div");
+    invBox.id = "hud-inventory";
+    invBox.style.cssText = [
+      "margin-top:8px",
+      "font-family:Cinzel,serif",
+      "font-size:10px",
+      "color:#e8dcc8",
+      "text-align:center",
+      "line-height:1.6",
+      "min-height:14px",
+    ].join(";");
+    hb.parentNode.appendChild(invBox);
+  }
+  var invLines = [];
+  if (GS.hasSword) invLines.push("⚔️ Sword");
+  if (GS.hasGold) invLines.push("🧵 Thread");
+  invBox.innerHTML = invLines.length ? invLines.join("<br>") : "";
 }
 /* ── STEPS ─────────────────────────────────────────────────────── */
 function showStep(idx) {
