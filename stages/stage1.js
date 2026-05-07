@@ -8,7 +8,6 @@
 
 /* ── CANVAS / CTX ──────────────────────────────────────────────── */
 var TC, TX;
-var MAP_THEME_STORAGE_KEY = "minos-map-theme";
 var MAP_THEME_ROOT = "../map_themes/Map";
 var TORCH_ASSET = "../torch.png";
 var MAP_THEME_ASSETS = {
@@ -243,13 +242,15 @@ async function loadSpr() {
   sprOK = true;
 }
 
+// Tracks the last used theme so we never pick the same one twice in a row
+var _lastMapTheme = null;
+
 function getSelectedMapTheme() {
-  try {
-    var selected = localStorage.getItem(MAP_THEME_STORAGE_KEY);
-    return MAP_THEME_ASSETS[selected] ? selected : "classic";
-  } catch (e) {
-    return "classic";
-  }
+  var variants = ["variant1", "variant2", "variant3"];
+  var available = variants.filter(function (v) { return v !== _lastMapTheme; });
+  var chosen = available[Math.floor(Math.random() * available.length)];
+  _lastMapTheme = chosen;
+  return chosen;
 }
 
 /* ── CAMERA ─────────────────────────────────────────────────────── */
@@ -1143,6 +1144,8 @@ function spawnPlayer() {
 }
 
 function resetToStart() {
+
+  loadSpr();
   // Reset all traps
   // Re-randomize correct door on reset
   if (MAP.doors && MAP.doors.length === 3) {
