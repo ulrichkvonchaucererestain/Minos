@@ -113,6 +113,7 @@ var SPR = {
   mapTheme: { map: null, roof: null, fall: null },
 };
 var sprOK = false;
+var SPR_PATHS = {}; // stores original src paths for HUD use
 var HAMMER_LEFT_PATHS = [
   "../hammer_animation_swing_to_the_left1.png",
   "../hammer_animation_swing_to_the_left2.png",
@@ -204,10 +205,19 @@ async function loadSpr() {
   SPR.jump = await Promise.all(JUMP_PATHS.map(li));
   if (typeof SPRITE_DOOR1 !== "undefined") SPR.door1 = await li(SPRITE_DOOR1);
   if (typeof SPRITE_DOOR2 !== "undefined") SPR.door2 = await li(SPRITE_DOOR2);
-  if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
+  if (typeof SPRITE_GOLD !== "undefined") {
+    SPR.gold = await li(SPRITE_GOLD);
+    SPR_PATHS.gold = SPRITE_GOLD;
+  }
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
-  if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
-  if (typeof SPRITE_SWORD !== "undefined") SPR.sword = await li(SPRITE_SWORD);
+  if (typeof SPRITE_POT !== "undefined") {
+    SPR.pot = await li(SPRITE_POT);
+    SPR_PATHS.pot = SPRITE_POT;
+  }
+  if (typeof SPRITE_SWORD !== "undefined") {
+    SPR.sword = await li(SPRITE_SWORD);
+    SPR_PATHS.sword = SPRITE_SWORD;
+  }
   if (typeof SPRITE_SWING_IDLE !== "undefined")
     SPR.swingIdle = await li(SPRITE_SWING_IDLE);
   if (typeof SPRITE_SWING !== "undefined") SPR.swing = await li(SPRITE_SWING);
@@ -558,6 +568,8 @@ var GS = {
   hasGold: false,
   hasArmor: false,
   hasSword: false,
+  nearSword: false,
+  nearDroppedItem: false,
   startTime: 0,
   timerSecs: 0,
   step: 0, // tutorial step index
@@ -602,6 +614,69 @@ function clearDroppedItems() {
   DROPPED_ITEMS = [];
 }
 
+function drawDroppedItems() {
+  DROPPED_ITEMS.forEach(function (item) {
+    if (!item.active) return;
+    if (item.x < CAM.x - 60 || item.x > CAM.x + TC.width + 60) return;
+
+    item.bobTimer += 0.05;
+    var bob = Math.sin(item.bobTimer) * 6;
+    var ix = item.x,
+      iy = item.y + bob;
+
+    // Glow
+    var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 35);
+    gl.addColorStop(0, "rgba(255,215,0,.35)");
+    gl.addColorStop(1, "transparent");
+    TX.fillStyle = gl;
+    TX.fillRect(ix - 40, iy - 40, 80, 80);
+
+    var itemImg = SPR.gold || SPR.decor.threadPaper;
+    if (itemImg && itemImg.complete && itemImg.naturalWidth) {
+      TX.drawImage(itemImg, ix - 20, iy - 20, 40, 40);
+    } else {
+      TX.save();
+      TX.shadowBlur = 15;
+      TX.shadowColor = "#ffd700";
+      TX.fillStyle = "#ffd700";
+      TX.beginPath();
+      TX.arc(ix, iy, 14, 0, Math.PI * 2);
+      TX.fill();
+      TX.fillStyle = "#ffaa00";
+      TX.beginPath();
+      TX.arc(ix, iy, 10, 0, Math.PI * 2);
+      TX.fill();
+      TX.restore();
+    }
+
+    // Item name — always visible when on screen
+    TX.fillStyle = "rgba(255,215,0,.7)";
+    TX.font = "bold 9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText("Golden Thread", ix, iy - 26);
+
+    // [E] prompt — only when player is close enough
+    if (GS.nearDroppedItem) {
+      TX.save();
+      TX.fillStyle = "rgba(255,255,180,1)";
+      TX.font = "bold 10px Cinzel,serif";
+      TX.textAlign = "center";
+      // Pulsing background pill for visibility
+      var promptW = 80,
+        promptH = 18;
+      TX.fillStyle = "rgba(0,0,0,0.55)";
+      TX.beginPath();
+      TX.roundRect(ix - promptW / 2, iy - 16, promptW, promptH, 4);
+      TX.fill();
+      TX.fillStyle = "rgba(255,255,180,1)";
+      TX.fillText("[E] Pick up", ix, iy - 3);
+      TX.restore();
+    }
+
+    TX.textAlign = "left";
+  });
+}
+
 function drawSwordItem() {
   if (!MAP.swordItem || MAP.swordItem.collected) return;
   var s = MAP.swordItem;
@@ -643,53 +718,42 @@ function drawSwordItem() {
   TX.font = "bold 9px Cinzel,serif";
   TX.textAlign = "center";
   TX.fillText("Sword", ix, iy - 26);
-  TX.fillText("[E] Pick up", ix, iy - 16);
+  if (GS.nearSword) {
+    TX.fillStyle = "rgba(255,255,180,1)";
+    TX.font = "bold 10px Cinzel,serif";
+    TX.fillText("[E] Pick up", ix, iy - 14);
+  }
   TX.textAlign = "left";
 }
 
-function drawDroppedItems() {
-  DROPPED_ITEMS.forEach(function (item) {
-    if (!item.active) return;
-    if (item.x < CAM.x - 60 || item.x > CAM.x + TC.width + 60) return;
+function checkDroppedItemPickup() {
+  if (GS.hasGold) return;
+  GS.nearDroppedItem = false;
 
-    item.bobTimer += 0.05;
-    var bob = Math.sin(item.bobTimer) * 6;
-    var ix = item.x,
-      iy = item.y + bob;
+  for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
+    var item = DROPPED_ITEMS[i];
+    if (!item.active) continue;
 
-    // Glow
-    var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 35);
-    gl.addColorStop(0, "rgba(255,215,0,.35)");
-    gl.addColorStop(1, "transparent");
-    TX.fillStyle = gl;
-    TX.fillRect(ix - 40, iy - 40, 80, 80);
+    var px = PL.x + PL_COX + PL.w / 2;
+    var py = PL.y + PL_COY + PL.h / 2;
+    var dist = Math.hypot(px - item.x, py - item.y);
 
-    var itemImg = SPR.gold || SPR.decor.threadPaper;
-    if (itemImg && itemImg.complete && itemImg.naturalWidth) {
-      TX.drawImage(itemImg, ix - 20, iy - 20, 40, 40);
-    } else {
-      TX.save();
-      TX.shadowBlur = 15;
-      TX.shadowColor = "#ffd700";
-      TX.fillStyle = "#ffd700";
-      TX.beginPath();
-      TX.arc(ix, iy, 14, 0, Math.PI * 2);
-      TX.fill();
-      TX.fillStyle = "#ffaa00";
-      TX.beginPath();
-      TX.arc(ix, iy, 10, 0, Math.PI * 2);
-      TX.fill();
-      TX.restore();
+    if (dist < 80) {
+      GS.nearDroppedItem = true;
+
+      // Only pick up when E is pressed
+      if (JP["KeyE"]) {
+        item.active = false;
+        GS.hasGold = true;
+        GS.nearDroppedItem = false;
+        showBadge("✨ Golden Thread recovered!");
+        spawnGoldPtcls(item.x, item.y);
+        updateHUD();
+        JP["KeyE"] = false;
+        break;
+      }
     }
-
-    // Label
-    TX.fillStyle = "rgba(255,215,0,.7)";
-    TX.font = "bold 9px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText("Dropped Key", ix, iy - 22);
-    TX.fillText("[E] Pick up", ix, iy - 12);
-    TX.textAlign = "left";
-  });
+  }
 }
 
 function checkSwordPickup() {
@@ -702,36 +766,17 @@ function checkSwordPickup() {
   var sy = MAP.swordItem.y;
   var dist = Math.hypot(px - sx, py - sy);
 
-  if (dist < 55 || (JP["KeyE"] && dist < 100)) {
+  // Show prompt when close
+  GS.nearSword = dist < 80;
+
+  // Only pick up when E is pressed
+  if (dist < 80 && JP["KeyE"]) {
     MAP.swordItem.collected = true;
     GS.hasSword = true;
+    GS.nearSword = false;
     JP["KeyE"] = false;
     showBadge("⚔️ Sword equipped! Press [F] to swing.");
     updateHUD();
-  }
-}
-
-function checkDroppedItemPickup() {
-  if (GS.hasGold) return; // Already has gold
-
-  for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
-    var item = DROPPED_ITEMS[i];
-    if (!item.active) continue;
-
-    var px = PL.x + PL_COX + PL.w / 2;
-    var py = PL.y + PL_COY + PL.h / 2;
-    var dist = Math.hypot(px - item.x, py - item.y);
-
-    if (dist < 60 || (JP["KeyE"] && dist < 100)) {
-      // Pick up
-      item.active = false;
-      GS.hasGold = true;
-      showBadge("✨ Golden Thread recovered!");
-      spawnGoldPtcls(item.x, item.y);
-      updateHUD();
-      JP["KeyE"] = false;
-      break;
-    }
   }
 }
 
@@ -3198,26 +3243,89 @@ function updateHUD() {
       '"/>';
   }
 
-  // ── Inventory text list ──
+  // ── Visual icon inventory (fixed right-side panel) ──
   var invBox = document.getElementById("hud-inventory");
   if (!invBox) {
     invBox = document.createElement("div");
     invBox.id = "hud-inventory";
     invBox.style.cssText = [
-      "margin-top:8px",
-      "font-family:Cinzel,serif",
-      "font-size:10px",
-      "color:#e8dcc8",
-      "text-align:center",
-      "line-height:1.6",
-      "min-height:14px",
+      "position:fixed",
+      "top:18px",
+      "right:22px",
+      "z-index:50",
+      "display:flex",
+      "flex-direction:column",
+      "gap:6px",
+      "align-items:flex-end",
+      "pointer-events:none",
     ].join(";");
-    hb.parentNode.appendChild(invBox);
+    document.body.appendChild(invBox);
   }
-  var invLines = [];
-  if (GS.hasSword) invLines.push("⚔️ Sword");
-  if (GS.hasGold) invLines.push("🧵 Thread");
-  invBox.innerHTML = invLines.length ? invLines.join("<br>") : "";
+  // Build icon slots
+  var items = [];
+  if (GS.hasSword)
+    items.push({
+      label: "Sword",
+      src: SPR_PATHS.sword || null,
+      emoji: "⚔️",
+      key: "sword",
+    });
+  if (GS.hasGold)
+    items.push({
+      label: "Thread",
+      src: SPR_PATHS.gold || SPR_PATHS.pot || null,
+      emoji: "🧵",
+      key: "gold",
+    });
+
+  invBox.innerHTML = "";
+  items.forEach(function (item) {
+    var slot = document.createElement("div");
+    slot.style.cssText = [
+      "display:flex",
+      "align-items:center",
+      "gap:7px",
+      "background:rgba(10,6,4,0.82)",
+      "border:1px solid #d4a843",
+      "border-radius:6px",
+      "padding:4px 9px 4px 5px",
+      "animation:inv-pop 0.22s ease",
+    ].join(";");
+
+    // Icon — use sprite image if available, emoji fallback
+    if (item.src) {
+      var img = document.createElement("img");
+      img.src = item.src;
+      img.width = 28;
+      img.height = 28;
+      img.style.cssText =
+        "image-rendering:pixelated;border-radius:3px;background:rgba(255,255,255,0.05);object-fit:contain;";
+      img.onerror = function () {
+        // If image fails, swap in the emoji fallback
+        var emo = document.createElement("span");
+        emo.textContent = item.emoji;
+        emo.style.cssText =
+          "font-size:22px;line-height:28px;width:28px;text-align:center;display:inline-block;";
+        if (img.parentNode) img.parentNode.replaceChild(emo, img);
+      };
+      slot.appendChild(img);
+    } else {
+      var emo = document.createElement("span");
+      emo.textContent = item.emoji;
+      emo.style.cssText =
+        "font-size:22px;line-height:28px;width:28px;text-align:center;display:inline-block;";
+      slot.appendChild(emo);
+    }
+
+    // Label
+    var lbl = document.createElement("span");
+    lbl.textContent = item.label;
+    lbl.style.cssText =
+      "font-family:Cinzel,serif;font-size:10px;color:#e8dcc8;";
+    slot.appendChild(lbl);
+
+    invBox.appendChild(slot);
+  });
 }
 /* ── STEPS ─────────────────────────────────────────────────────── */
 function showStep(idx) {
@@ -3229,7 +3337,33 @@ function advanceStep() {
 }
 
 function showBadge(msg) {
-  return;
+  var existing = document.getElementById("hud-badge");
+  if (existing) existing.remove();
+  var badge = document.createElement("div");
+  badge.id = "hud-badge";
+  badge.textContent = msg;
+  badge.style.cssText = [
+    "position:fixed",
+    "bottom:90px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "background:rgba(10,6,4,0.88)",
+    "border:1px solid #d4a843",
+    "border-radius:6px",
+    "padding:8px 18px",
+    "color:#e8dcc8",
+    "font-family:Cinzel,serif",
+    "font-size:13px",
+    "pointer-events:none",
+    "z-index:500",
+    "white-space:nowrap",
+    "animation:inv-pop 0.2s ease",
+  ].join(";");
+  document.body.appendChild(badge);
+  clearTimeout(showBadge._t);
+  showBadge._t = setTimeout(function () {
+    if (badge.parentNode) badge.parentNode.removeChild(badge);
+  }, 2400);
 }
 
 /* ── SCREENS ────────────────────────────────────────────────────── */
