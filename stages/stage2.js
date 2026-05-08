@@ -8,27 +8,9 @@
 
 /* ── CANVAS / CTX ──────────────────────────────────────────────── */
 var TC, TX;
-var MAP_THEME_STORAGE_KEY = "minos-map-theme";
-var MAP_THEME_ROOT = "../map_themes/Map";
 var TORCH_ASSET = "../torch.png";
-var MAP_THEME_ASSETS = {
-  classic: null,
-  variant1: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 1.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 1 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-  variant2: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 2.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 2 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-  variant3: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 3.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 3 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-};
+var MAP_THEME_ASSETS = null; // Populated in tutInit after map.js loads
+var _lastMapTheme = null;
 
 /* ── PHYSICS CONSTANTS ─────────────────────────────────────────── */
 var PX = 3.0; // base walk speed
@@ -228,22 +210,23 @@ async function loadSpr() {
     SPR.decor[decorKeys[i]] = await li(DECOR_PATHS[decorKeys[i]]);
   }
   var selectedTheme = getSelectedMapTheme();
-  var themeSet = MAP_THEME_ASSETS[selectedTheme];
-  if (themeSet) {
-    SPR.mapTheme.map = await li(themeSet.map);
-    SPR.mapTheme.roof = await li(themeSet.roof);
-    SPR.mapTheme.fall = await li(themeSet.fall);
+  var mapDataUrl = MAP_THEME_ASSETS ? MAP_THEME_ASSETS[selectedTheme] : null;
+  if (mapDataUrl) {
+    SPR.mapTheme.map = await li(mapDataUrl);
+    SPR.mapTheme.roof = null;
+    SPR.mapTheme.fall = null;
   }
   sprOK = true;
 }
 
 function getSelectedMapTheme() {
-  try {
-    var selected = localStorage.getItem(MAP_THEME_STORAGE_KEY);
-    return MAP_THEME_ASSETS[selected] ? selected : "classic";
-  } catch (e) {
-    return "classic";
-  }
+  var variants = ["variant1", "variant2", "variant3"];
+  var available = variants.filter(function (v) {
+    return v !== _lastMapTheme;
+  });
+  var chosen = available[Math.floor(Math.random() * available.length)];
+  _lastMapTheme = chosen;
+  return chosen;
 }
 
 /* ── CAMERA ─────────────────────────────────────────────────────── */
@@ -1000,6 +983,23 @@ async function tutInit() {
   window.addEventListener("resize", tutResize);
   buildHUD();
   buildQuizModal();
+
+  buildQuizModal();
+
+  MAP_THEME_ASSETS = {
+    variant1: typeof SPRITE_MAP !== "undefined" ? SPRITE_MAP : null,
+    variant2: typeof SPRITE_MAP2 !== "undefined" ? SPRITE_MAP2 : null,
+    variant3: typeof SPRITE_MAP3 !== "undefined" ? SPRITE_MAP3 : null,
+  };
+  console.log(
+    "Map assets loaded:",
+    !!MAP_THEME_ASSETS.variant1,
+    !!MAP_THEME_ASSETS.variant2,
+    !!MAP_THEME_ASSETS.variant3,
+  );
+
+  await loadSpr();
+
   await loadSpr();
   spawnPlayer();
   GS.startTime = Date.now();
@@ -1044,6 +1044,7 @@ function spawnPlayer() {
 }
 
 function resetToStart() {
+  loadSpr();
   // Reset all traps
   // Re-randomize correct door on reset
   if (MAP.doors && MAP.doors.length === 3) {
@@ -3219,13 +3220,20 @@ function updateHUD() {
   }
   armorRow.innerHTML = "";
   var armorSrc = GS.hasArmor
-    ? (SPR.armorWith ? SPR.armorWith.src : "")
-    : (SPR.armorWithout ? SPR.armorWithout.src : "");
+    ? SPR.armorWith
+      ? SPR.armorWith.src
+      : ""
+    : SPR.armorWithout
+      ? SPR.armorWithout.src
+      : "";
   for (var j = 0; j < 2; j++) {
     armorRow.innerHTML +=
-      '<img src="' + armorSrc + '" width="22" height="22" ' +
+      '<img src="' +
+      armorSrc +
+      '" width="22" height="22" ' +
       'style="image-rendering:pixelated;opacity:' +
-      (GS.hasArmor ? "1" : "0.35") + '"/>';
+      (GS.hasArmor ? "1" : "0.35") +
+      '"/>';
   }
 }
 

@@ -8,26 +8,10 @@
 
 /* ── CANVAS / CTX ──────────────────────────────────────────────── */
 var TC, TX;
-var MAP_THEME_ROOT = "../map_themes/Map";
 var TORCH_ASSET = "../torch.png";
-var MAP_THEME_ASSETS = {
-  classic: null,
-  variant1: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 1.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 1 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-  variant2: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 2.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 2 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-  variant3: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 3.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 3 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-};
+
+// The three sprite maps from map.js (loaded via <script src="map.js">)
+var MAP_THEME_ASSETS = null; // Populated in tutInit after map.js loads
 
 /* ── PHYSICS CONSTANTS ─────────────────────────────────────────── */
 var PX = 3.0; // base walk speed
@@ -233,11 +217,12 @@ async function loadSpr() {
     SPR.decor[decorKeys[i]] = await li(DECOR_PATHS[decorKeys[i]]);
   }
   var selectedTheme = getSelectedMapTheme();
-  var themeSet = MAP_THEME_ASSETS[selectedTheme];
-  if (themeSet) {
-    SPR.mapTheme.map = await li(themeSet.map);
-    SPR.mapTheme.roof = await li(themeSet.roof);
-    SPR.mapTheme.fall = await li(themeSet.fall);
+  var mapDataUrl = MAP_THEME_ASSETS ? MAP_THEME_ASSETS[selectedTheme] : null;
+  if (mapDataUrl) {
+    SPR.mapTheme.map = await li(mapDataUrl);
+    // No separate roof/fall images — the sprite map is one image
+    SPR.mapTheme.roof = null;
+    SPR.mapTheme.fall = null;
   }
   sprOK = true;
 }
@@ -247,7 +232,9 @@ var _lastMapTheme = null;
 
 function getSelectedMapTheme() {
   var variants = ["variant1", "variant2", "variant3"];
-  var available = variants.filter(function (v) { return v !== _lastMapTheme; });
+  var available = variants.filter(function (v) {
+    return v !== _lastMapTheme;
+  });
   var chosen = available[Math.floor(Math.random() * available.length)];
   _lastMapTheme = chosen;
   return chosen;
@@ -1101,6 +1088,23 @@ async function tutInit() {
   window.addEventListener("resize", tutResize);
   buildHUD();
   buildQuizModal();
+
+  //The Moas
+  if (typeof SPRITE_MAP === "undefined") {
+    console.error("map.js not loaded! Check script order in HTML.");
+  }
+  MAP_THEME_ASSETS = {
+    variant1: typeof SPRITE_MAP !== "undefined" ? SPRITE_MAP : null,
+    variant2: typeof SPRITE_MAP2 !== "undefined" ? SPRITE_MAP2 : null,
+    variant3: typeof SPRITE_MAP3 !== "undefined" ? SPRITE_MAP3 : null,
+  };
+  console.log(
+    "Map assets loaded:",
+    !!MAP_THEME_ASSETS.variant1,
+    !!MAP_THEME_ASSETS.variant2,
+    !!MAP_THEME_ASSETS.variant3,
+  );
+
   await loadSpr();
   spawnPlayer();
   GS.startTime = Date.now();
@@ -1144,7 +1148,6 @@ function spawnPlayer() {
 }
 
 function resetToStart() {
-
   loadSpr();
   // Reset all traps
   // Re-randomize correct door on reset
@@ -1918,8 +1921,8 @@ function drawBG(W, H) {
   TX.fillRect(0, 0, WORLD, H);
   if (SPR.mapTheme.map) {
     TX.save();
-    TX.globalAlpha = 0.34;
-    TX.drawImage(SPR.mapTheme.map, 0, H * 0.08, WORLD, H * 0.68);
+    TX.globalAlpha = 0.7;
+    TX.drawImage(SPR.mapTheme.map, 0, 0, WORLD, H);
     TX.restore();
   }
   if (SPR.mapTheme.roof) {
