@@ -535,6 +535,9 @@ class MapMaker {
       },
       trap: {
         spikes: "#e94560",
+        fireball: "#ff6600",
+        rats: "#5a4a3a",
+        bats: "#3a2450",
         saw: "#ff6b6b",
         lava: "#ff4500",
         arrow: "#f9a826",
@@ -574,15 +577,27 @@ class MapMaker {
     this.ctx.font = "14px Arial";
     this.ctx.textAlign = "center";
     this.ctx.textBaseline = "middle";
+    const trapSymbols = {
+      spikes: "▲",
+      fireball: "🔥",
+      rats: "🐀",
+      bats: "🦇",
+      saw: "⊙",
+      lava: "♨",
+      arrow: "→",
+      poison: "☠",
+      electric: "⚡",
+    };
     const sym =
-      {
-        platform: "▬",
-        trap: "⚠",
-        door: "🚪",
-        item: "◆",
-        spawn: "○",
-        mob: "👾",
-      }[obj.type] || "?";
+      obj.type === "trap"
+        ? trapSymbols[obj.subtype] || "⚠"
+        : {
+            platform: "▬",
+            door: "🚪",
+            item: "◆",
+            spawn: "○",
+            mob: "👾",
+          }[obj.type] || "?";
     this.ctx.fillText(sym, obj.x + obj.width / 2, obj.y + obj.height / 2);
   }
 
@@ -661,7 +676,9 @@ class MapMaker {
       nt.push({
         id: Date.now(),
         type: "trap",
-        subtype: ["spikes", "saw", "arrow"][Math.floor(rng() * 3)],
+        subtype: ["spikes", "fireball", "rats", "bats", "saw", "arrow"][
+          Math.floor(rng() * 6)
+        ],
         x: gx * this.gridSize,
         y: gy * this.gridSize,
         width: this.gridSize,
@@ -1193,6 +1210,18 @@ class MapMaker {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  }
+  // ─── Stage Toggle Bar ────────────────────────────────────
+  switchStageFromToggle(stageNum) {
+    const targetStage = Number(stageNum);
+    const sel = document.getElementById("admin-stage-select");
+    if (sel) {
+      sel.value = String(targetStage);
+      this.onStageChange();
+    }
+    document.querySelectorAll(".stage-toggle-btn").forEach((btn) => {
+      btn.classList.toggle("active", Number(btn.dataset.stage) === targetStage);
+    });
   }
 }
 
