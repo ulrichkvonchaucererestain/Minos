@@ -1,0 +1,61 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #000;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.manga-viewer {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+.panel-container {
+  position: absolute;
+  inset: 0;
+}
+
+.panel-bg {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  transition: opacity 0.6s ease;
+  opacity: 1;
+}
+
+.panel-bg.fading {
+  opacity: 0;
+}
+
+.panel-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+  pointer-events: none;
+}
+
+.panel-counter {
+  position: absolute;
+  bottom: 24px;
+  right: 28px;
+  font-family: "Courier New", monospace;
+  font-size: 13px;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
