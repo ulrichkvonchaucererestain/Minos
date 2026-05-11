@@ -1,16 +1,9 @@
-/* ═══════════════════════════════════════════════════════════════════
-   LABYRINTH OF MINOS — TUTORIAL 2   tutorial2.js
-   Faithfully implements the hand-drawn sketch:
-   START → 1.5-block obstacle → pressure-plate spike1 → platform →
-   pressure-plate spike2 → fall-down shaft → ready spike (DASH) →
-   long platform → hammer trap → golden thread → 3 doors (pick right)
-   ═══════════════════════════════════════════════════════════════════ */
-
 /* ── CANVAS / CTX ──────────────────────────────────────────────── */
 var TC, TX;
 var TORCH_ASSET = "../torch.png";
+
+// The three sprite maps from map.js (loaded via <script src="map.js">)
 var MAP_THEME_ASSETS = null; // Populated in tutInit after map.js loads
-var _lastMapTheme = null;
 
 /* ── PHYSICS CONSTANTS ─────────────────────────────────────────── */
 var PX = 3.0; // base walk speed
@@ -30,7 +23,6 @@ var STAM_MAX = 100,
 /* ── WORLD DIMENSIONS ──────────────────────────────────────────── */
 // Stage II stretches through a reworked webbed route with tighter staggered jumps.
 var WORLD = 8450;
-var TILE = 48; // 1 game tile = 48px
 
 /* ── PLAYER ─────────────────────────────────────────────────────── */
 var PL = {
@@ -76,8 +68,6 @@ var PL_COX, PL_COY; // computed from sw/w after resize
 var SPR = {
   idle: null,
   idle2: null,
-  armorWith: null,
-  armorWithout: null,
   walk: [],
   run: [],
   jump: [],
@@ -92,12 +82,12 @@ var SPR = {
   sword: null,
   swingIdle: null,
   swing: null,
-  fireball: null,
   decor: {},
   torch: null,
   mapTheme: { map: null, roof: null, fall: null },
 };
 var sprOK = false;
+var SPR_PATHS = {}; // stores original src paths for HUD use
 var HAMMER_LEFT_PATHS = [
   "../hammer_animation_swing_to_the_left1.png",
   "../hammer_animation_swing_to_the_left2.png",
@@ -189,20 +179,28 @@ async function loadSpr() {
   SPR.jump = await Promise.all(JUMP_PATHS.map(li));
   if (typeof SPRITE_DOOR1 !== "undefined") SPR.door1 = await li(SPRITE_DOOR1);
   if (typeof SPRITE_DOOR2 !== "undefined") SPR.door2 = await li(SPRITE_DOOR2);
-  if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
+  if (typeof SPRITE_GOLD !== "undefined") {
+    SPR.gold = await li(SPRITE_GOLD);
+    SPR_PATHS.gold = SPRITE_GOLD;
+  }
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
-  if (typeof SPRITE_POT !== "undefined") SPR.pot = await li(SPRITE_POT);
-  if (typeof SPRITE_SWORD !== "undefined") SPR.sword = await li(SPRITE_SWORD);
+  if (typeof SPRITE_POT !== "undefined") {
+    SPR.pot = await li(SPRITE_POT);
+    SPR_PATHS.pot = SPRITE_POT;
+  }
+  if (typeof SPRITE_SWORD !== "undefined") {
+    SPR.sword = await li(SPRITE_SWORD);
+    SPR_PATHS.sword = SPRITE_SWORD;
+  }
   if (typeof SPRITE_SWING_IDLE !== "undefined")
     SPR.swingIdle = await li(SPRITE_SWING_IDLE);
   if (typeof SPRITE_SWING !== "undefined") SPR.swing = await li(SPRITE_SWING);
-  if (typeof SPRITE_FIRE !== "undefined") SPR.fireball = await li(SPRITE_FIRE);
-  SPR.torch = await li(TORCH_ASSET);
   // Armor indicator sprites
   if (typeof SPRITE_ARMOR_WITH !== "undefined")
     SPR.armorWith = await li(SPRITE_ARMOR_WITH);
   if (typeof SPRITE_ARMOR_WITHOUT !== "undefined")
     SPR.armorWithout = await li(SPRITE_ARMOR_WITHOUT);
+  SPR.torch = await li(TORCH_ASSET);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
   var decorKeys = Object.keys(DECOR_PATHS);
@@ -213,11 +211,15 @@ async function loadSpr() {
   var mapDataUrl = MAP_THEME_ASSETS ? MAP_THEME_ASSETS[selectedTheme] : null;
   if (mapDataUrl) {
     SPR.mapTheme.map = await li(mapDataUrl);
+    // No separate roof/fall images — the sprite map is one image
     SPR.mapTheme.roof = null;
     SPR.mapTheme.fall = null;
   }
   sprOK = true;
 }
+
+// Tracks the last used theme so we never pick the same one twice in a row
+var _lastMapTheme = null;
 
 function getSelectedMapTheme() {
   var variants = ["variant1", "variant2", "variant3"];
@@ -278,44 +280,19 @@ window.addEventListener("keyup", function (e) {
    All x/y are world-space pixels.
    Floor is at y = FLOOR_Y (set dynamically as canvas.height * 0.82)
 ═══════════════════════════════════════════════════════════════════ */
-var FLOOR_Y; // set in resize()
 var MAP = {}; // rebuilt in buildMap()
 
 function buildMap() {
-  var H = TC.height;
-  FLOOR_Y = Math.round(H * 0.8);
-  PL_COX = Math.round((PL.sw - PL.w) / 2);
-  PL_COY = PL.sh - PL.h;
+  buildPlatforms(); // sets FLOOR_Y, PL_COX, PL_COY, MAP.platforms + MAP._*
 
-  /* ── PLATFORMS ─────────────────────────────────────────────── */
-  var ph = TILE * 1.5;
-  var mezzY = FLOOR_Y - TILE * 0.7;
-  var loftY = FLOOR_Y - TILE * 1.75;
-  var galleryY = FLOOR_Y - TILE * 2.8;
-  var lowerY = FLOOR_Y + TILE * 3.2;
-  var rise1Y = FLOOR_Y + TILE * 2.2;
-  var rise2Y = FLOOR_Y + TILE * 1.2;
-  var rise3Y = FLOOR_Y + TILE * 0.2;
-
-  MAP.platforms = [
-    { x: 0, y: FLOOR_Y, w: 640, h: ph },
-    { x: 790, y: mezzY, w: 260, h: TILE },
-    { x: 1160, y: loftY, w: 300, h: TILE },
-    { x: 1580, y: galleryY, w: 280, h: TILE },
-    { x: 1985, y: loftY, w: 300, h: TILE },
-    { x: 2405, y: mezzY, w: 240, h: TILE },
-    { x: 2760, y: loftY, w: 420, h: TILE },
-    { x: 3330, y: FLOOR_Y, w: 290, h: ph },
-    { x: 3820, y: lowerY, w: 430, h: ph },
-    { x: 4380, y: lowerY, w: 320, h: ph },
-    { x: 4850, y: lowerY, w: 430, h: ph },
-    { x: 5420, y: rise1Y, w: 220, h: TILE },
-    { x: 5710, y: rise2Y, w: 200, h: TILE },
-    { x: 6000, y: rise3Y, w: 260, h: TILE },
-    { x: 6350, y: loftY, w: 390, h: TILE },
-    { x: 6890, y: mezzY, w: 260, h: TILE },
-    { x: 7280, y: FLOOR_Y, w: 1090, h: ph },
-  ];
+  var ph = MAP._ph;
+  var mezzY = MAP._mezzY;
+  var loftY = MAP._loftY;
+  var galleryY = MAP._galleryY;
+  var lowerY = MAP._lowerY;
+  var rise1Y = MAP._rise1Y;
+  var rise2Y = MAP._rise2Y;
+  var rise3Y = MAP._rise3Y;
 
   MAP.obstacle = null;
   MAP.plates = [];
@@ -337,20 +314,8 @@ function buildMap() {
   MAP.readySpike = null;
   MAP.hammer = null;
 
-  /* ── FIREBALL LAUNCHER ── */
-  // Tripwire at x:4820 — middle-end of stage, after the shaft recovery section
-  MAP.fireballLauncher = {
-    tripwireX: 4820,
-    tripwireW: 20,
-    triggered: false,
-    intervalFrames: 60,
-    timer: 60,
-    rangeX: 4820,
-    rangeW: 3500,
-    speed: 0,
-  };
-  // Speed: travel full screen height in 1.3s
-  MAP.fireballLauncher.speed = Math.round(TC.height / (1.3 * 60));
+  /* ── DROPPED SWORD ITEM ── */
+  MAP.swordItem = null;
 
   /* ── POTS (3 random, one has the gold thread) ── */
   MAP.gold = null; // gold thread is now inside a pot, not floating
@@ -550,6 +515,9 @@ var GS = {
   lives: 3,
   hasGold: false,
   hasArmor: false,
+  hasSword: true,
+  nearSword: false,
+  nearDroppedItem: false,
   startTime: 0,
   timerSecs: 0,
   step: 0, // tutorial step index
@@ -574,7 +542,6 @@ var GS = {
     swingFrame: 0,
     swingTick: 0,
   },
-  fireballs: [],
 };
 
 /* ── DROPPED ITEMS SYSTEM ── */
@@ -630,18 +597,86 @@ function drawDroppedItems() {
       TX.restore();
     }
 
-    // Label
+    // Item name — always visible when on screen
     TX.fillStyle = "rgba(255,215,0,.7)";
     TX.font = "bold 9px Cinzel,serif";
     TX.textAlign = "center";
-    TX.fillText("Dropped Key", ix, iy - 22);
-    TX.fillText("[E] Pick up", ix, iy - 12);
+    TX.fillText("Golden Thread", ix, iy - 26);
+
+    // [E] prompt — only when player is close enough
+    if (GS.nearDroppedItem) {
+      TX.save();
+      TX.fillStyle = "rgba(255,255,180,1)";
+      TX.font = "bold 10px Cinzel,serif";
+      TX.textAlign = "center";
+      // Pulsing background pill for visibility
+      var promptW = 80,
+        promptH = 18;
+      TX.fillStyle = "rgba(0,0,0,0.55)";
+      TX.beginPath();
+      TX.roundRect(ix - promptW / 2, iy - 16, promptW, promptH, 4);
+      TX.fill();
+      TX.fillStyle = "rgba(255,255,180,1)";
+      TX.fillText("[E] Pick up", ix, iy - 3);
+      TX.restore();
+    }
+
     TX.textAlign = "left";
   });
 }
 
+function drawSwordItem() {
+  if (!MAP.swordItem || MAP.swordItem.collected) return;
+  var s = MAP.swordItem;
+  if (s.x < CAM.x - 80 || s.x > CAM.x + TC.width + 80) return;
+
+  var bob = Math.sin(Date.now() * 0.003) * 5;
+  var ix = s.x - CAM.x;
+  var iy = s.y + bob;
+
+  // Glow
+  var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 32);
+  gl.addColorStop(0, "rgba(212,168,67,.4)");
+  gl.addColorStop(1, "transparent");
+  TX.fillStyle = gl;
+  TX.fillRect(ix - 40, iy - 40, 80, 80);
+
+  // Draw sword sprite or fallback
+  if (SPR.sword && SPR.sword.complete && SPR.sword.naturalWidth) {
+    TX.save();
+    TX.translate(ix, iy);
+    TX.rotate(-Math.PI / 4);
+    TX.drawImage(SPR.sword, -18, -18, 36, 36);
+    TX.restore();
+  } else {
+    TX.save();
+    TX.translate(ix, iy);
+    TX.rotate(-Math.PI / 4);
+    TX.fillStyle = "#5a3010";
+    TX.fillRect(-3, -18, 6, 10);
+    TX.fillStyle = "#d4a843";
+    TX.fillRect(-8, -8, 16, 4);
+    TX.fillStyle = "#e8eaf0";
+    TX.fillRect(-4, -4, 8, 40);
+    TX.restore();
+  }
+
+  // Label
+  TX.fillStyle = "rgba(212,168,67,.85)";
+  TX.font = "bold 9px Cinzel,serif";
+  TX.textAlign = "center";
+  TX.fillText("Sword", ix, iy - 26);
+  if (GS.nearSword) {
+    TX.fillStyle = "rgba(255,255,180,1)";
+    TX.font = "bold 10px Cinzel,serif";
+    TX.fillText("[E] Pick up", ix, iy - 14);
+  }
+  TX.textAlign = "left";
+}
+
 function checkDroppedItemPickup() {
-  if (GS.hasGold) return; // Already has gold
+  if (GS.hasGold) return;
+  GS.nearDroppedItem = false;
 
   for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
     var item = DROPPED_ITEMS[i];
@@ -651,15 +686,45 @@ function checkDroppedItemPickup() {
     var py = PL.y + PL_COY + PL.h / 2;
     var dist = Math.hypot(px - item.x, py - item.y);
 
-    if (dist < 60 || (JP["KeyE"] && dist < 100)) {
-      // Pick up
-      item.active = false;
-      GS.hasGold = true;
-      showBadge("✨ Golden Thread recovered!");
-      spawnGoldPtcls(item.x, item.y);
-      JP["KeyE"] = false;
-      break;
+    if (dist < 80) {
+      GS.nearDroppedItem = true;
+
+      // Only pick up when E is pressed
+      if (JP["KeyE"]) {
+        item.active = false;
+        GS.hasGold = true;
+        GS.nearDroppedItem = false;
+        showBadge("✨ Golden Thread recovered!");
+        spawnGoldPtcls(item.x, item.y);
+        updateHUD();
+        JP["KeyE"] = false;
+        break;
+      }
     }
+  }
+}
+
+function checkSwordPickup() {
+  if (GS.hasSword) return;
+  if (!MAP.swordItem || MAP.swordItem.collected) return;
+
+  var px = PL.x + PL_COX + PL.w / 2;
+  var py = PL.y + PL_COY + PL.h / 2;
+  var sx = MAP.swordItem.x;
+  var sy = MAP.swordItem.y;
+  var dist = Math.hypot(px - sx, py - sy);
+
+  // Show prompt when close
+  GS.nearSword = dist < 80;
+
+  // Only pick up when E is pressed
+  if (dist < 80 && JP["KeyE"]) {
+    MAP.swordItem.collected = true;
+    GS.hasSword = true;
+    GS.nearSword = false;
+    JP["KeyE"] = false;
+    showBadge("⚔️ Sword equipped! Press [F] to swing.");
+    updateHUD();
   }
 }
 
@@ -984,8 +1049,10 @@ async function tutInit() {
   buildHUD();
   buildQuizModal();
 
-  buildQuizModal();
-
+  //The Moas
+  if (typeof SPRITE_MAP === "undefined") {
+    console.error("map.js not loaded! Check script order in HTML.");
+  }
   MAP_THEME_ASSETS = {
     variant1: typeof SPRITE_MAP !== "undefined" ? SPRITE_MAP : null,
     variant2: typeof SPRITE_MAP2 !== "undefined" ? SPRITE_MAP2 : null,
@@ -997,8 +1064,6 @@ async function tutInit() {
     !!MAP_THEME_ASSETS.variant2,
     !!MAP_THEME_ASSETS.variant3,
   );
-
-  await loadSpr();
 
   await loadSpr();
   spawnPlayer();
@@ -1040,7 +1105,6 @@ function spawnPlayer() {
   CAM.x = 0;
   // Don't reset hasGold here — dropped items persist until picked up or void death
   GS.activeDoorIndex = -1;
-  GS.hasSword = true;
 }
 
 function resetToStart() {
@@ -1068,13 +1132,9 @@ function resetToStart() {
   }
   // Clear dropped items on full reset
   clearDroppedItems();
-  GS.fireballs = [];
-  if (MAP.fireballLauncher) {
-    MAP.fireballLauncher.triggered = false;
-    MAP.fireballLauncher.timer = 60;
-  }
   GS.hasGold = false;
   GS.hasArmor = false;
+  GS.hasSword = true;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -1086,6 +1146,7 @@ function resetToStart() {
   GS.startTime = Date.now();
   GS.timerSecs = 0;
   spawnPlayer();
+  if (MAP.swordItem) MAP.swordItem.collected = false;
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
 
@@ -1118,130 +1179,8 @@ function tutUpdate() {
 
   GS.timerSecs = Math.floor((Date.now() - GS.startTime) / 1000);
 
-  /* ── INPUT ── */
-  var canSpr = PL.stamina > STAM_MIN;
-  PL.sprinting = false;
-  PL.moving = false;
+  updatePlayerMovement();
 
-  if (!PL.dashing) {
-    var spd = PX * (PL.sprinting ? SPR_MULT : 1);
-    if (KEYS["KeyD"] || KEYS["ArrowRight"]) {
-      PL.vx += spd;
-      PL.dir = 1;
-      PL.moving = true;
-    }
-    if (KEYS["KeyA"] || KEYS["ArrowLeft"]) {
-      PL.vx -= spd;
-      PL.dir = -1;
-      PL.moving = true;
-    }
-    if (KEYS["KeyS"] || KEYS["ArrowDown"]) {
-      PL.vx *= 0.5;
-    }
-  }
-
-  var cap = PX * (PL.sprinting ? SPR_MULT : 1) * 4;
-  PL.vx = Math.max(-cap, Math.min(cap, PL.vx));
-
-  // Jump
-  if ((JP["KeyW"] || JP["Space"] || JP["ArrowUp"]) && PL.grounded) {
-    PL.vy = JUMP_V;
-    PL.grounded = false;
-    PL.frame = 0;
-    PL.atick = 0;
-    JP["KeyW"] = JP["Space"] = JP["ArrowUp"] = false;
-  }
-
-  // Dash
-  if (
-    (JP["ShiftLeft"] || JP["ShiftRight"]) &&
-    PL.dcd <= 0 &&
-    PL.stamina >= DASH_COST &&
-    !PL.dashing
-  ) {
-    PL.dashing = true;
-    PL.dtmr = DASH_DUR;
-    PL.ddir = PL.dir;
-    PL.stamina -= DASH_COST;
-    PL.dcd = DASH_CD;
-    if (PL.vy > 0) PL.vy *= 0.3;
-    JP["ShiftLeft"] = false;
-    JP["ShiftRight"] = false;
-  }
-  if (PL.dashing) {
-    PL.vx = PL.ddir * DASH_SPD;
-    PL.dtmr--;
-    spawnDashPtcl();
-    if (PL.dtmr <= 0) {
-      PL.dashing = false;
-      PL.vx *= 0.4;
-    }
-  }
-
-  // Stamina
-  if (PL.sprinting && PL.moving)
-    PL.stamina = Math.max(0, PL.stamina - STAM_DRAIN);
-  else if (!PL.dashing)
-    PL.stamina = Math.min(
-      STAM_MAX,
-      PL.stamina + (PL.moving ? STAM_REGEN * 0.5 : STAM_REGEN),
-    );
-  if (PL.dcd > 0) PL.dcd--;
-  if (PL.iframes > 0) PL.iframes--;
-
-  // Physics
-  PL.vy += GRAV;
-  PL.vx *= FRIC;
-  PL.x += PL.vx;
-  PL.y += PL.vy;
-  if (PL.x < 0) {
-    PL.x = 0;
-    PL.vx = 0;
-  }
-
-  // Platform collision
-  PL.grounded = false;
-  MAP.platforms.forEach(function (p) {
-    var plx = PL.x + PL_COX,
-      ply = PL.y + PL_COY;
-    var prevBot = ply + PL.h - PL.vy;
-    if (
-      plx < p.x + p.w &&
-      plx + PL.w > p.x &&
-      ply + PL.h > p.y &&
-      prevBot <= p.y + 8 &&
-      PL.vy >= 0
-    ) {
-      PL.y = p.y - PL_COY - PL.h;
-      PL.vy = 0;
-      PL.grounded = true;
-    }
-  });
-
-  // Obstacle collision (opening wall removed)
-  var ob = MAP.obstacle;
-  if (ob) {
-    var plx2 = PL.x + PL_COX,
-      ply2 = PL.y + PL_COY;
-    if (
-      plx2 < ob.x + ob.w &&
-      plx2 + PL.w > ob.x &&
-      ply2 + PL.h > ob.y &&
-      ply2 < ob.y + ob.h
-    ) {
-      // Push player out from right side
-      if (PL.vx >= 0 && plx2 + PL.w > ob.x && plx2 < ob.x) {
-        PL.x = ob.x - PL_COX - PL.w;
-        PL.vx = 0;
-      }
-    }
-  }
-
-  // Clamp right edge of world
-  if (PL.x + PL.sw > WORLD) {
-    PL.x = WORLD - PL.sw;
-    PL.vx = 0;
-  }
 
   /* ── PROXIMITY SPIKE TRIGGERS ── */
   MAP.spikes.forEach(function (sp) {
@@ -1323,60 +1262,6 @@ function tutUpdate() {
     }
   }
 
-  /* ── FIREBALL TRIPWIRE & LAUNCHER ── */
-  var launcher = MAP.fireballLauncher;
-  var plCX = PL.x + PL_COX + PL.w / 2;
-
-  // Check if player crosses the invisible tripwire
-  if (
-    !launcher.triggered &&
-    plCX >= launcher.tripwireX &&
-    plCX <= launcher.tripwireX + launcher.tripwireW
-  ) {
-    launcher.triggered = true;
-  }
-
-  // Spawn and move fireballs only after tripwire is crossed
-  if (launcher.triggered) {
-    launcher.timer++;
-    if (launcher.timer >= launcher.intervalFrames) {
-      launcher.timer = 0;
-      var spawnX = launcher.rangeX + Math.random() * launcher.rangeW;
-      GS.fireballs.push({
-        x: spawnX,
-        y: -48, // spawn above the screen
-        vy: launcher.speed, // falls straight down
-        w: 48,
-        h: 48,
-      });
-    }
-  }
-
-  /* ── FIREBALL MOVEMENT & COLLISION ── */
-  for (var fbi = GS.fireballs.length - 1; fbi >= 0; fbi--) {
-    var fb = GS.fireballs[fbi];
-    fb.y += fb.vy;
-    if (fb.y > FLOOR_Y + 80) {
-      GS.fireballs.splice(fbi, 1);
-      continue;
-    }
-    if (PL.iframes <= 0) {
-      var fbPx = PL.x + PL_COX,
-        fbPy = PL.y + PL_COY;
-      if (
-        fbPx < fb.x + fb.w &&
-        fbPx + PL.w > fb.x &&
-        fbPy < fb.y + fb.h &&
-        fbPy + PL.h > fb.y
-      ) {
-        takeDamage("fireball");
-        GS.fireballs.splice(fbi, 1);
-      }
-    }
-  }
-
-  /* ── GOLD THREW PICKUP ── */
-
   /* ── GOLD THREW PICKUP ── */
   if (MAP.gold && !MAP.gold.collected && !GS.hasGold) {
     var g = MAP.gold;
@@ -1397,6 +1282,7 @@ function tutUpdate() {
         GS.hasGold = true;
         showBadge("✨ Golden Thread collected!");
         spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
+        updateHUD();
       }
     }
   }
@@ -1575,6 +1461,7 @@ function takeDamage(source) {
     MAP.gold.collected = true; // Mark original as gone
     GS.hasGold = false;
     showBadge("💔 Golden Thread dropped!");
+    updateHUD();
   }
 
   GS.lives = Math.max(0, GS.lives - 1);
@@ -1845,9 +1732,9 @@ function tutDraw() {
   drawHammer();
   drawGold();
   drawPots();
-  drawFireballs();
   drawThrowFx();
   drawDroppedItems();
+  drawSwordItem();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
   drawParticles();
@@ -1871,8 +1758,8 @@ function drawBG(W, H) {
   TX.fillRect(0, 0, WORLD, H);
   if (SPR.mapTheme.map) {
     TX.save();
-    TX.globalAlpha = 0.34;
-    TX.drawImage(SPR.mapTheme.map, 0, H * 0.08, WORLD, H * 0.68);
+    TX.globalAlpha = 0.7;
+    TX.drawImage(SPR.mapTheme.map, 0, 0, WORLD, H);
     TX.restore();
   }
   if (SPR.mapTheme.roof) {
@@ -2054,48 +1941,6 @@ function drawDecorLayer(list) {
     TX.globalAlpha = item.alpha == null ? 1 : item.alpha;
     TX.drawImage(img, item.x, item.y, item.w, item.h);
     TX.restore();
-  });
-}
-
-function drawPlatforms() {
-  MAP.platforms.forEach(function (p) {
-    if (p.x + p.w < CAM.x - 20 || p.x > CAM.x + TC.width + 20) return;
-    var sg = TX.createLinearGradient(p.x, p.y, p.x, p.y + p.h);
-    sg.addColorStop(0, "#372224");
-    sg.addColorStop(0.18, "#2a1a1c");
-    sg.addColorStop(1, "#140c10");
-    TX.fillStyle = sg;
-    TX.fillRect(p.x, p.y, p.w, p.h);
-
-    TX.fillStyle = "rgba(232,194,106,.62)";
-    TX.fillRect(p.x, p.y, p.w, 2);
-    TX.fillStyle = "rgba(120,86,44,.82)";
-    TX.fillRect(p.x, p.y + 2, p.w, 4);
-    TX.fillStyle = "rgba(255,248,224,.06)";
-    TX.fillRect(p.x + 6, p.y + 7, p.w - 12, 1);
-
-    TX.fillStyle = "rgba(0,0,0,.4)";
-    TX.fillRect(p.x, p.y, 3, p.h);
-    TX.fillRect(p.x + p.w - 3, p.y, 3, p.h);
-    TX.fillRect(p.x + 10, p.y + p.h - 8, Math.max(0, p.w - 20), 8);
-
-    if (SPR.decor.platform && p.w >= 120) {
-      var friezeW = Math.min(p.w - 36, 136);
-      TX.save();
-      TX.globalAlpha = 0.16;
-      TX.drawImage(
-        SPR.decor.platform,
-        6,
-        0,
-        Math.max(1, SPR.decor.platform.naturalWidth - 12),
-        SPR.decor.platform.naturalHeight,
-        p.x + (p.w - friezeW) / 2,
-        p.y - 8,
-        friezeW,
-        18,
-      );
-      TX.restore();
-    }
   });
 }
 
@@ -2334,48 +2179,6 @@ function drawHammer() {
     TX.fillText("⚠", hm.anchorX, hm.anchorY - 20);
     TX.restore();
   }
-}
-
-function drawFireballs() {
-  if (!GS.fireballs || !GS.fireballs.length) return;
-  GS.fireballs.forEach(function (fb) {
-    if (fb.x < CAM.x - 80 || fb.x > CAM.x + TC.width + 80) return;
-    TX.save();
-    TX.translate(fb.x + fb.w / 2, fb.y + fb.h / 2);
-    TX.rotate(Math.PI); // flame tail trails upward
-
-    if (SPR.fireball && SPR.fireball.complete && SPR.fireball.naturalWidth) {
-      TX.shadowBlur = 18;
-      TX.shadowColor = "rgba(255,120,0,0.85)";
-      TX.drawImage(
-        SPR.fireball,
-        -fb.w * 0.6,
-        -fb.h * 0.6,
-        fb.w * 1.2,
-        fb.h * 1.2,
-      );
-    } else {
-      // Fallback glowing circle with upward flame tail
-      TX.shadowBlur = 22;
-      TX.shadowColor = "rgba(255,100,0,0.9)";
-      TX.fillStyle = "#ff6600";
-      TX.beginPath();
-      TX.arc(0, 0, fb.w / 2, 0, Math.PI * 2);
-      TX.fill();
-      TX.fillStyle = "#ffee44";
-      TX.beginPath();
-      TX.arc(0, 0, fb.w / 4, 0, Math.PI * 2);
-      TX.fill();
-      TX.fillStyle = "rgba(255,80,0,0.6)";
-      TX.beginPath();
-      TX.moveTo(-8, -fb.h / 2);
-      TX.lineTo(8, -fb.h / 2);
-      TX.lineTo(0, -fb.h);
-      TX.closePath();
-      TX.fill();
-    }
-    TX.restore();
-  });
 }
 
 function getThrowLandingY(x) {
@@ -3038,7 +2841,7 @@ function drawPlayer() {
         TX.restore();
       }
     } else {
-      // IDLE — reset counters, no sprite drawn on top
+      // IDLE — keep normal SPRITE_IDLE / SPRITE_IDLE2
       GS.sword.swingFrame = 0;
       GS.sword.swingTick = 0;
     }
@@ -3109,8 +2912,13 @@ function drawStamBar(W, H) {
     document.body.appendChild(swordHud);
   }
   if (swordHud) {
-    var swReady = GS.sword && GS.sword.cooldown <= 0;
-    swordHud.style.opacity = swReady ? "1" : "0.45";
+    if (!GS.hasSword) {
+      swordHud.style.display = "none";
+    } else {
+      swordHud.style.display = "";
+      var swReady = GS.sword && GS.sword.cooldown <= 0;
+      swordHud.style.opacity = swReady ? "1" : "0.45";
+    }
   }
 }
 
@@ -3235,8 +3043,91 @@ function updateHUD() {
       (GS.hasArmor ? "1" : "0.35") +
       '"/>';
   }
-}
 
+  // ── Visual icon inventory (fixed right-side panel) ──
+  var invBox = document.getElementById("hud-inventory");
+  if (!invBox) {
+    invBox = document.createElement("div");
+    invBox.id = "hud-inventory";
+    invBox.style.cssText = [
+      "position:fixed",
+      "top:18px",
+      "right:22px",
+      "z-index:50",
+      "display:flex",
+      "flex-direction:column",
+      "gap:6px",
+      "align-items:flex-end",
+      "pointer-events:none",
+    ].join(";");
+    document.body.appendChild(invBox);
+  }
+  // Build icon slots
+  var items = [];
+  if (GS.hasSword)
+    items.push({
+      label: "Sword",
+      src: SPR_PATHS.sword || null,
+      emoji: "⚔️",
+      key: "sword",
+    });
+  if (GS.hasGold)
+    items.push({
+      label: "Thread",
+      src: SPR_PATHS.gold || SPR_PATHS.pot || null,
+      emoji: "🧵",
+      key: "gold",
+    });
+
+  invBox.innerHTML = "";
+  items.forEach(function (item) {
+    var slot = document.createElement("div");
+    slot.style.cssText = [
+      "display:flex",
+      "align-items:center",
+      "gap:7px",
+      "background:rgba(10,6,4,0.82)",
+      "border:1px solid #d4a843",
+      "border-radius:6px",
+      "padding:4px 9px 4px 5px",
+      "animation:inv-pop 0.22s ease",
+    ].join(";");
+
+    // Icon — use sprite image if available, emoji fallback
+    if (item.src) {
+      var img = document.createElement("img");
+      img.src = item.src;
+      img.width = 28;
+      img.height = 28;
+      img.style.cssText =
+        "image-rendering:pixelated;border-radius:3px;background:rgba(255,255,255,0.05);object-fit:contain;";
+      img.onerror = function () {
+        // If image fails, swap in the emoji fallback
+        var emo = document.createElement("span");
+        emo.textContent = item.emoji;
+        emo.style.cssText =
+          "font-size:22px;line-height:28px;width:28px;text-align:center;display:inline-block;";
+        if (img.parentNode) img.parentNode.replaceChild(emo, img);
+      };
+      slot.appendChild(img);
+    } else {
+      var emo = document.createElement("span");
+      emo.textContent = item.emoji;
+      emo.style.cssText =
+        "font-size:22px;line-height:28px;width:28px;text-align:center;display:inline-block;";
+      slot.appendChild(emo);
+    }
+
+    // Label
+    var lbl = document.createElement("span");
+    lbl.textContent = item.label;
+    lbl.style.cssText =
+      "font-family:Cinzel,serif;font-size:10px;color:#e8dcc8;";
+    slot.appendChild(lbl);
+
+    invBox.appendChild(slot);
+  });
+}
 /* ── STEPS ─────────────────────────────────────────────────────── */
 function showStep(idx) {
   return;
@@ -3247,7 +3138,33 @@ function advanceStep() {
 }
 
 function showBadge(msg) {
-  return;
+  var existing = document.getElementById("hud-badge");
+  if (existing) existing.remove();
+  var badge = document.createElement("div");
+  badge.id = "hud-badge";
+  badge.textContent = msg;
+  badge.style.cssText = [
+    "position:fixed",
+    "bottom:90px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "background:rgba(10,6,4,0.88)",
+    "border:1px solid #d4a843",
+    "border-radius:6px",
+    "padding:8px 18px",
+    "color:#e8dcc8",
+    "font-family:Cinzel,serif",
+    "font-size:13px",
+    "pointer-events:none",
+    "z-index:500",
+    "white-space:nowrap",
+    "animation:inv-pop 0.2s ease",
+  ].join(";");
+  document.body.appendChild(badge);
+  clearTimeout(showBadge._t);
+  showBadge._t = setTimeout(function () {
+    if (badge.parentNode) badge.parentNode.removeChild(badge);
+  }, 2400);
 }
 
 /* ── SCREENS ────────────────────────────────────────────────────── */
