@@ -1,34 +1,9 @@
-/* ═══════════════════════════════════════════════════════════════════
-   LABYRINTH OF MINOS — STAGE VIII   stage3.js
-   Faithfully implements the hand-drawn sketch:
-   START → 1.5-block obstacle → pressure-plate spike1 → platform →
-   pressure-plate spike2 → fall-down shaft → ready spike (DASH) →
-   long platform → hammer trap → golden thread → 3 doors (pick right)
-   ═══════════════════════════════════════════════════════════════════ */
-
 /* ── CANVAS / CTX ──────────────────────────────────────────────── */
 var TC, TX;
-var MAP_THEME_STORAGE_KEY = "minos-map-theme";
-var MAP_THEME_ROOT = "../map_themes/Map";
 var TORCH_ASSET = "../torch.png";
-var MAP_THEME_ASSETS = {
-  classic: null,
-  variant1: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 1.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 1 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-  variant2: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 2.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 2 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-  variant3: {
-    map: MAP_THEME_ROOT + "/MAP VARIENT 3.JPG",
-    roof: MAP_THEME_ROOT + "/MAP 3 ROOF VARIENT.JPG",
-    fall: MAP_THEME_ROOT + "/Fall Trap.JPG",
-  },
-};
+
+// The three sprite maps from map.js (loaded via <script src="map.js">)
+var MAP_THEME_ASSETS = null; // Populated in tutInit after map.js loads
 
 /* ── PHYSICS CONSTANTS ─────────────────────────────────────────── */
 var PX = 3.0; // base walk speed
@@ -46,9 +21,8 @@ var STAM_MAX = 100,
   STAM_MIN = 15;
 
 /* ── WORLD DIMENSIONS ──────────────────────────────────────────── */
-// Stage VIII keeps Stage III's feel but changes the obstacle route and increases danger.
-var WORLD = 9100;
-var TILE = 48; // 1 game tile = 48px
+// Stage II stretches through a reworked webbed route with tighter staggered jumps.
+var WORLD = 8450;
 
 /* ── PLAYER ─────────────────────────────────────────────────────── */
 var PL = {
@@ -103,13 +77,19 @@ var SPR = {
   hammerRight: [],
   gold: null,
   spike: null,
+  pot: null,
+  spike: null,
+  fireball: null,
+  sword: null,
+  sword: null,
+  swingIdle: null,
+  swing: null,
   decor: {},
   torch: null,
   mapTheme: { map: null, roof: null, fall: null },
-  rat: [],
-  bat: null,
 };
 var sprOK = false;
+var SPR_PATHS = {}; // stores original src paths for HUD use
 var HAMMER_LEFT_PATHS = [
   "../hammer_animation_swing_to_the_left1.png",
   "../hammer_animation_swing_to_the_left2.png",
@@ -175,14 +155,6 @@ var DECOR_PATHS = {
   vinesRed4: "../adds_assets/redvines4.png",
 };
 
-var MOB_RAT_PATHS = [
-  "../MOBS/rat1.png",
-  "../MOBS/rat2.png",
-  "../MOBS/rat3.png",
-  "../MOBS/rat4.png",
-];
-var MOB_BAT_PATH = "../MOBS/bats.png";
-
 async function loadSpr() {
   function li(src) {
     return new Promise(function (r) {
@@ -209,11 +181,29 @@ async function loadSpr() {
   SPR.jump = await Promise.all(JUMP_PATHS.map(li));
   if (typeof SPRITE_DOOR1 !== "undefined") SPR.door1 = await li(SPRITE_DOOR1);
   if (typeof SPRITE_DOOR2 !== "undefined") SPR.door2 = await li(SPRITE_DOOR2);
-  if (typeof SPRITE_GOLD !== "undefined") SPR.gold = await li(SPRITE_GOLD);
+  if (typeof SPRITE_GOLD !== "undefined") {
+    SPR.gold = await li(SPRITE_GOLD);
+    SPR_PATHS.gold = SPRITE_GOLD;
+  }
   if (typeof SPRITE_SPIKES !== "undefined") SPR.spike = await li(SPRITE_SPIKES);
+  if (typeof SPRITE_FIRE !== "undefined") SPR.fireball = await li(SPRITE_FIRE);
+  if (typeof SPRITE_POT !== "undefined") {
+    SPR.pot = await li(SPRITE_POT);
+    SPR_PATHS.pot = SPRITE_POT;
+  }
+  if (typeof SPRITE_SWORD !== "undefined") {
+    SPR.sword = await li(SPRITE_SWORD);
+    SPR_PATHS.sword = SPRITE_SWORD;
+  }
+  if (typeof SPRITE_SWING_IDLE !== "undefined")
+    SPR.swingIdle = await li(SPRITE_SWING_IDLE);
+  if (typeof SPRITE_SWING !== "undefined") SPR.swing = await li(SPRITE_SWING);
+  // Armor indicator sprites
+  if (typeof SPRITE_ARMOR_WITH !== "undefined")
+    SPR.armorWith = await li(SPRITE_ARMOR_WITH);
+  if (typeof SPRITE_ARMOR_WITHOUT !== "undefined")
+    SPR.armorWithout = await li(SPRITE_ARMOR_WITHOUT);
   SPR.torch = await li(TORCH_ASSET);
-  SPR.rat = await Promise.all(MOB_RAT_PATHS.map(li));
-  SPR.bat = await li(MOB_BAT_PATH);
   SPR.hammerLeft = await Promise.all(HAMMER_LEFT_PATHS.map(li));
   SPR.hammerRight = await Promise.all(HAMMER_RIGHT_PATHS.map(li));
   var decorKeys = Object.keys(DECOR_PATHS);
@@ -221,29 +211,37 @@ async function loadSpr() {
     SPR.decor[decorKeys[i]] = await li(DECOR_PATHS[decorKeys[i]]);
   }
   var selectedTheme = getSelectedMapTheme();
-  var themeSet = MAP_THEME_ASSETS[selectedTheme];
-  if (themeSet) {
-    SPR.mapTheme.map = await li(themeSet.map);
-    SPR.mapTheme.roof = await li(themeSet.roof);
-    SPR.mapTheme.fall = await li(themeSet.fall);
+  var mapDataUrl = MAP_THEME_ASSETS ? MAP_THEME_ASSETS[selectedTheme] : null;
+  if (mapDataUrl) {
+    SPR.mapTheme.map = await li(mapDataUrl);
+    // No separate roof/fall images — the sprite map is one image
+    SPR.mapTheme.roof = null;
+    SPR.mapTheme.fall = null;
   }
   sprOK = true;
 }
 
+// Tracks the last used theme so we never pick the same one twice in a row
+var _lastMapTheme = null;
+
 function getSelectedMapTheme() {
-  try {
-    var selected = localStorage.getItem(MAP_THEME_STORAGE_KEY);
-    return MAP_THEME_ASSETS[selected] ? selected : "classic";
-  } catch (e) {
-    return "classic";
-  }
+  var variants = ["variant1", "variant2", "variant3"];
+  var available = variants.filter(function (v) {
+    return v !== _lastMapTheme;
+  });
+  var chosen = available[Math.floor(Math.random() * available.length)];
+  _lastMapTheme = chosen;
+  return chosen;
 }
 
 /* ── CAMERA ─────────────────────────────────────────────────────── */
 var CAM = { x: 0, y: 0 }; // horizontal only
 
 function isMobileViewport() {
-  return window.matchMedia && window.matchMedia("(max-width: 900px), (max-height: 520px)").matches;
+  return (
+    window.matchMedia &&
+    window.matchMedia("(max-width: 900px), (max-height: 520px)").matches
+  );
 }
 
 function getCanvasRenderScale() {
@@ -267,6 +265,7 @@ window.addEventListener("keydown", function (e) {
       "KeyD",
       "KeyE",
       "KeyR",
+      "KeyF",
       "ShiftLeft",
       "ShiftRight",
     ].indexOf(e.code) !== -1
@@ -284,195 +283,221 @@ window.addEventListener("keyup", function (e) {
    All x/y are world-space pixels.
    Floor is at y = FLOOR_Y (set dynamically as canvas.height * 0.82)
 ═══════════════════════════════════════════════════════════════════ */
-var FLOOR_Y; // set in resize()
 var MAP = {}; // rebuilt in buildMap()
 
 function buildMap() {
-  var H = TC.height;
-  FLOOR_Y = Math.round(H * 0.8);
-  PL_COX = Math.round((PL.sw - PL.w) / 2);
-  PL_COY = PL.sh - PL.h;
+  buildPlatforms(); // sets FLOOR_Y, PL_COX, PL_COY, MAP.platforms + MAP._*
 
-  /* ── PLATFORMS ─────────────────────────────────────────────── */
-  var ph = TILE * 1.5;
-  var mezzY = FLOOR_Y - TILE * 0.35;
-  var loftY = FLOOR_Y - TILE * 0.95;
-  var galleryY = FLOOR_Y - TILE * 1.35;
-  var lowerY = FLOOR_Y + TILE * 2.7;
-  var trenchY = FLOOR_Y + TILE * 3.7;
-  var rise1Y = FLOOR_Y + TILE * 1.8;
-  var rise2Y = FLOOR_Y + TILE * 0.95;
-  var rise3Y = FLOOR_Y + TILE * 0.2;
-
-  MAP.platforms = [
-    { x: 0, y: FLOOR_Y, w: 340, h: ph },
-    { x: 470, y: mezzY, w: 140, h: TILE },
-    { x: 670, y: rise1Y, w: 130, h: TILE },
-    { x: 860, y: rise2Y, w: 130, h: TILE },
-    { x: 1040, y: rise3Y, w: 140, h: TILE },
-    { x: 1240, y: mezzY, w: 150, h: TILE },
-    { x: 1470, y: FLOOR_Y, w: 170, h: ph },
-    { x: 1710, y: trenchY, w: 135, h: ph },
-    { x: 1930, y: lowerY, w: 190, h: ph },
-    { x: 2180, y: rise1Y, w: 140, h: TILE },
-    { x: 2390, y: rise2Y, w: 130, h: TILE },
-    { x: 2590, y: loftY, w: 160, h: TILE },
-    { x: 2810, y: mezzY, w: 150, h: TILE },
-    { x: 3030, y: FLOOR_Y, w: 180, h: ph },
-    { x: 3280, y: lowerY, w: 190, h: ph },
-    { x: 3520, y: trenchY, w: 135, h: ph },
-    { x: 3740, y: rise1Y, w: 140, h: TILE },
-    { x: 3950, y: rise2Y, w: 130, h: TILE },
-    { x: 4150, y: rise3Y, w: 140, h: TILE },
-    { x: 4360, y: mezzY, w: 150, h: TILE },
-    { x: 4580, y: loftY, w: 160, h: TILE },
-    { x: 4810, y: FLOOR_Y, w: 180, h: ph },
-    { x: 5050, y: lowerY, w: 190, h: ph },
-    { x: 5290, y: rise1Y, w: 140, h: TILE },
-    { x: 5500, y: rise2Y, w: 130, h: TILE },
-    { x: 5710, y: loftY, w: 160, h: TILE },
-    { x: 5930, y: mezzY, w: 150, h: TILE },
-    { x: 6160, y: FLOOR_Y, w: 1680, h: ph },
-  ];
+  var ph = MAP._ph;
+  var mezzY = MAP._mezzY;
+  var loftY = MAP._loftY;
+  var galleryY = MAP._galleryY;
+  var lowerY = MAP._lowerY;
+  var rise1Y = MAP._rise1Y;
+  var rise2Y = MAP._rise2Y;
+  var rise3Y = MAP._rise3Y;
 
   MAP.obstacle = null;
   MAP.plates = [];
 
-  /* ── STAGE III SPIKE LAYOUT ── */
-  MAP.spikes = [
-    { x: 940, y: rise2Y, w: 64, triggerX: 875, active: false, riseTimer: 0 },
-    { x: 1320, y: mezzY, w: 64, triggerX: 1250, active: false, riseTimer: 0 },
-    { x: 2070, y: lowerY, w: 64, triggerX: 2000, active: false, riseTimer: 0 },
-    { x: 2680, y: loftY, w: 64, triggerX: 2610, active: false, riseTimer: 0 },
-    { x: 3430, y: lowerY, w: 64, triggerX: 3360, active: false, riseTimer: 0 },
-    { x: 4660, y: loftY, w: 64, triggerX: 4590, active: false, riseTimer: 0 },
-    { x: 5790, y: loftY, w: 64, triggerX: 5720, active: false, riseTimer: 0 },
-    { x: 6400, y: FLOOR_Y, w: 96, triggerX: 6320, active: false, riseTimer: 0 },
-  ];
-
-  MAP.mobs = [
-    {
-      type: "rat", x: 1255, startX: 1255, y: mezzY, w: 56, h: 32,
-      minX: 1245, maxX: 1360, vx: 1.3, tick: 0, dead: false, hitCooldown: 0,
-    },
-    {
-      type: "bat", x: 2185, startX: 2185, y: rise1Y - 128, baseY: rise1Y - 128, w: 72, h: 42,
-      minX: 2170, maxX: 2315, vx: 1.6, bob: 0, tick: 0, dead: false, hitCooldown: 0,
-    },
-    {
-      type: "rat", x: 2605, startX: 2605, y: loftY, w: 56, h: 32,
-      minX: 2595, maxX: 2705, vx: -1.3, tick: 0, dead: false, hitCooldown: 0,
-    },
-    {
-      type: "bat", x: 3745, startX: 3745, y: rise1Y - 130, baseY: rise1Y - 130, w: 72, h: 42,
-      minX: 3730, maxX: 3865, vx: 1.6, bob: 0, tick: 0, dead: false, hitCooldown: 0,
-    },
-    {
-      type: "rat", x: 4595, startX: 4595, y: loftY, w: 56, h: 32,
-      minX: 4585, maxX: 4700, vx: 1.35, tick: 0, dead: false, hitCooldown: 0,
-    },
-    {
-      type: "bat", x: 5725, startX: 5725, y: loftY - 126, baseY: loftY - 126, w: 72, h: 42,
-      minX: 5710, maxX: 5855, vx: -1.55, bob: 0, tick: 0, dead: false, hitCooldown: 0,
-    },
-  ];
+  initStage2SpikeTraps();
+  initStage2FireballTrap();
 
   /* ── SHAFT ── */
   MAP.shaft = {
-    x: 3140,
+    x: 3470,
     y: FLOOR_Y + ph,
-    w: 120,
-    bottom: trenchY,
+    w: 180,
+    bottom: lowerY,
   };
 
-  MAP.readySpike = null;
   MAP.hammer = null;
 
-  /* ── STAGE III EXIT ── */
-  MAP.gold = null;
+  /* ── DROPPED SWORD ITEM ── */
+  MAP.swordItem = null;
 
-  /* ── SINGLE EXIT DOOR ── */
+  /* ── POTS (3 random, one has the gold thread) ── */
+  MAP.gold = null; // gold thread is now inside a pot, not floating
+
+  var potPositions = [
+    { x: 920, y: mezzY - 68 }, // near early platform jar decor
+    { x: 5185, y: lowerY - 72 }, // mid-map lower section
+    { x: 7430, y: FLOOR_Y - 72 }, // near end corridor
+  ];
+  var goldPotIndex = Math.floor(Math.random() * 3);
+
+  MAP.pots = potPositions.map(function (pos, i) {
+    return {
+      x: pos.x,
+      y: pos.y,
+      w: 52,
+      h: 68,
+      hasGold: i === goldPotIndex,
+      broken: false,
+      breakTimer: 0, // counts up after breaking for shatter anim
+    };
+  });
+
+  /* ── STAGE II EXIT — 3 DOORS (2 fake, 1 real) ── */
   var dW = 118,
     dH = 154;
   var doorY = FLOOR_Y - dH;
+
+  // Randomly assign which door is correct (0, 1, or 2)
+  var correctDoorIndex = Math.floor(Math.random() * 3);
+
   MAP.doors = [
     {
-      x: 72,
-      y: doorY,
+      x: 2400, // scattered: mid-left area
+      y: loftY - dH,
       w: dW,
       h: dH,
-      correct: false,
-      label: "BACK",
-      targetStage: "stage7.html",
+      correct: correctDoorIndex === 0,
+      fake: correctDoorIndex !== 0,
+      label: correctDoorIndex === 0 ? "???" : "DOOR I",
+      hint: "The true path lies where shadows gather near the climb.",
     },
     {
-      x: 8030,
+      x: 5200, // scattered: lower area
+      y: lowerY - dH,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 1,
+      fake: correctDoorIndex !== 1,
+      label: correctDoorIndex === 1 ? "???" : "DOOR II",
+      hint: "Seek the threshold where the bones whisper warnings.",
+    },
+    {
+      x: 7800, // scattered: near end
       y: doorY,
       w: dW,
       h: dH,
-      correct: true,
-      label: "EXIT",
+      correct: correctDoorIndex === 2,
+      fake: correctDoorIndex !== 2,
+      label: correctDoorIndex === 2 ? "???" : "DOOR III",
+      hint: "The exit breathes where the thread of gold was spun.",
     },
   ];
+
+  // Store correct index for hint system
+  MAP.correctDoorIndex = correctDoorIndex;
+
+  // Track which doors have been attempted
+  MAP.doors.forEach(function (d) {
+    d.attempted = false;
+  });
+
   MAP.doorFrameRect = null;
 
   MAP.decorBack = [
-    { key: "cage", x: 110, y: FLOOR_Y - 274, w: 104, h: 88, alpha: 0.18 },
-    { key: "web", x: 220, y: FLOOR_Y - 256, w: 132, h: 48, alpha: 0.24 },
-    { key: "vinesGreenWide", x: 450, y: FLOOR_Y - 214, w: 170, h: 56, alpha: 0.15 },
-
-    { key: "web", x: 675, y: rise1Y - 94, w: 126, h: 44, alpha: 0.24 },
-    { key: "web", x: 865, y: rise2Y - 98, w: 128, h: 46, alpha: 0.25 },
-    { key: "web", x: 1050, y: rise3Y - 102, w: 132, h: 46, alpha: 0.28 },
-
-    { key: "muralShade", x: 1240, y: FLOOR_Y - 290, w: 182, h: 144, alpha: 0.1 },
-    { key: "vinesRed3", x: 1475, y: FLOOR_Y - 208, w: 82, h: 236, alpha: 0.22 },
-    { key: "web", x: 1940, y: lowerY - 118, w: 130, h: 46, alpha: 0.24 },
-
-    { key: "banner", x: 2180, y: FLOOR_Y - 308, w: 84, h: 166, alpha: 0.12 },
-    { key: "web", x: 2600, y: loftY - 96, w: 128, h: 46, alpha: 0.26 },
-    { key: "muralLady", x: 2820, y: FLOOR_Y - 286, w: 138, h: 112, alpha: 0.11 },
-
-    { key: "web", x: 3290, y: lowerY - 118, w: 130, h: 46, alpha: 0.24 },
-    { key: "vinesGreen", x: 3740, y: rise1Y - 148, w: 82, h: 96, alpha: 0.16 },
-    { key: "web", x: 4160, y: rise3Y - 102, w: 132, h: 46, alpha: 0.28 },
-
-    { key: "muralSeeker", x: 4380, y: FLOOR_Y - 288, w: 176, h: 138, alpha: 0.11 },
-    { key: "web", x: 4590, y: loftY - 96, w: 128, h: 46, alpha: 0.26 },
-    { key: "vinesRed4", x: 5070, y: FLOOR_Y - 212, w: 88, h: 244, alpha: 0.22 },
-
-    { key: "web", x: 5720, y: loftY - 96, w: 128, h: 46, alpha: 0.26 },
-    { key: "vinesGreenWide", x: 6200, y: FLOOR_Y - 162, w: 182, h: 60, alpha: 0.18 },
-    { key: "web", x: 7960, y: FLOOR_Y - 88, w: 120, h: 42, alpha: 0.22 },
+    { key: "cage", x: 168, y: FLOOR_Y - 268, w: 110, h: 90, alpha: 0.18 },
+    { key: "web", x: 352, y: FLOOR_Y - 258, w: 142, h: 52, alpha: 0.28 },
+    {
+      key: "vinesGreenWide",
+      x: 540,
+      y: FLOOR_Y - 228,
+      w: 174,
+      h: 58,
+      alpha: 0.15,
+    },
+    {
+      key: "muralShade",
+      x: 760,
+      y: FLOOR_Y - 292,
+      w: 198,
+      h: 154,
+      alpha: 0.12,
+    },
+    { key: "web", x: 1110, y: loftY - 92, w: 122, h: 44, alpha: 0.22 },
+    { key: "vinesRed3", x: 1320, y: loftY - 130, w: 84, h: 244, alpha: 0.24 },
+    { key: "web", x: 1568, y: galleryY - 102, w: 144, h: 52, alpha: 0.34 },
+    { key: "web", x: 1885, y: galleryY - 96, w: 130, h: 48, alpha: 0.24 },
+    { key: "vinesGreen", x: 2060, y: loftY - 112, w: 86, h: 30, alpha: 0.18 },
+    { key: "writing", x: 2320, y: loftY - 188, w: 148, h: 64, alpha: 0.18 },
+    { key: "web", x: 2630, y: loftY - 88, w: 122, h: 44, alpha: 0.24 },
+    { key: "web", x: 3010, y: loftY - 98, w: 136, h: 48, alpha: 0.28 },
+    { key: "web", x: 3390, y: FLOOR_Y - 250, w: 146, h: 54, alpha: 0.22 },
+    {
+      key: "vinesGreenWide",
+      x: 3650,
+      y: FLOOR_Y - 238,
+      w: 166,
+      h: 54,
+      alpha: 0.16,
+    },
+    { key: "web", x: 3960, y: lowerY - 108, w: 132, h: 46, alpha: 0.3 },
+    { key: "muralLady", x: 4140, y: lowerY - 198, w: 130, h: 108, alpha: 0.13 },
+    {
+      key: "vinesGreenWide",
+      x: 4460,
+      y: lowerY - 234,
+      w: 176,
+      h: 58,
+      alpha: 0.16,
+    },
+    { key: "web", x: 4740, y: lowerY - 110, w: 124, h: 42, alpha: 0.28 },
+    { key: "cage", x: 5035, y: lowerY - 266, w: 112, h: 92, alpha: 0.2 },
+    { key: "writing", x: 5205, y: lowerY - 260, w: 154, h: 66, alpha: 0.2 },
+    { key: "web", x: 5450, y: rise1Y - 92, w: 126, h: 44, alpha: 0.24 },
+    { key: "web", x: 5735, y: rise2Y - 90, w: 122, h: 42, alpha: 0.24 },
+    { key: "vinesRed4", x: 5950, y: rise3Y - 204, w: 92, h: 250, alpha: 0.24 },
+    { key: "web", x: 6310, y: loftY - 94, w: 138, h: 50, alpha: 0.3 },
+    {
+      key: "muralSeeker",
+      x: 6555,
+      y: FLOOR_Y - 286,
+      w: 178,
+      h: 140,
+      alpha: 0.13,
+    },
+    {
+      key: "vinesGreenWide",
+      x: 6845,
+      y: mezzY - 154,
+      w: 180,
+      h: 60,
+      alpha: 0.18,
+    },
+    { key: "web", x: 7070, y: mezzY - 86, w: 120, h: 42, alpha: 0.22 },
+    { key: "web", x: 7395, y: FLOOR_Y - 242, w: 134, h: 48, alpha: 0.22 },
+    {
+      key: "vinesGreenWide",
+      x: 7640,
+      y: FLOOR_Y - 232,
+      w: 170,
+      h: 56,
+      alpha: 0.16,
+    },
+    { key: "web", x: 7920, y: FLOOR_Y - 240, w: 138, h: 50, alpha: 0.24 },
+    { key: "web", x: 8195, y: FLOOR_Y - 238, w: 126, h: 44, alpha: 0.2 },
   ];
 
   MAP.decorFront = [
-    { key: "jar", x: 482, y: mezzY - 58, w: 52, h: 62, alpha: 0.76 },
-    { key: "bonesSmall", x: 1252, y: mezzY - 4, w: 72, h: 30, alpha: 0.24 },
-    { key: "bonesWide", x: 1945, y: lowerY + 10, w: 114, h: 52, alpha: 0.24 },
-    { key: "jar", x: 2608, y: loftY - 58, w: 54, h: 64, alpha: 0.76 },
-    { key: "bonesLarge", x: 3305, y: lowerY + 2, w: 110, h: 62, alpha: 0.22 },
-    { key: "blood", x: 4670, y: loftY - 84, w: 102, h: 58, alpha: 0.2 },
-    { key: "jar", x: 5730, y: loftY - 58, w: 54, h: 64, alpha: 0.76 },
-    { key: "clueMarker", x: 6188, y: FLOOR_Y - 204, w: 68, h: 40, alpha: 0.64 },
-    { key: "bonesHuge", x: 7900, y: FLOOR_Y - 18, w: 148, h: 92, alpha: 0.28 },
+    { key: "jar", x: 920, y: mezzY - 54, w: 58, h: 68, alpha: 0.78 },
+    { key: "bonesSmall", x: 2940, y: loftY - 6, w: 76, h: 34, alpha: 0.22 },
+    { key: "bonesWide", x: 4070, y: lowerY + 8, w: 118, h: 56, alpha: 0.24 },
+    { key: "jar", x: 5185, y: lowerY - 58, w: 62, h: 72, alpha: 0.82 },
+    { key: "bonesSmall", x: 5970, y: rise3Y - 6, w: 78, h: 34, alpha: 0.2 },
+    { key: "blood", x: 6720, y: FLOOR_Y - 112, w: 112, h: 66, alpha: 0.22 },
+    { key: "clueMarker", x: 7430, y: FLOOR_Y - 210, w: 72, h: 44, alpha: 0.68 },
+    { key: "bonesHuge", x: 7880, y: FLOOR_Y - 18, w: 150, h: 96, alpha: 0.3 },
   ];
   cleanStageDecor();
 
   MAP.roomLights = [
-    { x: 30, y: FLOOR_Y - 280, w: 820, h: 350, glow: 0.08 },
-    { x: 880, y: FLOOR_Y - 330, w: 1200, h: 410, glow: 0.1 },
-    { x: 2140, y: lowerY - 240, w: 1300, h: 430, glow: 0.11 },
-    { x: 3540, y: FLOOR_Y - 300, w: 1600, h: 370, glow: 0.09 },
-    { x: 5170, y: FLOOR_Y - 270, w: 2950, h: 340, glow: 0.1 },
+    { x: 30, y: FLOOR_Y - 280, w: 920, h: 350, glow: 0.08 },
+    { x: 1060, y: FLOOR_Y - 330, w: 2250, h: 410, glow: 0.1 },
+    { x: 3820, y: lowerY - 220, w: 1600, h: 360, glow: 0.11 },
+    { x: 6230, y: FLOOR_Y - 280, w: 1120, h: 340, glow: 0.09 },
+    { x: 7300, y: FLOOR_Y - 260, w: 1180, h: 330, glow: 0.1 },
   ];
 
   MAP.roomColumns = [
-    { x: 430, y: 120, w: 22, h: FLOOR_Y - 28, alpha: 0.11 },
-    { x: 1440, y: 126, w: 22, h: FLOOR_Y - 22, alpha: 0.12 },
-    { x: 3010, y: 138, w: 22, h: FLOOR_Y - 24, alpha: 0.13 },
-    { x: 4330, y: 120, w: 24, h: FLOOR_Y - 26, alpha: 0.11 },
-    { x: 6190, y: 120, w: 24, h: FLOOR_Y - 24, alpha: 0.13 },
+    { x: 710, y: 120, w: 22, h: FLOOR_Y - 28, alpha: 0.11 },
+    { x: 2280, y: 126, w: 22, h: FLOOR_Y - 22, alpha: 0.12 },
+    { x: 4630, y: 138, w: 22, h: lowerY - 34, alpha: 0.13 },
+    { x: 6510, y: 120, w: 24, h: FLOOR_Y - 26, alpha: 0.11 },
+    { x: 8010, y: 120, w: 24, h: FLOOR_Y - 24, alpha: 0.13 },
   ];
 
   /* ── SPAWN POINT ── */
@@ -488,6 +513,10 @@ function buildMap() {
 var GS = {
   lives: 3,
   hasGold: false,
+  hasArmor: false,
+  hasSword: true,
+  nearSword: false,
+  nearDroppedItem: false,
   startTime: 0,
   timerSecs: 0,
   step: 0, // tutorial step index
@@ -504,49 +533,509 @@ var GS = {
   deathFlash: 0,
   badgeTimer: null,
   stepCardTimer: null,
+  sword: {
+    active: false,
+    timer: 0,
+    cooldown: 0,
+    dir: 1,
+    swingFrame: 0,
+    swingTick: 0,
+  },
 };
+
+/* ── DROPPED ITEMS SYSTEM ── */
+var DROPPED_ITEMS = []; // Array of {x, y, type, bobTimer, active}
+
+function spawnDroppedItem(x, y, type) {
+  DROPPED_ITEMS.push({
+    x: x,
+    y: y,
+    type: type, // "gold"
+    bobTimer: Math.random() * Math.PI * 2,
+    active: true,
+    spawnTime: Date.now(),
+  });
+}
+
+function clearDroppedItems() {
+  DROPPED_ITEMS = [];
+}
+
+function drawDroppedItems() {
+  DROPPED_ITEMS.forEach(function (item) {
+    if (!item.active) return;
+    if (item.x < CAM.x - 60 || item.x > CAM.x + TC.width + 60) return;
+
+    item.bobTimer += 0.05;
+    var bob = Math.sin(item.bobTimer) * 6;
+    var ix = item.x,
+      iy = item.y + bob;
+
+    // Glow
+    var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 35);
+    gl.addColorStop(0, "rgba(255,215,0,.35)");
+    gl.addColorStop(1, "transparent");
+    TX.fillStyle = gl;
+    TX.fillRect(ix - 40, iy - 40, 80, 80);
+
+    var itemImg = SPR.gold || SPR.decor.threadPaper;
+    if (itemImg && itemImg.complete && itemImg.naturalWidth) {
+      TX.drawImage(itemImg, ix - 20, iy - 20, 40, 40);
+    } else {
+      TX.save();
+      TX.shadowBlur = 15;
+      TX.shadowColor = "#ffd700";
+      TX.fillStyle = "#ffd700";
+      TX.beginPath();
+      TX.arc(ix, iy, 14, 0, Math.PI * 2);
+      TX.fill();
+      TX.fillStyle = "#ffaa00";
+      TX.beginPath();
+      TX.arc(ix, iy, 10, 0, Math.PI * 2);
+      TX.fill();
+      TX.restore();
+    }
+
+    // Item name — always visible when on screen
+    TX.fillStyle = "rgba(255,215,0,.7)";
+    TX.font = "bold 9px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText("Golden Thread", ix, iy - 26);
+
+    // [E] prompt — only when player is close enough
+    if (GS.nearDroppedItem) {
+      TX.save();
+      TX.fillStyle = "rgba(255,255,180,1)";
+      TX.font = "bold 10px Cinzel,serif";
+      TX.textAlign = "center";
+      // Pulsing background pill for visibility
+      var promptW = 80,
+        promptH = 18;
+      TX.fillStyle = "rgba(0,0,0,0.55)";
+      TX.beginPath();
+      TX.roundRect(ix - promptW / 2, iy - 16, promptW, promptH, 4);
+      TX.fill();
+      TX.fillStyle = "rgba(255,255,180,1)";
+      TX.fillText("[E] Pick up", ix, iy - 3);
+      TX.restore();
+    }
+
+    TX.textAlign = "left";
+  });
+}
+
+function drawSwordItem() {
+  if (!MAP.swordItem || MAP.swordItem.collected) return;
+  var s = MAP.swordItem;
+  if (s.x < CAM.x - 80 || s.x > CAM.x + TC.width + 80) return;
+
+  var bob = Math.sin(Date.now() * 0.003) * 5;
+  var ix = s.x - CAM.x;
+  var iy = s.y + bob;
+
+  // Glow
+  var gl = TX.createRadialGradient(ix, iy, 2, ix, iy, 32);
+  gl.addColorStop(0, "rgba(212,168,67,.4)");
+  gl.addColorStop(1, "transparent");
+  TX.fillStyle = gl;
+  TX.fillRect(ix - 40, iy - 40, 80, 80);
+
+  // Draw sword sprite or fallback
+  if (SPR.sword && SPR.sword.complete && SPR.sword.naturalWidth) {
+    TX.save();
+    TX.translate(ix, iy);
+    TX.rotate(-Math.PI / 4);
+    TX.drawImage(SPR.sword, -18, -18, 36, 36);
+    TX.restore();
+  } else {
+    TX.save();
+    TX.translate(ix, iy);
+    TX.rotate(-Math.PI / 4);
+    TX.fillStyle = "#5a3010";
+    TX.fillRect(-3, -18, 6, 10);
+    TX.fillStyle = "#d4a843";
+    TX.fillRect(-8, -8, 16, 4);
+    TX.fillStyle = "#e8eaf0";
+    TX.fillRect(-4, -4, 8, 40);
+    TX.restore();
+  }
+
+  // Label
+  TX.fillStyle = "rgba(212,168,67,.85)";
+  TX.font = "bold 9px Cinzel,serif";
+  TX.textAlign = "center";
+  TX.fillText("Sword", ix, iy - 26);
+  if (GS.nearSword) {
+    TX.fillStyle = "rgba(255,255,180,1)";
+    TX.font = "bold 10px Cinzel,serif";
+    TX.fillText("[E] Pick up", ix, iy - 14);
+  }
+  TX.textAlign = "left";
+}
+
+function checkDroppedItemPickup() {
+  if (GS.hasGold) return;
+  GS.nearDroppedItem = false;
+
+  for (var i = DROPPED_ITEMS.length - 1; i >= 0; i--) {
+    var item = DROPPED_ITEMS[i];
+    if (!item.active) continue;
+
+    var px = PL.x + PL_COX + PL.w / 2;
+    var py = PL.y + PL_COY + PL.h / 2;
+    var dist = Math.hypot(px - item.x, py - item.y);
+
+    if (dist < 80) {
+      GS.nearDroppedItem = true;
+
+      // Only pick up when E is pressed
+      if (JP["KeyE"]) {
+        item.active = false;
+        GS.hasGold = true;
+        GS.nearDroppedItem = false;
+        showBadge("✨ Golden Thread recovered!");
+        spawnGoldPtcls(item.x, item.y);
+        updateHUD();
+        JP["KeyE"] = false;
+        break;
+      }
+    }
+  }
+}
+
+function checkSwordPickup() {
+  if (GS.hasSword) return;
+  if (!MAP.swordItem || MAP.swordItem.collected) return;
+
+  var px = PL.x + PL_COX + PL.w / 2;
+  var py = PL.y + PL_COY + PL.h / 2;
+  var sx = MAP.swordItem.x;
+  var sy = MAP.swordItem.y;
+  var dist = Math.hypot(px - sx, py - sy);
+
+  // Show prompt when close
+  GS.nearSword = dist < 80;
+
+  // Only pick up when E is pressed
+  if (dist < 80 && JP["KeyE"]) {
+    MAP.swordItem.collected = true;
+    GS.hasSword = true;
+    GS.nearSword = false;
+    JP["KeyE"] = false;
+    showBadge("⚔️ Sword equipped! Press [F] to swing.");
+    updateHUD();
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    TUTORIAL STEPS
 ═══════════════════════════════════════════════════════════════════ */
 var STEPS = [
   {
-    icon: "🕸",
-    title: "Stage VIII — Final Ruin Path",
-    desc: "The eighth chamber is the hardest route yet, with the heaviest trap density and the most aggressive patrols in the temple.",
-    keys: ["Stay mobile", "Watch for rats and bats"],
+    icon: "🏛",
+    title: "Webbed Galleries",
+    desc: "Stage II keeps the same chamber language as Stage I, but the route now breaks into staggered ledges and tighter reads.",
+    keys: ["D → Advance", "W / Space → Jump"],
     trigger: function () {
-      return PL.x > 700;
+      return PL.x > 640;
     },
   },
   {
-    icon: "☠",
-    title: "Hazards Stack",
-    desc: "Fewer spike traps protect the route now, but 3 mobs patrol the safest-looking ledges.",
-    keys: ["Clear ledges fast"],
+    icon: "⚖",
+    title: "Split Route",
+    desc: "Cross the lofted openings and keep your rhythm. The early room now asks for cleaner jump spacing than Stage I.",
+    keys: ["Jump the breaks"],
     trigger: function () {
-      return PL.x > 2400;
+      return PL.x > 1500;
     },
   },
   {
-    icon: "🦇",
-    title: "Roaming Threats",
-    desc: "Flying and crawling enemies force cleaner timing. Hesitation is punished harder here.",
-    keys: ["Read patrols"],
+    icon: "⚠",
+    title: "Watch the Floor",
+    desc: "Small spike groups now guard both the upper lane and the recovery floor. Read them early and keep moving.",
+    keys: ["Read proximity traps"],
     trigger: function () {
-      return PL.x > 5200;
+      return PL.x > 2200;
+    },
+  },
+  {
+    icon: "💨",
+    title: "Drop and Recover",
+    desc: "The gallery drops into a lower recovery path. Land cleanly, cross the second spike read, then climb back to the main floor.",
+    keys: ["Recover from the shaft"],
+    trigger: function () {
+      return PL.x > 4800;
     },
   },
   {
     icon: "🚪",
-    title: "Final Push",
-    desc: "The exit hall is longer and less forgiving. Cross the last hazards and reach the next gate.",
-    keys: ["Finish the chamber"],
+    title: "Exit Hall",
+    desc: "The final corridor opens into a single gate. Clear the last span and close the chamber behind you.",
+    keys: ["Reach the exit"],
     trigger: function () {
-      return PL.x > 7900;
+      return PL.x > 7400;
     },
   },
 ];
+
+/* ═══════════════════════════════════════════════════════════════════
+   MATH QUIZ SYSTEM
+═══════════════════════════════════════════════════════════════════ */
+var QUIZ_QUESTIONS = [
+  {
+    q: "What is 17 × 4?",
+    choices: ["58", "68", "72", "64"],
+    answer: 1, // index of correct choice (68)
+    hint: "10×4 = 40, 7×4 = 28, 40+28 = 68",
+  },
+  {
+    q: "Solve: 144 ÷ 12",
+    choices: ["10", "11", "12", "14"],
+    answer: 2,
+    hint: "12 × 12 = 144",
+  },
+  {
+    q: "What is 8² + 6²?",
+    choices: ["100", "96", "110", "98"],
+    answer: 0,
+    hint: "64 + 36 = 100",
+  },
+  {
+    q: "If 3x + 7 = 22, what is x?",
+    choices: ["4", "5", "6", "7"],
+    answer: 1,
+    hint: "3x = 15, so x = 5",
+  },
+  {
+    q: "What is the remainder when 97 is divided by 8?",
+    choices: ["0", "1", "2", "3"],
+    answer: 1,
+    hint: "8 × 12 = 96, 97 − 96 = 1",
+  },
+  {
+    q: "Simplify: (15 + 9) ÷ 4 × 2",
+    choices: ["10", "12", "8", "14"],
+    answer: 1,
+    hint: "24 ÷ 4 = 6, 6 × 2 = 12",
+  },
+];
+
+function getRandomQuestion() {
+  var idx = Math.floor(Math.random() * QUIZ_QUESTIONS.length);
+  return QUIZ_QUESTIONS[idx];
+}
+
+function buildQuizModal() {
+  // Create modal if it doesn't exist
+  if (document.getElementById("quiz-modal")) return;
+
+  var modal = document.createElement("div");
+  modal.id = "quiz-modal";
+  modal.style.cssText = [
+    "position:fixed",
+    "inset:0",
+    "z-index:9000",
+    "display:none",
+    "align-items:center",
+    "justify-content:center",
+    "background:rgba(0,0,0,0.85)",
+    "backdrop-filter:blur(4px)",
+  ].join(";");
+
+  var card = document.createElement("div");
+  card.id = "quiz-card";
+  card.style.cssText = [
+    "background:linear-gradient(180deg,#1a1210 0%,#0d0908 100%)",
+    "border:2px solid #d4a843",
+    "border-radius:8px",
+    "padding:32px 28px",
+    "max-width:420px",
+    "width:90%",
+    "box-shadow:0 0 40px rgba(212,168,67,0.25), inset 0 1px 0 rgba(255,255,255,0.06)",
+    "text-align:center",
+    "font-family:Cinzel,serif",
+  ].join(";");
+
+  var title = document.createElement("div");
+  title.id = "quiz-title";
+  title.textContent = "🔒 THE LABYRINTH ASKS";
+  title.style.cssText = [
+    "color:#d4a843",
+    "font-size:18px",
+    "font-weight:bold",
+    "margin-bottom:20px",
+    "letter-spacing:1px",
+  ].join(";");
+
+  var question = document.createElement("div");
+  question.id = "quiz-question";
+  question.style.cssText = [
+    "color:#e8dcc8",
+    "font-size:16px",
+    "margin-bottom:24px",
+    "line-height:1.5",
+    "min-height:48px",
+  ].join(";");
+
+  var choicesDiv = document.createElement("div");
+  choicesDiv.id = "quiz-choices";
+  choicesDiv.style.cssText = [
+    "display:flex",
+    "flex-direction:column",
+    "gap:10px",
+    "margin-bottom:20px",
+  ].join(";");
+
+  var feedback = document.createElement("div");
+  feedback.id = "quiz-feedback";
+  feedback.style.cssText = [
+    "color:#ff6644",
+    "font-size:13px",
+    "min-height:20px",
+    "margin-bottom:12px",
+    "font-style:italic",
+  ].join(";");
+
+  var hintDiv = document.createElement("div");
+  hintDiv.id = "quiz-hint";
+  hintDiv.style.cssText = [
+    "color:#88bb88",
+    "font-size:12px",
+    "min-height:18px",
+    "display:none",
+    "font-style:italic",
+    "border-top:1px solid rgba(212,168,67,0.2)",
+    "padding-top:10px",
+    "margin-top:10px",
+  ].join(";");
+
+  card.appendChild(title);
+  card.appendChild(question);
+  card.appendChild(choicesDiv);
+  card.appendChild(feedback);
+  card.appendChild(hintDiv);
+  modal.appendChild(card);
+  document.body.appendChild(modal);
+}
+
+function showQuizModal(doorIndex) {
+  buildQuizModal();
+  var modal = document.getElementById("quiz-modal");
+  var questionEl = document.getElementById("quiz-question");
+  var choicesEl = document.getElementById("quiz-choices");
+  var feedbackEl = document.getElementById("quiz-feedback");
+  var hintEl = document.getElementById("quiz-hint");
+
+  // Pick one random question
+  var qData = getRandomQuestion();
+  GS.currentQuiz = {
+    doorIndex: doorIndex,
+    data: qData,
+    answered: false,
+  };
+
+  questionEl.textContent = qData.q;
+  feedbackEl.textContent = "";
+  hintEl.style.display = "none";
+  hintEl.textContent = "";
+  choicesEl.innerHTML = "";
+
+  qData.choices.forEach(function (choice, idx) {
+    var btn = document.createElement("button");
+    btn.textContent = choice;
+    btn.style.cssText = [
+      "background:linear-gradient(180deg,#2a1e18 0%,#1a1210 100%)",
+      "border:1px solid #5a3a20",
+      "color:#d4c4a8",
+      "padding:12px 16px",
+      "border-radius:4px",
+      "cursor:pointer",
+      "font-family:Cinzel,serif",
+      "font-size:14px",
+      "transition:all 0.15s",
+      "width:100%",
+    ].join(";");
+
+    btn.onmouseenter = function () {
+      btn.style.borderColor = "#d4a843";
+      btn.style.background = "linear-gradient(180deg,#3a2a20 0%,#2a1e18 100%)";
+    };
+    btn.onmouseleave = function () {
+      btn.style.borderColor = "#5a3a20";
+      btn.style.background = "linear-gradient(180deg,#2a1e18 0%,#1a1210 100%)";
+    };
+
+    btn.onclick = function () {
+      if (GS.currentQuiz.answered) return;
+      handleQuizAnswer(idx);
+    };
+
+    choicesEl.appendChild(btn);
+  });
+
+  modal.style.display = "flex";
+  GS.paused = true;
+}
+
+function handleQuizAnswer(choiceIndex) {
+  if (!GS.currentQuiz) return;
+  var quiz = GS.currentQuiz;
+  var feedbackEl = document.getElementById("quiz-feedback");
+  var hintEl = document.getElementById("quiz-hint");
+  var choicesEl = document.getElementById("quiz-choices");
+
+  quiz.answered = true;
+
+  // Disable all buttons
+  var buttons = choicesEl.querySelectorAll("button");
+  buttons.forEach(function (btn, idx) {
+    btn.style.pointerEvents = "none";
+    btn.style.opacity = "0.6";
+    if (idx === quiz.data.answer) {
+      btn.style.borderColor = "#44aa44";
+      btn.style.background = "linear-gradient(180deg,#1a3018 0%,#102010 100%)";
+      btn.style.color = "#88ff88";
+    }
+  });
+
+  if (choiceIndex === quiz.data.answer) {
+    // CORRECT — proceed to next stage
+    feedbackEl.textContent = "✓ Correct! The door yields...";
+    feedbackEl.style.color = "#88ff88";
+
+    setTimeout(function () {
+      closeQuizModal();
+      GS.won = true;
+      showScreen("screen-win");
+    }, 1200);
+  } else {
+    // WRONG — 1 heart damage + hint
+    feedbackEl.textContent = "✗ Wrong! The labyrinth tightens its grip...";
+    feedbackEl.style.color = "#ff6644";
+
+    // Show hint about correct door
+    hintEl.textContent =
+      "💡 Hint: " +
+      quiz.data.hint +
+      " | " +
+      MAP.doors[MAP.correctDoorIndex].hint;
+    hintEl.style.display = "block";
+
+    // Damage
+    setTimeout(function () {
+      closeQuizModal();
+      takeDamage("quiz");
+      MAP.doors[quiz.doorIndex].attempted = true;
+    }, 2200);
+  }
+}
+
+function closeQuizModal() {
+  var modal = document.getElementById("quiz-modal");
+  if (modal) modal.style.display = "none";
+  GS.paused = false;
+  GS.currentQuiz = null;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    INIT
@@ -557,6 +1046,24 @@ async function tutInit() {
   tutResize();
   window.addEventListener("resize", tutResize);
   buildHUD();
+  buildQuizModal();
+
+  //The Moas
+  if (typeof SPRITE_MAP === "undefined") {
+    console.error("map.js not loaded! Check script order in HTML.");
+  }
+  MAP_THEME_ASSETS = {
+    variant1: typeof SPRITE_MAP !== "undefined" ? SPRITE_MAP : null,
+    variant2: typeof SPRITE_MAP2 !== "undefined" ? SPRITE_MAP2 : null,
+    variant3: typeof SPRITE_MAP3 !== "undefined" ? SPRITE_MAP3 : null,
+  };
+  console.log(
+    "Map assets loaded:",
+    !!MAP_THEME_ASSETS.variant1,
+    !!MAP_THEME_ASSETS.variant2,
+    !!MAP_THEME_ASSETS.variant3,
+  );
+
   await loadSpr();
   spawnPlayer();
   GS.startTime = Date.now();
@@ -595,40 +1102,38 @@ function spawnPlayer() {
   PL.moving = false;
   PL.sprinting = false;
   CAM.x = 0;
-  GS.hasGold = false;
+  // Don't reset hasGold here — dropped items persist until picked up or void death
   GS.activeDoorIndex = -1;
-  if (MAP.mobs) {
-    MAP.mobs.forEach(function (m) {
-      m.dead = false;
-      m.hitCooldown = 0;
-      if (typeof m.startX === "undefined") m.startX = m.x;
-      m.x = m.startX;
-      m.tick = 0;
-      if (m.type === "bat") m.bob = m.bob || 0;
-    });
-  }
 }
 
 function resetToStart() {
+  loadSpr();
   // Reset all traps
-  MAP.spikes.forEach(function (s) {
-    s.active = false;
-    s.riseTimer = 0;
-  });
+  // Re-randomize correct door on reset
+  if (MAP.doors && MAP.doors.length === 3) {
+    var newCorrect = Math.floor(Math.random() * 3);
+    MAP.correctDoorIndex = newCorrect;
+    MAP.doors.forEach(function (d, i) {
+      d.correct = i === newCorrect;
+      d.fake = i !== newCorrect;
+      d.label = i === newCorrect ? "???" : "DOOR " + ["I", "II", "III"][i];
+      d.attempted = false;
+    });
+  }
+
+  // Clear quiz state
+  GS.currentQuiz = null;
+  closeQuizModal();
   if (MAP.hammer) {
     MAP.hammer.angle = 0;
     MAP.hammer.swingTimer = 0;
     MAP.hammer.hitCooldown = 0;
   }
-  if (MAP.mobs) {
-    MAP.mobs.forEach(function (m) {
-      m.dead = false;
-      m.hitCooldown = 0;
-      if (typeof m.startX !== "undefined") m.x = m.startX;
-      m.tick = 0;
-    });
-  }
+  // Clear dropped items on full reset
+  clearDroppedItems();
   GS.hasGold = false;
+  GS.hasArmor = false;
+  GS.hasSword = true;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -640,8 +1145,19 @@ function resetToStart() {
   GS.startTime = Date.now();
   GS.timerSecs = 0;
   spawnPlayer();
+  if (MAP.swordItem) MAP.swordItem.collected = false;
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
+
+  // Re-randomize which pot has the gold
+  if (MAP.pots) {
+    var newGoldPot = Math.floor(Math.random() * MAP.pots.length);
+    MAP.pots.forEach(function (pot, i) {
+      pot.hasGold = i === newGoldPot;
+      pot.broken = false;
+      pot.breakTimer = 0;
+    });
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -662,169 +1178,10 @@ function tutUpdate() {
 
   GS.timerSecs = Math.floor((Date.now() - GS.startTime) / 1000);
 
-  /* ── INPUT ── */
-  var canSpr = PL.stamina > STAM_MIN;
-  PL.sprinting = false;
-  PL.moving = false;
+  updatePlayerMovement();
 
-  if (!PL.dashing) {
-    var spd = PX * (PL.sprinting ? SPR_MULT : 1);
-    if (KEYS["KeyD"] || KEYS["ArrowRight"]) {
-      PL.vx += spd;
-      PL.dir = 1;
-      PL.moving = true;
-    }
-    if (KEYS["KeyA"] || KEYS["ArrowLeft"]) {
-      PL.vx -= spd;
-      PL.dir = -1;
-      PL.moving = true;
-    }
-    if (KEYS["KeyS"] || KEYS["ArrowDown"]) {
-      PL.vx *= 0.5;
-    }
-  }
-
-  var cap = PX * (PL.sprinting ? SPR_MULT : 1) * 4;
-  PL.vx = Math.max(-cap, Math.min(cap, PL.vx));
-
-  // Jump
-  if ((JP["KeyW"] || JP["Space"] || JP["ArrowUp"]) && PL.grounded) {
-    PL.vy = JUMP_V;
-    PL.grounded = false;
-    PL.frame = 0;
-    PL.atick = 0;
-    JP["KeyW"] = JP["Space"] = JP["ArrowUp"] = false;
-  }
-
-  // Dash
-  if ((JP["ShiftLeft"] || JP["ShiftRight"]) && PL.dcd <= 0 && PL.stamina >= DASH_COST && !PL.dashing) {
-    PL.dashing = true;
-    PL.dtmr = DASH_DUR;
-    PL.ddir = PL.dir;
-    PL.stamina -= DASH_COST;
-    PL.dcd = DASH_CD;
-    if (PL.vy > 0) PL.vy *= 0.3;
-    JP["ShiftLeft"] = false;
-    JP["ShiftRight"] = false;
-  }
-  if (PL.dashing) {
-    PL.vx = PL.ddir * DASH_SPD;
-    PL.dtmr--;
-    spawnDashPtcl();
-    if (PL.dtmr <= 0) {
-      PL.dashing = false;
-      PL.vx *= 0.4;
-    }
-  }
-
-  // Stamina
-  if (PL.sprinting && PL.moving)
-    PL.stamina = Math.max(0, PL.stamina - STAM_DRAIN);
-  else if (!PL.dashing)
-    PL.stamina = Math.min(
-      STAM_MAX,
-      PL.stamina + (PL.moving ? STAM_REGEN * 0.5 : STAM_REGEN),
-    );
-  if (PL.dcd > 0) PL.dcd--;
-  if (PL.iframes > 0) PL.iframes--;
-
-  // Physics
-  PL.vy += GRAV;
-  PL.vx *= FRIC;
-  PL.x += PL.vx;
-  PL.y += PL.vy;
-  if (PL.x < 0) {
-    PL.x = 0;
-    PL.vx = 0;
-  }
-
-  // Platform collision
-  PL.grounded = false;
-  MAP.platforms.forEach(function (p) {
-    var plx = PL.x + PL_COX,
-      ply = PL.y + PL_COY;
-    var prevBot = ply + PL.h - PL.vy;
-    if (
-      plx < p.x + p.w &&
-      plx + PL.w > p.x &&
-      ply + PL.h > p.y &&
-      prevBot <= p.y + 8 &&
-      PL.vy >= 0
-    ) {
-      PL.y = p.y - PL_COY - PL.h;
-      PL.vy = 0;
-      PL.grounded = true;
-    }
-  });
-
-  // Obstacle collision (opening wall removed)
-  var ob = MAP.obstacle;
-  if (ob) {
-    var plx2 = PL.x + PL_COX,
-      ply2 = PL.y + PL_COY;
-    if (
-      plx2 < ob.x + ob.w &&
-      plx2 + PL.w > ob.x &&
-      ply2 + PL.h > ob.y &&
-      ply2 < ob.y + ob.h
-    ) {
-      // Push player out from right side
-      if (PL.vx >= 0 && plx2 + PL.w > ob.x && plx2 < ob.x) {
-        PL.x = ob.x - PL_COX - PL.w;
-        PL.vx = 0;
-      }
-    }
-  }
-  
-  // Clamp right edge of world
-  if (PL.x + PL.sw > WORLD) {
-    PL.x = WORLD - PL.sw;
-    PL.vx = 0;
-  }
-
-  /* ── PROXIMITY SPIKE TRIGGERS ── */
-  MAP.spikes.forEach(function (sp) {
-    if (sp.active) return;
-    if (PL.x + PL_COX + PL.w >= sp.triggerX) {
-      sp.active = true;
-      sp.riseTimer = 0;
-    }
-  });
-
-  /* ── SPIKE TRAPS ── */
-  if (PL.iframes <= 0) {
-    MAP.spikes.forEach(function (sp) {
-      if (!sp.active) return;
-      var spikeH = 32;
-      var spikeY = sp.y - spikeH;
-      var px3 = PL.x + PL_COX,
-        py3 = PL.y + PL_COY;
-      if (
-        px3 < sp.x + sp.w &&
-        px3 + PL.w > sp.x &&
-        py3 + PL.h > spikeY &&
-        py3 < sp.y
-      ) {
-        takeDamage("spike");
-      }
-    });
-  }
-
-  /* ── READY SPIKE (static — need dash) ── */
-  if (MAP.readySpike && PL.iframes <= 0 && !PL.dashing) {
-    var rs = MAP.readySpike;
-    var spikeH2 = 36;
-    var px4 = PL.x + PL_COX,
-      py4 = PL.y + PL_COY;
-    if (
-      px4 < rs.x + rs.w &&
-      px4 + PL.w > rs.x &&
-      py4 + PL.h > rs.y - spikeH2 &&
-      py4 < rs.y
-    ) {
-      takeDamage("readySpike");
-    }
-  }
+  updateStage2SpikeTraps();
+  updateStage2FireballTrap();
 
   /* ── HAMMER ── */
   if (MAP.hammer) {
@@ -882,11 +1239,64 @@ function tutUpdate() {
         GS.hasGold = true;
         showBadge("✨ Golden Thread collected!");
         spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
+        updateHUD();
       }
     }
   }
+
+  /* ── SWORD SWING ── */
+  if (GS.hasSword) {
+    if (GS.sword.cooldown > 0) GS.sword.cooldown--;
+
+    if (JP["KeyF"] && !GS.sword.active && GS.sword.cooldown <= 0) {
+      GS.sword.active = true;
+      GS.sword.timer = 18;
+      GS.sword.dir = PL.dir;
+      GS.sword.cooldown = 28;
+      JP["KeyF"] = false;
+
+      if (MAP.pots) {
+        var swingReach = 72;
+        var swingCX =
+          PL.x + PL_COX + PL.w / 2 + GS.sword.dir * swingReach * 0.5;
+        var swingCY = PL.y + PL_COY + PL.h * 0.45;
+
+        MAP.pots.forEach(function (pot) {
+          if (pot.broken) return;
+          var potCX = pot.x + pot.w / 2;
+          var potCY = pot.y + pot.h / 2;
+          var dx = Math.abs(swingCX - potCX);
+          var dy = Math.abs(swingCY - potCY);
+          if (dx < swingReach && dy < pot.h * 0.7) {
+            pot.broken = true;
+            pot.breakTimer = 0;
+            spawnPotShards(potCX, potCY);
+            if (pot.hasGold && !GS.hasGold) {
+              spawnDroppedItem(potCX, pot.y, "gold");
+              showBadge("⚔️ Pot smashed — Golden Thread found!");
+            } else {
+              showBadge("⚔️ Empty pot.");
+            }
+          }
+        });
+      }
+    }
+
+    if (GS.sword.active) {
+      GS.sword.timer--;
+      if (GS.sword.timer <= 0) GS.sword.active = false;
+    }
+  }
+
   handleThrowInput();
   updateThrowFx();
+
+  /* ── POT BREAK TIMER ── */
+  if (MAP.pots) {
+    MAP.pots.forEach(function (pot) {
+      if (pot.broken) pot.breakTimer++;
+    });
+  }
 
   /* ── DOOR INTERACTION ── */
   GS.activeDoorIndex = -1;
@@ -901,15 +1311,26 @@ function tutUpdate() {
     ) {
       GS.activeDoorIndex = i;
       if (JP["KeyE"]) {
-        if (door.targetStage) {
-          window.location.href = door.targetStage;
-        } else {
-          GS.won = true;
-          showScreen("screen-win");
+        if (!GS.hasGold) {
+          showBadge("🔒 Locked! Find the Golden Thread first...");
+          JP["KeyE"] = false;
+          /* ── DROPPED ITEM PICKUP ── */
+          checkDroppedItemPickup();
+          return;
         }
+
+        if (door.fake) {
+          // Wrong door — jumpscare + reset
+          wrongDoor();
+        } else {
+          // Right door — quiz time
+          showQuizModal(i);
+        }
+        JP["KeyE"] = false;
       }
     }
   });
+  checkDroppedItemPickup();
   JP["KeyE"] = false;
 
   /* ── VOID DEATH (fall off bottom) ── */
@@ -943,19 +1364,16 @@ function tutUpdate() {
   /* ── CAMERA ── */
   var targetCamX = PL.x + PL.sw / 2 - TC.width / 2;
   var targetCamY = PL.y + PL.sh / 2 - TC.height / 2;
-  
+
   // Clamp to world bounds
   targetCamX = Math.max(0, Math.min(WORLD - TC.width, targetCamX));
   targetCamY = Math.max(0, Math.min(TC.height * 2 - TC.height, targetCamY)); // Adjust vertical bounds as needed
-  
+
   CAM.x += (targetCamX - CAM.x) * 0.12;
   CAM.y += (targetCamY - CAM.y) * 0.12;
 
-
-
   /* ── PARTICLES ── */
   updateParticles();
-  updateMobs();
 
   /* ── TIMER ── */
   var t = document.getElementById("hud-timer");
@@ -971,16 +1389,38 @@ function tutUpdate() {
   updateHUD();
 }
 
-/* ── DAMAGE / DEATH ─────────────────────────────────────────────── */
 function takeDamage(source) {
   if (PL.iframes > 0) return;
+
   if (source === "void") {
+    // VOID DEATH: respawn items, reset lives, no item drop
     GS.lives = 0;
     PL.iframes = 0;
+
+    // Clear any previously dropped items (they respawn at original location)
+    clearDroppedItems();
+
+    // Reset gold to map spawn location (respawn)
+    if (MAP.gold) {
+      MAP.gold.collected = false;
+    }
+    GS.hasGold = false;
+
     updateHUD();
     startDeathSequence(source);
     return;
   }
+
+  // NORMAL DEATH (spike, hammer, quiz wrong): drop items where player died
+  if (GS.hasGold && MAP.gold) {
+    // Drop the gold at player's death location
+    spawnDroppedItem(PL.x + PL.sw / 2, PL.y + PL.sh * 0.5, "gold");
+    MAP.gold.collected = true; // Mark original as gone
+    GS.hasGold = false;
+    showBadge("💔 Golden Thread dropped!");
+    updateHUD();
+  }
+
   GS.lives = Math.max(0, GS.lives - 1);
   PL.iframes = 12;
   PL.vy = -10;
@@ -989,39 +1429,6 @@ function takeDamage(source) {
   if (GS.lives <= 0) {
     startDeathSequence(source);
   }
-}
-
-function updateMobs() {
-  if (!MAP.mobs) return;
-  MAP.mobs.forEach(function (m) {
-    if (m.dead) return;
-    if (m.hitCooldown > 0) m.hitCooldown--;
-    m.tick = (m.tick || 0) + 1;
-    if (m.type === "bat") {
-      m.x += m.vx;
-      if (m.x < m.minX || m.x + m.w > m.maxX) {
-        m.vx *= -1;
-        m.x = Math.max(m.minX, Math.min(m.maxX - m.w, m.x));
-      }
-      m.bob = (m.bob || 0) + 0.08;
-      m.y = m.baseY + Math.sin(m.bob) * 18;
-    } else {
-      m.x += m.vx;
-      if (m.x < m.minX || m.x + m.w > m.maxX) {
-        m.vx *= -1;
-        m.x = Math.max(m.minX, Math.min(m.maxX - m.w, m.x));
-      }
-    }
-
-    if (PL.iframes > 0) return;
-    var px = PL.x + PL_COX, py = PL.y + PL_COY;
-    var my = m.type === "rat" ? m.y - m.h : m.y;
-    if (px < m.x + m.w && px + PL.w > m.x && py < my + m.h && py + PL.h > my) {
-      PL.vx = (px + PL.w * 0.5 < m.x + m.w * 0.5 ? -8 : 8);
-      PL.vy = -8;
-      takeDamage("mob");
-    }
-  });
 }
 
 function updateParticles() {
@@ -1047,8 +1454,12 @@ function spawnImpactPtcls(x, y, count) {
       dec: 0.035 + Math.random() * 0.03,
       sz: Math.random() * (isEmber ? 4 : 3) + 2,
       col: isEmber
-        ? (Math.random() < 0.5 ? "#ffd36c" : "#ffb347")
-        : (Math.random() < 0.5 ? "#9b1f2d" : "#67202a"),
+        ? Math.random() < 0.5
+          ? "#ffd36c"
+          : "#ffb347"
+        : Math.random() < 0.5
+          ? "#9b1f2d"
+          : "#67202a",
       type: isEmber ? "ember" : "dust",
     });
   }
@@ -1070,7 +1481,9 @@ function startDeathSequence(source) {
     y: PL.y,
     vx:
       source === "hammer"
-        ? (PL.x + PL.sw / 2 < MAP.hammer.anchorX ? -2.8 : 2.8)
+        ? PL.x + PL.sw / 2 < MAP.hammer.anchorX
+          ? -2.8
+          : 2.8
         : PL.dir * 1.2,
     vy: -6.4,
     rot: source === "hammer" ? 0.18 * PL.dir : 0,
@@ -1107,7 +1520,7 @@ function updateDeathFx() {
   fx.vx *= 0.95;
   fx.rot += fx.rotV;
   fx.rotV *= 0.985;
-  fx.scale = 1 + Math.sin(Math.min(fx.t, 16) / 16 * Math.PI) * 0.07;
+  fx.scale = 1 + Math.sin((Math.min(fx.t, 16) / 16) * Math.PI) * 0.07;
   fx.glow = Math.max(0, 1 - fx.t / 22);
   fx.alpha = fx.t < 12 ? 1 : Math.max(0, 1 - (fx.t - 12) / 28);
   GS.deathFlash = Math.max(0, 1 - fx.t / 20);
@@ -1141,7 +1554,7 @@ function wrongDoor() {
     "background:#000",
     "opacity:0",
     "transition:opacity 0.05s",
-    "overflow:hidden"
+    "overflow:hidden",
   ].join(";");
 
   var img = new Image();
@@ -1153,7 +1566,7 @@ function wrongDoor() {
     "object-fit:cover",
     "transform:scale(1.08)",
     "image-rendering:pixelated",
-    "filter:brightness(1.3) contrast(1.4)"
+    "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
   // Use SPRITE_MINO if available, otherwise a red fallback
@@ -1164,7 +1577,8 @@ function wrongDoor() {
     overlay.style.background = "#cc0000";
     var txt = document.createElement("div");
     txt.textContent = "YOU CHOSE WRONG";
-    txt.style.cssText = "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
+    txt.style.cssText =
+      "color:#fff;font-size:80px;font-weight:bold;font-family:serif;text-shadow:0 0 40px #ff0000;";
     overlay.appendChild(txt);
   }
 
@@ -1175,7 +1589,9 @@ function wrongDoor() {
   var fl = document.getElementById("wrong-flash");
   if (fl) {
     fl.classList.add("show");
-    setTimeout(function () { fl.classList.remove("show"); }, 200);
+    setTimeout(function () {
+      fl.classList.remove("show");
+    }, 200);
   }
 
   // Screen shake
@@ -1226,9 +1642,12 @@ function cleanStageDecor() {
     MAP.decorBack.forEach(function (item) {
       if (!item || !item.key) return;
       if (item.key === "web") item.alpha = Math.min(item.alpha || 0.22, 0.24);
-      else if (item.key.indexOf("vines") === 0) item.alpha = Math.min(item.alpha || 0.18, 0.2);
-      else if (item.key.indexOf("mural") === 0) item.alpha = Math.min(item.alpha || 0.12, 0.12);
-      else if (item.key === "cage") item.alpha = Math.min(item.alpha || 0.18, 0.18);
+      else if (item.key.indexOf("vines") === 0)
+        item.alpha = Math.min(item.alpha || 0.18, 0.2);
+      else if (item.key.indexOf("mural") === 0)
+        item.alpha = Math.min(item.alpha || 0.12, 0.12);
+      else if (item.key === "cage")
+        item.alpha = Math.min(item.alpha || 0.18, 0.18);
     });
   }
 
@@ -1237,7 +1656,8 @@ function cleanStageDecor() {
       if (!item || !item.key) return;
       if (item.key.indexOf("bones") === 0) {
         var floorLine = item.y;
-        if (item.y > FLOOR_Y - item.h) floorLine = Math.min(FLOOR_Y, item.y + 8);
+        if (item.y > FLOOR_Y - item.h)
+          floorLine = Math.min(FLOOR_Y, item.y + 8);
         item.y = floorLine - item.h + 8;
         item.alpha = Math.min(Math.max(item.alpha || 0.28, 0.28), 0.42);
       } else if (item.key === "jar") {
@@ -1255,8 +1675,7 @@ function tutDraw() {
   TX.clearRect(0, 0, W, H);
 
   TX.save();
-TX.translate(-CAM.x, -CAM.y);
-
+  TX.translate(-CAM.x, -CAM.y);
 
   drawBG(W, H);
   drawChamberDepth(H);
@@ -1269,12 +1688,15 @@ TX.translate(-CAM.x, -CAM.y);
   drawShaft(H);
   drawHammer();
   drawGold();
+  drawPots();
   drawThrowFx();
+  drawDroppedItems();
+  drawSwordItem();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
-  drawMobs();
   drawParticles();
   drawPlayer();
+  drawFireballs();
 
   TX.restore();
 
@@ -1294,8 +1716,8 @@ function drawBG(W, H) {
   TX.fillRect(0, 0, WORLD, H);
   if (SPR.mapTheme.map) {
     TX.save();
-    TX.globalAlpha = 0.34;
-    TX.drawImage(SPR.mapTheme.map, 0, H * 0.08, WORLD, H * 0.68);
+    TX.globalAlpha = 0.7;
+    TX.drawImage(SPR.mapTheme.map, 0, 0, WORLD, H);
     TX.restore();
   }
   if (SPR.mapTheme.roof) {
@@ -1304,7 +1726,14 @@ function drawBG(W, H) {
     TX.drawImage(SPR.mapTheme.roof, 0, 0, WORLD, H * 0.18);
     TX.restore();
   }
-  var haze = TX.createRadialGradient(CAM.x + W * 0.5, H * 0.18, 10, CAM.x + W * 0.5, H * 0.42, W * 0.7);
+  var haze = TX.createRadialGradient(
+    CAM.x + W * 0.5,
+    H * 0.18,
+    10,
+    CAM.x + W * 0.5,
+    H * 0.42,
+    W * 0.7,
+  );
   haze.addColorStop(0, "rgba(214,187,128,0.11)");
   haze.addColorStop(1, "transparent");
   TX.fillStyle = haze;
@@ -1348,10 +1777,23 @@ function drawBG(W, H) {
     var torchH = 34;
     var torchBaseY = ty - 6;
     if (torch) {
-      TX.drawImage(torch, tx - torchW * 0.5, torchBaseY - torchH, torchW, torchH);
+      TX.drawImage(
+        torch,
+        tx - torchW * 0.5,
+        torchBaseY - torchH,
+        torchW,
+        torchH,
+      );
     }
 
-    var emberGlow = TX.createRadialGradient(tx, torchBaseY - 28, 0, tx, torchBaseY - 28, 34);
+    var emberGlow = TX.createRadialGradient(
+      tx,
+      torchBaseY - 28,
+      0,
+      tx,
+      torchBaseY - 28,
+      34,
+    );
     emberGlow.addColorStop(0, "rgba(255,240,184,.48)");
     emberGlow.addColorStop(0.3, "rgba(255,170,70,.26)");
     emberGlow.addColorStop(1, "transparent");
@@ -1365,13 +1807,23 @@ function drawBG(W, H) {
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 45 - flameWobble * 0.12);
     TX.quadraticCurveTo(tx + 10, torchBaseY - 30, tx, torchBaseY - 12);
-    TX.quadraticCurveTo(tx - 12, torchBaseY - 30, tx, torchBaseY - 45 - flameWobble * 0.12);
+    TX.quadraticCurveTo(
+      tx - 12,
+      torchBaseY - 30,
+      tx,
+      torchBaseY - 45 - flameWobble * 0.12,
+    );
     TX.fill();
     TX.fillStyle = "rgba(255,241,190,.96)";
     TX.beginPath();
     TX.moveTo(tx, torchBaseY - 38 - flameWobble * 0.08);
     TX.quadraticCurveTo(tx + 5, torchBaseY - 28, tx, torchBaseY - 18);
-    TX.quadraticCurveTo(tx - 6, torchBaseY - 28, tx, torchBaseY - 38 - flameWobble * 0.08);
+    TX.quadraticCurveTo(
+      tx - 6,
+      torchBaseY - 28,
+      tx,
+      torchBaseY - 38 - flameWobble * 0.08,
+    );
     TX.fill();
     TX.restore();
   }
@@ -1388,7 +1840,12 @@ function drawChamberDepth(H) {
     TX.fillStyle = "rgba(10,8,14,.22)";
     TX.fillRect(zone.x, zone.y, zone.w, zone.h);
 
-    var archG = TX.createLinearGradient(zone.x, zone.y, zone.x, zone.y + zone.h);
+    var archG = TX.createLinearGradient(
+      zone.x,
+      zone.y,
+      zone.x,
+      zone.y + zone.h,
+    );
     archG.addColorStop(0, "rgba(26,18,22,.44)");
     archG.addColorStop(0.25, "rgba(10,7,12,.1)");
     archG.addColorStop(1, "rgba(0,0,0,0)");
@@ -1420,7 +1877,7 @@ function drawChamberDepth(H) {
     TX.save();
     var cg = TX.createLinearGradient(col.x, col.y, col.x + col.w, col.y);
     cg.addColorStop(0, "rgba(14,10,16," + col.alpha + ")");
-    cg.addColorStop(0.5, "rgba(42,30,34," + (col.alpha * 1.2) + ")");
+    cg.addColorStop(0.5, "rgba(42,30,34," + col.alpha * 1.2 + ")");
     cg.addColorStop(1, "rgba(12,8,12," + col.alpha + ")");
     TX.fillStyle = cg;
     TX.fillRect(col.x, col.y, col.w, col.h);
@@ -1436,53 +1893,12 @@ function drawDecorLayer(list) {
   if (!list) return;
   list.forEach(function (item) {
     var img = SPR.decor[item.key];
-    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40) return;
+    if (!img || item.x + item.w < CAM.x - 40 || item.x > CAM.x + TC.width + 40)
+      return;
     TX.save();
     TX.globalAlpha = item.alpha == null ? 1 : item.alpha;
     TX.drawImage(img, item.x, item.y, item.w, item.h);
     TX.restore();
-  });
-}
-
-function drawPlatforms() {
-  MAP.platforms.forEach(function (p) {
-    if (p.x + p.w < CAM.x - 20 || p.x > CAM.x + TC.width + 20) return;
-    var sg = TX.createLinearGradient(p.x, p.y, p.x, p.y + p.h);
-    sg.addColorStop(0, "#372224");
-    sg.addColorStop(0.18, "#2a1a1c");
-    sg.addColorStop(1, "#140c10");
-    TX.fillStyle = sg;
-    TX.fillRect(p.x, p.y, p.w, p.h);
-
-    TX.fillStyle = "rgba(232,194,106,.62)";
-    TX.fillRect(p.x, p.y, p.w, 2);
-    TX.fillStyle = "rgba(120,86,44,.82)";
-    TX.fillRect(p.x, p.y + 2, p.w, 4);
-    TX.fillStyle = "rgba(255,248,224,.06)";
-    TX.fillRect(p.x + 6, p.y + 7, p.w - 12, 1);
-
-    TX.fillStyle = "rgba(0,0,0,.4)";
-    TX.fillRect(p.x, p.y, 3, p.h);
-    TX.fillRect(p.x + p.w - 3, p.y, 3, p.h);
-    TX.fillRect(p.x + 10, p.y + p.h - 8, Math.max(0, p.w - 20), 8);
-
-    if (SPR.decor.platform && p.w >= 120) {
-      var friezeW = Math.min(p.w - 36, 136);
-      TX.save();
-      TX.globalAlpha = 0.16;
-      TX.drawImage(
-        SPR.decor.platform,
-        6,
-        0,
-        Math.max(1, SPR.decor.platform.naturalWidth - 12),
-        SPR.decor.platform.naturalHeight,
-        p.x + (p.w - friezeW) / 2,
-        p.y - 8,
-        friezeW,
-        18,
-      );
-      TX.restore();
-    }
   });
 }
 
@@ -1509,89 +1925,12 @@ function drawObstacle() {
   TX.textAlign = "left";
 }
 
-function drawSpikeRack(x, y, w, spikeH, gap) {
-  var count = Math.max(3, Math.round(w / gap));
-  var toothW = w / count;
-  var rackTop = y - 8;
-  var rackHeight = 12;
-
-  TX.save();
-
-  TX.fillStyle = "rgba(0,0,0,.32)";
-  TX.beginPath();
-  TX.ellipse(x + w / 2, y + 6, w * 0.56, 10, 0, 0, Math.PI * 2);
-  TX.fill();
-
-  var baseG = TX.createLinearGradient(x, rackTop, x, rackTop + rackHeight);
-  baseG.addColorStop(0, "#1b1214");
-  baseG.addColorStop(0.45, "#40282b");
-  baseG.addColorStop(1, "#12090b");
-  TX.fillStyle = baseG;
-  TX.fillRect(x, rackTop, w, rackHeight);
-
-  TX.fillStyle = "rgba(255,204,140,.15)";
-  TX.fillRect(x, rackTop, w, 2);
-  TX.fillStyle = "rgba(90,14,14,.35)";
-  TX.fillRect(x, rackTop + rackHeight - 3, w, 2);
-  TX.fillStyle = "rgba(0,0,0,.42)";
-  TX.fillRect(x, rackTop + rackHeight, w, 4);
-
-  for (var j = 0; j < count; j++) {
-    var sx = x + j * toothW;
-    var tipX = sx + toothW / 2;
-    var leftX = sx + toothW * 0.14;
-    var rightX = sx + toothW * 0.86;
-
-    TX.fillStyle = "rgba(0,0,0,.24)";
-    TX.beginPath();
-    TX.moveTo(leftX + 1, rackTop + rackHeight - 1);
-    TX.lineTo(tipX, y - spikeH + 6);
-    TX.lineTo(rightX + 2, rackTop + rackHeight - 1);
-    TX.closePath();
-    TX.fill();
-
-    var bladeG = TX.createLinearGradient(tipX, y - spikeH, tipX, rackTop + rackHeight);
-    bladeG.addColorStop(0, "#f3e5d5");
-    bladeG.addColorStop(0.18, "#d8d1c8");
-    bladeG.addColorStop(0.55, "#8a8c93");
-    bladeG.addColorStop(1, "#2f3137");
-    TX.fillStyle = bladeG;
-    TX.beginPath();
-    TX.moveTo(leftX, rackTop + rackHeight - 1);
-    TX.lineTo(tipX, y - spikeH);
-    TX.lineTo(rightX, rackTop + rackHeight - 1);
-    TX.closePath();
-    TX.fill();
-
-    TX.strokeStyle = "rgba(21,16,18,.72)";
-    TX.lineWidth = 1;
-    TX.beginPath();
-    TX.moveTo(leftX, rackTop + rackHeight - 1);
-    TX.lineTo(tipX, y - spikeH);
-    TX.lineTo(rightX, rackTop + rackHeight - 1);
-    TX.stroke();
-
-    TX.strokeStyle = "rgba(255,255,255,.26)";
-    TX.beginPath();
-    TX.moveTo(tipX, y - spikeH + 3);
-    TX.lineTo(tipX - toothW * 0.1, rackTop + 1);
-    TX.stroke();
-
-    TX.fillStyle = "rgba(104,18,20,.42)";
-    TX.beginPath();
-    TX.moveTo(leftX + 1, rackTop + rackHeight - 1);
-    TX.lineTo(tipX, y - spikeH * 0.34);
-    TX.lineTo(rightX - toothW * 0.2, rackTop + rackHeight - 1);
-    TX.closePath();
-    TX.fill();
-  }
-
-  TX.restore();
-}
-
 function drawPlates() {
+  if (!MAP.plates) return;
+
   MAP.plates.forEach(function (plate) {
-    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20) return;
+    if (plate.x + plate.w < CAM.x - 20 || plate.x > CAM.x + TC.width + 20)
+      return;
 
     TX.save();
     TX.fillStyle = plate.active ? "rgba(156,104,28,.95)" : "rgba(106,74,24,.9)";
@@ -1607,32 +1946,6 @@ function drawPlates() {
     TX.textAlign = "left";
     TX.restore();
   });
-}
-
-function drawSpikes() {
-  MAP.spikes.forEach(function (sp) {
-    if (!sp.active) return;
-    if (sp.x + sp.w < CAM.x - 20 || sp.x > CAM.x + TC.width + 20) return;
-    drawSpikeRack(sp.x, sp.y, sp.w, 42, 22);
-  });
-}
-
-function drawReadySpike() {
-  if (!MAP.readySpike) return;
-  var rs = MAP.readySpike;
-  if (rs.x + rs.w < CAM.x - 20 || rs.x > CAM.x + TC.width + 20) return;
-  var spikeH = 48;
-  drawSpikeRack(rs.x, rs.y, rs.w, spikeH, 22);
-
-  TX.fillStyle = "rgba(8,14,22,.72)";
-  TX.fillRect(rs.x + rs.w / 2 - 74, rs.y - spikeH - 28, 148, 20);
-  TX.strokeStyle = "rgba(68,170,255,.28)";
-  TX.strokeRect(rs.x + rs.w / 2 - 74, rs.y - spikeH - 28, 148, 20);
-  TX.fillStyle = "rgba(92,184,255,.9)";
-  TX.font = "bold 10px Cinzel,serif";
-  TX.textAlign = "center";
-  TX.fillText("DASH [SHIFT]", rs.x + rs.w / 2, rs.y - spikeH - 14);
-  TX.textAlign = "left";
 }
 
 function drawShaft(H) {
@@ -1652,7 +1965,6 @@ function drawShaft(H) {
   }
   TX.fillStyle = "rgba(0,0,0,.26)";
   TX.fillRect(sh.x + 10, sh.y + 6, sh.w - 20, sh.bottom - sh.y - 6);
-
 }
 
 function drawHammer() {
@@ -1662,7 +1974,8 @@ function drawHammer() {
   var hx = hm.anchorX + Math.sin(hm.angle) * hm.length;
   var hy2 = hm.anchorY + Math.cos(hm.angle) * hm.length;
 
-  var hmImg = SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
+  var hmImg =
+    SPR.hammerRight && SPR.hammerRight.length ? SPR.hammerRight[0] : null;
   if (hmImg && hmImg.complete && hmImg.naturalWidth) {
     TX.save();
     // Rotate one hammer asset around the pointer/ball for a genuinely steady swing.
@@ -1679,7 +1992,12 @@ function drawHammer() {
     TX.translate(hm.anchorX, hm.anchorY);
     TX.rotate(hm.angle);
     // Fallback rectangle if no sprite
-    var hg = TX.createLinearGradient(-hm.hw / 2, -hm.hh / 2, hm.hw / 2, hm.hh / 2);
+    var hg = TX.createLinearGradient(
+      -hm.hw / 2,
+      -hm.hh / 2,
+      hm.hw / 2,
+      hm.hh / 2,
+    );
     hg.addColorStop(0, "#909090");
     hg.addColorStop(0.4, "#c0c0c8");
     hg.addColorStop(1, "#484858");
@@ -1711,7 +2029,6 @@ function drawHammer() {
     TX.restore();
   }
 }
-
 
 function getThrowLandingY(x) {
   var best = FLOOR_Y;
@@ -1748,6 +2065,52 @@ function startThrownItem(icon) {
   PL.throwTimer = 18;
 }
 
+/* ── SWORD SWING ── */
+if (GS.hasSword) {
+  if (GS.sword.cooldown > 0) GS.sword.cooldown--;
+
+  if (JP["KeyF"] && !GS.sword.active && GS.sword.cooldown <= 0) {
+    GS.sword.active = true;
+    GS.sword.timer = 18; // swing lasts 18 frames
+    GS.sword.dir = PL.dir;
+    GS.sword.cooldown = 28;
+    JP["KeyF"] = false;
+
+    // Check pot collision during the swing
+    if (MAP.pots) {
+      var swingReach = 72; // horizontal reach of the swing
+      var swingCX = PL.x + PL_COX + PL.w / 2 + GS.sword.dir * swingReach * 0.5;
+      var swingCY = PL.y + PL_COY + PL.h * 0.45;
+
+      MAP.pots.forEach(function (pot) {
+        if (pot.broken) return;
+        var potCX = pot.x + pot.w / 2;
+        var potCY = pot.y + pot.h / 2;
+        var dx = Math.abs(swingCX - potCX);
+        var dy = Math.abs(swingCY - potCY);
+        if (dx < swingReach && dy < pot.h * 0.7) {
+          pot.broken = true;
+          pot.breakTimer = 0;
+          spawnPotShards(potCX, potCY);
+          if (pot.hasGold && !GS.hasGold) {
+            spawnDroppedItem(potCX, pot.y, "gold");
+            showBadge("⚔️ Pot smashed — Golden Thread found!");
+          } else {
+            showBadge("⚔️ Empty pot.");
+          }
+        }
+      });
+    }
+  }
+
+  if (GS.sword.active) {
+    GS.sword.timer--;
+    if (GS.sword.timer <= 0) {
+      GS.sword.active = false;
+    }
+  }
+}
+
 function handleThrowInput() {
   if (!JP["KeyR"]) return;
   JP["KeyR"] = false;
@@ -1776,7 +2139,8 @@ function handleThrowInput() {
     MAP.gold.collected = true;
     MAP.gold.visible = true;
   }
-  if (typeof updateTutorialInventoryUI === "function") updateTutorialInventoryUI();
+  if (typeof updateTutorialInventoryUI === "function")
+    updateTutorialInventoryUI();
   if (typeof renderInventoryHUD === "function") renderInventoryHUD();
   if (typeof showBadge === "function") showBadge("Golden Thread thrown!");
   startThrownItem(icon);
@@ -1800,7 +2164,11 @@ function updateThrowFx() {
       MAP.gold.collected = false;
       MAP.gold.visible = true;
       MAP.gold.bobTimer = 0;
-      if (typeof spawnGoldPtcls === "function") spawnGoldPtcls(MAP.gold.x + MAP.gold.w / 2, MAP.gold.y + MAP.gold.h / 2);
+      if (typeof spawnGoldPtcls === "function")
+        spawnGoldPtcls(
+          MAP.gold.x + MAP.gold.w / 2,
+          MAP.gold.y + MAP.gold.h / 2,
+        );
     }
     GS.throwFx = null;
   }
@@ -1818,7 +2186,12 @@ function drawThrowFx() {
     TX.lineCap = "round";
     TX.beginPath();
     TX.moveTo(handX - PL.dir * 18, handY + 16);
-    TX.quadraticCurveTo(handX + PL.dir * 18, handY - 6, handX + PL.dir * 52, handY - 18);
+    TX.quadraticCurveTo(
+      handX + PL.dir * 18,
+      handY - 6,
+      handX + PL.dir * 52,
+      handY - 18,
+    );
     TX.stroke();
     TX.restore();
   }
@@ -1832,7 +2205,12 @@ function drawThrowFx() {
   TX.lineCap = "round";
   TX.beginPath();
   TX.moveTo(fx.sx, fx.sy);
-  TX.quadraticCurveTo((fx.sx + fx.x) / 2, Math.min(fx.sy, fx.y) - 64, fx.x, fx.y);
+  TX.quadraticCurveTo(
+    (fx.sx + fx.x) / 2,
+    Math.min(fx.sy, fx.y) - 64,
+    fx.x,
+    fx.y,
+  );
   TX.stroke();
   TX.globalAlpha = 1;
   TX.shadowBlur = 18;
@@ -1912,16 +2290,63 @@ function drawGold() {
   TX.textAlign = "left";
 }
 
+function drawPots() {
+  if (!MAP.pots) return;
+  MAP.pots.forEach(function (pot) {
+    if (pot.x + pot.w < CAM.x - 60 || pot.x > CAM.x + TC.width + 60) return;
+    if (pot.broken) return; // don't draw after shattering
+
+    TX.save();
+
+    var potImg = SPR.pot;
+    if (potImg && potImg.complete && potImg.naturalWidth) {
+      TX.drawImage(potImg, pot.x, pot.y, pot.w, pot.h);
+    } else {
+      // Fallback drawn pot
+      TX.fillStyle = "#8B6955";
+      TX.beginPath();
+      TX.ellipse(
+        pot.x + pot.w / 2,
+        pot.y + pot.h * 0.72,
+        pot.w * 0.42,
+        pot.h * 0.28,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      TX.fill();
+      TX.fillStyle = "#A0785A";
+      TX.fillRect(
+        pot.x + pot.w * 0.18,
+        pot.y + pot.h * 0.1,
+        pot.w * 0.64,
+        pot.h * 0.65,
+      );
+      TX.fillStyle = "#C4A882";
+      TX.fillRect(pot.x + pot.w * 0.14, pot.y + pot.h * 0.08, pot.w * 0.72, 8);
+    }
+    TX.restore();
+  });
+}
+
 function drawDoors() {
   MAP.doors.forEach(function (door, i) {
     if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
-    var lit = false;
-    var pulse = 1;
-
+    // Only the CORRECT door glows when player has the gold key
+    var lit = door.correct && GS.hasGold;
+    var pulse = lit ? 0.7 + 0.3 * Math.sin(Date.now() * 0.004) : 1;
     TX.save();
     TX.fillStyle = "rgba(0,0,0,.22)";
     TX.beginPath();
-    TX.ellipse(door.x + door.w / 2, door.y + door.h + 10, door.w * 0.56, 10, 0, 0, Math.PI * 2);
+    TX.ellipse(
+      door.x + door.w / 2,
+      door.y + door.h + 10,
+      door.w * 0.56,
+      10,
+      0,
+      0,
+      Math.PI * 2,
+    );
     TX.fill();
     TX.fillStyle = "rgba(32,18,18,.88)";
     TX.fillRect(door.x - 14, door.y + door.h - 14, door.w + 28, 30);
@@ -1930,22 +2355,51 @@ function drawDoors() {
     TX.restore();
 
     // Glow for correct door
+    // Glow for correct door — golden ethereal aura
     if (lit) {
       TX.save();
-      TX.shadowBlur = 30;
-      TX.shadowColor = "#ffd700";
+      TX.shadowBlur = 40 + 10 * Math.sin(Date.now() * 0.006);
+      TX.shadowColor = "rgba(255,215,0,0.6)";
       var glowG = TX.createRadialGradient(
         door.x + door.w / 2,
         door.y + door.h / 2,
-        10,
+        5,
         door.x + door.w / 2,
         door.y + door.h / 2,
-        80,
+        100 + 15 * Math.sin(Date.now() * 0.003),
       );
-      glowG.addColorStop(0, "rgba(255,215,0,.35)");
+      glowG.addColorStop(
+        0,
+        "rgba(255,215,0," + (0.25 + 0.1 * Math.sin(Date.now() * 0.005)) + ")",
+      );
+      glowG.addColorStop(
+        0.4,
+        "rgba(255,180,60," + (0.12 + 0.06 * Math.sin(Date.now() * 0.004)) + ")",
+      );
       glowG.addColorStop(1, "transparent");
       TX.fillStyle = glowG;
-      TX.fillRect(door.x - 40, door.y - 20, door.w + 80, door.h + 40);
+      TX.fillRect(door.x - 60, door.y - 40, door.w + 120, door.h + 80);
+
+      // Floating sparkles around correct door
+      var sparkleCount = 5;
+      for (var spk = 0; spk < sparkleCount; spk++) {
+        var spkAngle = Date.now() * 0.002 + (spk / sparkleCount) * Math.PI * 2;
+        var spkRadius = 50 + 20 * Math.sin(Date.now() * 0.003 + spk);
+        var spkX = door.x + door.w / 2 + Math.cos(spkAngle) * spkRadius;
+        var spkY = door.y + door.h / 2 + Math.sin(spkAngle) * spkRadius * 0.6;
+        var spkAlpha = 0.4 + 0.4 * Math.sin(Date.now() * 0.005 + spk);
+        TX.fillStyle = "rgba(255,230,150," + spkAlpha + ")";
+        TX.beginPath();
+        TX.arc(
+          spkX,
+          spkY,
+          2 + Math.sin(Date.now() * 0.007 + spk),
+          0,
+          Math.PI * 2,
+        );
+        TX.fill();
+      }
+
       TX.restore();
     }
 
@@ -1995,50 +2449,25 @@ function drawDoors() {
       }
     }
     // Labels
-    TX.fillStyle = lit ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
+    TX.fillStyle = door.correct ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
     TX.font = "9px Cinzel,serif";
     TX.textAlign = "center";
-    TX.fillText(door.label || "EXIT", door.x + door.w / 2, door.y + door.h + 14);
+    TX.fillText(
+      door.label || "EXIT",
+      door.x + door.w / 2,
+      door.y + door.h + 14,
+    );
     if (GS.activeDoorIndex === i) {
       TX.fillStyle = "rgba(255,215,0,.95)";
-      TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
+      if (!GS.hasGold) {
+        TX.fillText("🔒 NEED KEY", door.x + door.w / 2, door.y - 8);
+      } else if (door.attempted) {
+        TX.fillText("[E] RETRY", door.x + door.w / 2, door.y - 8);
+      } else {
+        TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
+      }
     }
     TX.textAlign = "left";
-  });
-}
-
-function drawMobs() {
-  if (!MAP.mobs) return;
-  MAP.mobs.forEach(function (m) {
-    if (m.dead) return;
-    var drawY = m.type === "rat" ? m.y - m.h : m.y;
-    if (m.x + m.w < CAM.x - 40 || m.x > CAM.x + TC.width + 40) return;
-
-    TX.save();
-    if (m.vx < 0) {
-      TX.translate(m.x + m.w, drawY);
-      TX.scale(-1, 1);
-      var dx = 0;
-    } else {
-      TX.translate(m.x, drawY);
-      var dx = 0;
-    }
-
-    if (m.type === "rat" && SPR.rat && SPR.rat.length) {
-      var frame = SPR.rat[Math.floor((m.tick || 0) / 8) % SPR.rat.length];
-      if (frame && frame.complete && frame.naturalWidth) {
-        TX.drawImage(frame, dx, 0, m.w, m.h);
-      } else {
-        TX.fillStyle = "#7c6450";
-        TX.fillRect(dx, 0, m.w, m.h);
-      }
-    } else if (m.type === "bat" && SPR.bat && SPR.bat.complete && SPR.bat.naturalWidth) {
-      TX.drawImage(SPR.bat, dx, 0, m.w, m.h);
-    } else {
-      TX.fillStyle = m.type === "bat" ? "#5a485e" : "#7c6450";
-      TX.fillRect(dx, 0, m.w, m.h);
-    }
-    TX.restore();
   });
 }
 
@@ -2089,7 +2518,7 @@ function drawPlayer() {
     TX.globalAlpha = fx.alpha;
     TX.shadowBlur = 24 * fx.glow;
     TX.shadowColor = "rgba(255,180,90,.85)";
-    TX.fillStyle = "rgba(0,0,0," + (0.18 * fx.alpha) + ")";
+    TX.fillStyle = "rgba(0,0,0," + 0.18 * fx.alpha + ")";
     TX.beginPath();
     TX.ellipse(
       fx.x + PL.sw / 2,
@@ -2104,7 +2533,10 @@ function drawPlayer() {
 
     TX.translate(fx.x + PL.sw / 2, fx.y + PL.sh * 0.56);
     TX.rotate(fx.rot);
-    TX.scale((PL.dir === -1 ? -1 : 1) * fx.scale, Math.max(0.78, 1 - fx.t * 0.01));
+    TX.scale(
+      (PL.dir === -1 ? -1 : 1) * fx.scale,
+      Math.max(0.78, 1 - fx.t * 0.01),
+    );
 
     if (img && img.complete && img.naturalWidth) {
       TX.drawImage(img, -PL.sw / 2, -PL.sh * 0.56, PL.sw, PL.sh);
@@ -2153,28 +2585,39 @@ function drawPlayer() {
     }
   }
 
-  if (img && img.complete && img.naturalWidth) {
-    if (PL.dir === -1) {
-      TX.translate(PL.x + PL.sw, PL.y);
-      TX.scale(-1, 1);
-      TX.drawImage(img, 0, 0, PL.sw, PL.sh);
+  // Skip drawing normal idle/walk sprite if sword swing is active
+  var suppressNormalSprite =
+    GS.hasSword &&
+    GS.sword.active &&
+    SPR.swing &&
+    SPR.swing.complete &&
+    SPR.swing.naturalWidth;
+
+  if (!suppressNormalSprite) {
+    if (img && img.complete && img.naturalWidth) {
+      if (PL.dir === -1) {
+        TX.translate(PL.x + PL.sw, PL.y);
+        TX.scale(-1, 1);
+        TX.drawImage(img, 0, 0, PL.sw, PL.sh);
+      } else {
+        TX.drawImage(img, PL.x, PL.y, PL.sw, PL.sh);
+      }
     } else {
-      TX.drawImage(img, PL.x, PL.y, PL.sw, PL.sh);
+      // Fallback block figure
+      if (PL.dir === -1) {
+        TX.translate((PL.x + PL.sw / 2) * 2, 0);
+        TX.scale(-1, 1);
+      }
+      TX.fillStyle = "#d4a843";
+      TX.fillRect(PL.x + 8, PL.y + 20, PL.sw - 16, PL.sh - 28);
+      TX.fillStyle = "#f0c080";
+      TX.fillRect(PL.x + 10, PL.y + 2, PL.sw - 20, 20);
+      TX.fillStyle = "#8a3020";
+      TX.fillRect(PL.x + 8, PL.y + 22, PL.sw - 16, 6);
     }
-  } else {
-    // Fallback block figure
-    if (PL.dir === -1) {
-      TX.translate((PL.x + PL.sw / 2) * 2, 0);
-      TX.scale(-1, 1);
-    }
-    TX.fillStyle = "#d4a843";
-    TX.fillRect(PL.x + 8, PL.y + 20, PL.sw - 16, PL.sh - 28);
-    TX.fillStyle = "#f0c080";
-    TX.fillRect(PL.x + 10, PL.y + 2, PL.sw - 20, 20);
-    TX.fillStyle = "#8a3020";
-    TX.fillRect(PL.x + 8, PL.y + 22, PL.sw - 16, 6);
   }
 
+  // Gold item indicator above head
   // Gold item indicator above head
   if (GS.hasGold) {
     TX.globalAlpha = 1;
@@ -2183,6 +2626,76 @@ function drawPlayer() {
     TX.fillText("🪙", PL.x + PL.sw / 2, PL.y - 6);
     TX.textAlign = "left";
   }
+
+  // ── SWORD / SWING ANIMATION DRAW ──
+  if (GS.hasSword && !GS.deathFx) {
+    if (GS.sword.active) {
+      // SWINGING — show SPRITE_SWING at exact same position/size as the player
+      GS.sword.swingTick++;
+      if (GS.sword.swingTick >= 3) {
+        GS.sword.swingTick = 0;
+        GS.sword.swingFrame++;
+      }
+
+      var swingImg = SPR.swing;
+      if (swingImg && swingImg.complete && swingImg.naturalWidth) {
+        TX.save();
+        if (PL.dir === -1) {
+          TX.translate(PL.x + PL.sw, PL.y - PL.sh * 0.25);
+          TX.scale(-1, 1);
+          TX.drawImage(swingImg, 0, 0, PL.sw * 1.5, PL.sh * 1.5);
+        } else {
+          TX.drawImage(
+            swingImg,
+            PL.x - PL.sw * 0.25,
+            PL.y - PL.sh * 0.25,
+            PL.sw * 2.0,
+            PL.sh * 1.5,
+          );
+        }
+        TX.restore();
+      } else {
+        // Fallback — drawn swing arc
+        var swingProgress = 1 - GS.sword.timer / 18;
+        var handX = PL.x + PL.sw / 2 + PL.dir * 40;
+        var handY = PL.y + PL_COY + PL.h * 0.62;
+        var idleAngle = PL.dir === 1 ? Math.PI * 0.55 : Math.PI * 0.45;
+        var swingAngle =
+          PL.dir === 1
+            ? idleAngle - Math.PI * 0.9 * Math.sin(swingProgress * Math.PI)
+            : idleAngle + Math.PI * 0.9 * Math.sin(swingProgress * Math.PI);
+        var swordLen = 62,
+          swordW = 10;
+        TX.save();
+        TX.translate(handX, handY);
+        TX.rotate(swingAngle);
+        if (swingProgress < 0.85) {
+          TX.save();
+          TX.globalAlpha = 0.18 * (1 - swingProgress);
+          TX.strokeStyle = "#ffe066";
+          TX.lineWidth = swordW * 2.2;
+          TX.lineCap = "round";
+          TX.beginPath();
+          TX.moveTo(0, 19);
+          TX.lineTo(0, 19 + swordLen);
+          TX.stroke();
+          TX.restore();
+        }
+        TX.fillStyle = "#5a3010";
+        TX.fillRect(-3, 0, 6, 14);
+        TX.fillStyle = "#d4a843";
+        TX.fillRect(-10, 14, 20, 5);
+        TX.fillStyle = "#e8eaf0";
+        TX.fillRect(-swordW / 2, 19, swordW, swordLen);
+        TX.restore();
+      }
+    } else {
+      // IDLE — keep normal SPRITE_IDLE / SPRITE_IDLE2
+      GS.sword.swingFrame = 0;
+      GS.sword.swingTick = 0;
+    }
+  }
+
   TX.restore();
 }
 
@@ -2224,6 +2737,38 @@ function drawStamBar(W, H) {
   var dr = document.getElementById("dash-ready");
   if (dr)
     dr.textContent = PL.dcd <= 0 && PL.stamina >= DASH_COST ? "READY" : "";
+
+  // Sword HUD indicator
+  var swordHud = document.getElementById("sword-hud");
+  if (!swordHud && GS.hasSword) {
+    swordHud = document.createElement("div");
+    swordHud.id = "sword-hud";
+    swordHud.style.cssText = [
+      "position:fixed",
+      "bottom:54px",
+      "right:18px",
+      "background:rgba(10,6,4,0.82)",
+      "border:1px solid #d4a843",
+      "border-radius:6px",
+      "padding:4px 10px",
+      "color:#e8dcc8",
+      "font-family:Cinzel,serif",
+      "font-size:11px",
+      "pointer-events:none",
+      "z-index:200",
+    ].join(";");
+    swordHud.textContent = "⚔️  [F] Swing";
+    document.body.appendChild(swordHud);
+  }
+  if (swordHud) {
+    if (!GS.hasSword) {
+      swordHud.style.display = "none";
+    } else {
+      swordHud.style.display = "";
+      var swReady = GS.sword && GS.sword.cooldown <= 0;
+      swordHud.style.opacity = swReady ? "1" : "0.45";
+    }
+  }
 }
 
 /* ── PARTICLES ──────────────────────────────────────────────────── */
@@ -2270,6 +2815,24 @@ function spawnGoldPtcls(gx, gy) {
     });
 }
 
+function spawnPotShards(cx, cy) {
+  for (var i = 0; i < 14; i++) {
+    var angle = Math.random() * Math.PI * 2;
+    var speed = Math.random() * 5 + 2;
+    GS.ptcls.push({
+      x: cx + (Math.random() - 0.5) * 20,
+      y: cy + (Math.random() - 0.5) * 20,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 3,
+      life: 1,
+      dec: 0.04 + Math.random() * 0.03,
+      sz: Math.random() * 5 + 3,
+      col: Math.random() < 0.5 ? "#8B6955" : "#C4A882",
+      type: "dust",
+    });
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MAIN LOOP
 ═══════════════════════════════════════════════════════════════════ */
@@ -2302,8 +2865,118 @@ function updateHUD() {
       (full ? "#ff4444" : "#4a2020") +
       '" stroke-width="1.5"/></svg>';
   }
-}
 
+  // ── Armor indicator: 2 sprite pips below the hearts ──
+  var armorRow = document.getElementById("hud-armor");
+  if (!armorRow) {
+    armorRow = document.createElement("div");
+    armorRow.id = "hud-armor";
+    armorRow.style.cssText =
+      "display:flex;gap:4px;margin-top:5px;justify-content:center;";
+    hb.parentNode.appendChild(armorRow);
+  }
+  armorRow.innerHTML = "";
+  var armorSrc = GS.hasArmor
+    ? SPR.armorWith
+      ? SPR.armorWith.src
+      : ""
+    : SPR.armorWithout
+      ? SPR.armorWithout.src
+      : "";
+  for (var j = 0; j < 2; j++) {
+    armorRow.innerHTML +=
+      '<img src="' +
+      armorSrc +
+      '" width="22" height="22" ' +
+      'style="image-rendering:pixelated;opacity:' +
+      (GS.hasArmor ? "1" : "0.35") +
+      '"/>';
+  }
+
+  // ── Visual icon inventory (fixed right-side panel) ──
+  var invBox = document.getElementById("hud-inventory");
+  if (!invBox) {
+    invBox = document.createElement("div");
+    invBox.id = "hud-inventory";
+    invBox.style.cssText = [
+      "position:fixed",
+      "top:18px",
+      "right:22px",
+      "z-index:50",
+      "display:flex",
+      "flex-direction:column",
+      "gap:6px",
+      "align-items:flex-end",
+      "pointer-events:none",
+    ].join(";");
+    document.body.appendChild(invBox);
+  }
+  // Build icon slots
+  var items = [];
+  if (GS.hasSword)
+    items.push({
+      label: "Sword",
+      src: SPR_PATHS.sword || null,
+      emoji: "⚔️",
+      key: "sword",
+    });
+  if (GS.hasGold)
+    items.push({
+      label: "Thread",
+      src: SPR_PATHS.gold || SPR_PATHS.pot || null,
+      emoji: "🧵",
+      key: "gold",
+    });
+
+  invBox.innerHTML = "";
+  items.forEach(function (item) {
+    var slot = document.createElement("div");
+    slot.style.cssText = [
+      "display:flex",
+      "align-items:center",
+      "gap:7px",
+      "background:rgba(10,6,4,0.82)",
+      "border:1px solid #d4a843",
+      "border-radius:6px",
+      "padding:4px 9px 4px 5px",
+      "animation:inv-pop 0.22s ease",
+    ].join(";");
+
+    // Icon — use sprite image if available, emoji fallback
+    if (item.src) {
+      var img = document.createElement("img");
+      img.src = item.src;
+      img.width = 28;
+      img.height = 28;
+      img.style.cssText =
+        "image-rendering:pixelated;border-radius:3px;background:rgba(255,255,255,0.05);object-fit:contain;";
+      img.onerror = function () {
+        // If image fails, swap in the emoji fallback
+        var emo = document.createElement("span");
+        emo.textContent = item.emoji;
+        emo.style.cssText =
+          "font-size:22px;line-height:28px;width:28px;text-align:center;display:inline-block;";
+        if (img.parentNode) img.parentNode.replaceChild(emo, img);
+      };
+      slot.appendChild(img);
+    } else {
+      var emo = document.createElement("span");
+      emo.textContent = item.emoji;
+      emo.style.cssText =
+        "font-size:22px;line-height:28px;width:28px;text-align:center;display:inline-block;";
+      slot.appendChild(emo);
+    }
+
+    // Label
+    var lbl = document.createElement("span");
+    lbl.textContent = item.label;
+    lbl.style.cssText =
+      "font-family:Cinzel,serif;font-size:10px;color:#e8dcc8;";
+    slot.appendChild(lbl);
+
+    invBox.appendChild(slot);
+  });
+}
 /* ── STEPS ─────────────────────────────────────────────────────── */
 function showStep(idx) {
   return;
@@ -2314,7 +2987,33 @@ function advanceStep() {
 }
 
 function showBadge(msg) {
-  return;
+  var existing = document.getElementById("hud-badge");
+  if (existing) existing.remove();
+  var badge = document.createElement("div");
+  badge.id = "hud-badge";
+  badge.textContent = msg;
+  badge.style.cssText = [
+    "position:fixed",
+    "bottom:90px",
+    "left:50%",
+    "transform:translateX(-50%)",
+    "background:rgba(10,6,4,0.88)",
+    "border:1px solid #d4a843",
+    "border-radius:6px",
+    "padding:8px 18px",
+    "color:#e8dcc8",
+    "font-family:Cinzel,serif",
+    "font-size:13px",
+    "pointer-events:none",
+    "z-index:500",
+    "white-space:nowrap",
+    "animation:inv-pop 0.2s ease",
+  ].join(";");
+  document.body.appendChild(badge);
+  clearTimeout(showBadge._t);
+  showBadge._t = setTimeout(function () {
+    if (badge.parentNode) badge.parentNode.removeChild(badge);
+  }, 2400);
 }
 
 /* ── SCREENS ────────────────────────────────────────────────────── */
@@ -2323,7 +3022,7 @@ function showScreen(id) {
     window.__minosStageSaved = true;
     import("../progress-service.js")
       .then(function (service) {
-        return service.markStageComplete(8);
+        return service.markStageComplete(2);
       })
       .catch(function (error) {
         console.warn("Firebase stage progress save failed.", error);
