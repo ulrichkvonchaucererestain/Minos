@@ -338,56 +338,7 @@ function buildMap() {
     };
   });
 
-  /* ── STAGE II EXIT — 3 DOORS (2 fake, 1 real) ── */
-  var dW = 118,
-    dH = 154;
-  var doorY = FLOOR_Y - dH;
-
-  // Randomly assign which door is correct (0, 1, or 2)
-  var correctDoorIndex = Math.floor(Math.random() * 3);
-
-  MAP.doors = [
-    {
-      x: 2400, // scattered: mid-left area
-      y: loftY - dH,
-      w: dW,
-      h: dH,
-      correct: correctDoorIndex === 0,
-      fake: correctDoorIndex !== 0,
-      label: correctDoorIndex === 0 ? "???" : "DOOR I",
-      hint: "The true path lies where shadows gather near the climb.",
-    },
-    {
-      x: 5200, // scattered: lower area
-      y: lowerY - dH,
-      w: dW,
-      h: dH,
-      correct: correctDoorIndex === 1,
-      fake: correctDoorIndex !== 1,
-      label: correctDoorIndex === 1 ? "???" : "DOOR II",
-      hint: "Seek the threshold where the bones whisper warnings.",
-    },
-    {
-      x: 7800, // scattered: near end
-      y: doorY,
-      w: dW,
-      h: dH,
-      correct: correctDoorIndex === 2,
-      fake: correctDoorIndex !== 2,
-      label: correctDoorIndex === 2 ? "???" : "DOOR III",
-      hint: "The exit breathes where the thread of gold was spun.",
-    },
-  ];
-
-  // Store correct index for hint system
-  MAP.correctDoorIndex = correctDoorIndex;
-
-  // Track which doors have been attempted
-  MAP.doors.forEach(function (d) {
-    d.attempted = false;
-  });
-
-  MAP.doorFrameRect = null;
+  initStage2Doors(loftY, lowerY);
 
   MAP.decorBack = [
     { key: "cage", x: 168, y: FLOOR_Y - 268, w: 110, h: 90, alpha: 0.18 },
@@ -1108,18 +1059,9 @@ function spawnPlayer() {
 
 function resetToStart() {
   loadSpr();
-  // Reset all traps
-  // Re-randomize correct door on reset
-  if (MAP.doors && MAP.doors.length === 3) {
-    var newCorrect = Math.floor(Math.random() * 3);
-    MAP.correctDoorIndex = newCorrect;
-    MAP.doors.forEach(function (d, i) {
-      d.correct = i === newCorrect;
-      d.fake = i !== newCorrect;
-      d.label = i === newCorrect ? "???" : "DOOR " + ["I", "II", "III"][i];
-      d.attempted = false;
-    });
-  }
+
+  //Para Ma Reset Lahat ng Pintuan
+  resetStage2Doors();
 
   // Clear quiz state
   GS.currentQuiz = null;
@@ -1298,38 +1240,8 @@ function tutUpdate() {
     });
   }
 
-  /* ── DOOR INTERACTION ── */
-  GS.activeDoorIndex = -1;
-  MAP.doors.forEach(function (door, i) {
-    var px7 = PL.x + PL_COX,
-      py7 = PL.y + PL_COY;
-    if (
-      px7 < door.x + door.w + 10 &&
-      px7 + PL.w > door.x - 10 &&
-      py7 + PL.h > door.y &&
-      py7 < door.y + door.h
-    ) {
-      GS.activeDoorIndex = i;
-      if (JP["KeyE"]) {
-        if (!GS.hasGold) {
-          showBadge("🔒 Locked! Find the Golden Thread first...");
-          JP["KeyE"] = false;
-          /* ── DROPPED ITEM PICKUP ── */
-          checkDroppedItemPickup();
-          return;
-        }
+  updateStage2Doors();
 
-        if (door.fake) {
-          // Wrong door — jumpscare + reset
-          wrongDoor();
-        } else {
-          // Right door — quiz time
-          showQuizModal(i);
-        }
-        JP["KeyE"] = false;
-      }
-    }
-  });
   checkDroppedItemPickup();
   JP["KeyE"] = false;
 
