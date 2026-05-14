@@ -340,6 +340,7 @@ function buildMap() {
 
   initStage2Doors(loftY, lowerY);
   initRats();
+  initBats();
 
   MAP.decorBack = [
     { key: "cage", x: 168, y: FLOOR_Y - 268, w: 110, h: 90, alpha: 0.18 },
@@ -1126,6 +1127,7 @@ function tutUpdate() {
   updateStage2SpikeTraps();
   updateStage2FireballTrap();
   updateRats();
+  updateBats();
 
   /* ── HAMMER ── */
   if (MAP.hammer) {
@@ -1607,6 +1609,7 @@ function tutDraw() {
   drawDroppedItems();
   drawSwordItem();
   drawRats();
+  drawBats();
   drawDoors();
   drawDecorLayer(MAP.decorFront);
   drawParticles();

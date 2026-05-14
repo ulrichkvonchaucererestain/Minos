@@ -1,6 +1,6 @@
 var RAT_MIN_COUNT = 4;
 var RAT_MAX_COUNT = 6;
-var RAT_PLAYER_SPAWN_SAFE_DISTANCE = 700;
+var RAT_PLAYER_SPAWN_SAFE_DISTANCE = 900;
 var RAT_IMG = null;
 
 function loadRatSprite() {
