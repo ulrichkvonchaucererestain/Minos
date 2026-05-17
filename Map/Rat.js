@@ -1,6 +1,5 @@
-var RAT_MIN_COUNT = 4;
-var RAT_MAX_COUNT = 6;
-var RAT_PLAYER_SPAWN_SAFE_DISTANCE = 900;
+var RAT_MIN_COUNT = MOB_MIN_COUNT;
+var RAT_MAX_COUNT = MOB_MAX_COUNT;
 var RAT_IMG = null;
 
 function loadRatSprite() {
@@ -10,78 +9,16 @@ function loadRatSprite() {
   RAT_IMG.src = SPRITE_RAT;
 }
 
-function rectOverlapsPlatform(platform, rect) {
-  return (
-    rect.x < platform.x + platform.w &&
-    rect.x + rect.w > platform.x &&
-    Math.abs(rect.y - platform.y) < 180
-  );
-}
-
-function platformHasDoorOrTrap(platform) {
-  var blocked = false;
-
-  if (MAP.doors) {
-    MAP.doors.forEach(function (door) {
-      if (rectOverlapsPlatform(platform, door)) blocked = true;
-    });
-  }
-
-  if (MAP.spikes) {
-    MAP.spikes.forEach(function (spike) {
-      if (rectOverlapsPlatform(platform, spike)) blocked = true;
-    });
-  }
-
-  if (MAP.readySpike && rectOverlapsPlatform(platform, MAP.readySpike)) {
-    blocked = true;
-  }
-
-  if (MAP.fireballLauncher) {
-    var fireTrap = {
-      x: MAP.fireballLauncher.plateX,
-      y: FLOOR_Y,
-      w: MAP.fireballLauncher.plateW,
-      h: 40,
-    };
-
-    if (rectOverlapsPlatform(platform, fireTrap)) blocked = true;
-  }
-
-  return blocked;
-}
-
-function platformIsNearPlayerSpawn(platform) {
-  if (!MAP.spawn) return false;
-
-  var platformCenterX = platform.x + platform.w / 2;
-  var spawnCenterX = MAP.spawn.x + PL.w / 2;
-
-  return (
-    Math.abs(platformCenterX - spawnCenterX) < RAT_PLAYER_SPAWN_SAFE_DISTANCE
-  );
-}
-
 function initRats() {
   loadRatSprite();
 
-  var safePlatforms = MAP.platforms.filter(function (platform) {
-    return (
-      platform.w >= 140 &&
-      !platformHasDoorOrTrap(platform) &&
-      !platformIsNearPlayerSpawn(platform)
-    );
-  });
-
   MAP.rats = [];
 
-  var ratCount =
-    RAT_MIN_COUNT +
-    Math.floor(Math.random() * (RAT_MAX_COUNT - RAT_MIN_COUNT + 1));
+  var ratCount = getRandomMobCount();
+  var safePlatforms = getMobSpawnPlatforms("rat", 140, ratCount);
 
-  for (var i = 0; i < ratCount && safePlatforms.length > 0; i++) {
-    var platformIndex = Math.floor(Math.random() * safePlatforms.length);
-    var platform = safePlatforms.splice(platformIndex, 1)[0];
+  for (var i = 0; i < safePlatforms.length; i++) {
+    var platform = safePlatforms[i];
     var ratW = 46;
     var ratH = 32;
     var minX = platform.x + 18;
@@ -100,7 +37,6 @@ function initRats() {
     });
   }
 }
-
 function ratHitsPlayer(rat) {
   var px = PL.x + PL_COX;
   var py = PL.y + PL_COY;
@@ -117,6 +53,7 @@ function updateRats() {
   if (!MAP.rats) return;
 
   MAP.rats.forEach(function (rat) {
+    if (rat.dead) return;
     rat.x += rat.vx;
     rat.frame += 0.15;
 
@@ -136,6 +73,7 @@ function drawRats() {
   if (!MAP.rats) return;
 
   MAP.rats.forEach(function (rat) {
+    if (rat.dead) return; 
     if (rat.x + rat.w < CAM.x - 50 || rat.x > CAM.x + TC.width + 50) return;
 
     TX.save();

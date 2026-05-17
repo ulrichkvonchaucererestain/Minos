@@ -1,6 +1,5 @@
-var BAT_MIN_COUNT = 3;
-var BAT_MAX_COUNT = 5;
-var BAT_PLAYER_SPAWN_SAFE_DISTANCE = 900;
+var BAT_MIN_COUNT = MOB_MIN_COUNT;
+var BAT_MAX_COUNT = MOB_MAX_COUNT;
 var BAT_DAMAGE_DISTANCE = 55;
 var BAT_HEIGHT_OFFSET = 19;
 var BAT_IMG = null;
@@ -12,81 +11,16 @@ function loadBatSprite() {
   BAT_IMG.src = SPRITE_BAT;
 }
 
-function batRectOverlapsPlatform(platform, rect) {
-  return (
-    rect.x < platform.x + platform.w &&
-    rect.x + rect.w > platform.x &&
-    Math.abs(rect.y - platform.y) < 180
-  );
-}
-
-function batPlatformHasDoorOrTrap(platform) {
-  var blocked = false;
-
-  if (MAP.doors) {
-    MAP.doors.forEach(function (door) {
-      if (batRectOverlapsPlatform(platform, door)) blocked = true;
-    });
-  }
-
-  if (MAP.spikes) {
-    MAP.spikes.forEach(function (spike) {
-      if (batRectOverlapsPlatform(platform, spike)) blocked = true;
-    });
-  }
-
-  if (MAP.readySpike && batRectOverlapsPlatform(platform, MAP.readySpike)) {
-    blocked = true;
-  }
-
-  if (MAP.fireballLauncher) {
-    var fireTrap = {
-      x: MAP.fireballLauncher.plateX,
-      y: FLOOR_Y,
-      w: MAP.fireballLauncher.plateW,
-      h: 40,
-    };
-
-    if (batRectOverlapsPlatform(platform, fireTrap)) blocked = true;
-  }
-
-  return blocked;
-}
-
-function batPlatformIsNearPlayerSpawn(platform) {
-  if (!MAP.spawn) return false;
-
-  var platformCenterX = platform.x + platform.w / 2;
-  var platformCenterY = platform.y;
-  var spawnCenterX = MAP.spawn.x + PL.w / 2;
-  var spawnCenterY = MAP.spawn.y + PL.h / 2;
-
-  return (
-    Math.hypot(platformCenterX - spawnCenterX, platformCenterY - spawnCenterY) <
-    BAT_PLAYER_SPAWN_SAFE_DISTANCE
-  );
-}
-
 function initBats() {
   loadBatSprite();
 
-  var safePlatforms = MAP.platforms.filter(function (platform) {
-    return (
-      platform.w >= 160 &&
-      !batPlatformHasDoorOrTrap(platform) &&
-      !batPlatformIsNearPlayerSpawn(platform)
-    );
-  });
-
   MAP.bats = [];
 
-  var batCount =
-    BAT_MIN_COUNT +
-    Math.floor(Math.random() * (BAT_MAX_COUNT - BAT_MIN_COUNT + 1));
+  var batCount = getRandomMobCount();
+  var safePlatforms = getMobSpawnPlatforms("bat", 160, batCount);
 
-  for (var i = 0; i < batCount && safePlatforms.length > 0; i++) {
-    var platformIndex = Math.floor(Math.random() * safePlatforms.length);
-    var platform = safePlatforms.splice(platformIndex, 1)[0];
+  for (var i = 0; i < safePlatforms.length; i++) {
+    var platform = safePlatforms[i];
 
     var batW = 44;
     var batH = 38;
@@ -108,7 +42,6 @@ function initBats() {
     });
   }
 }
-
 function batHitsPlayer(bat) {
   var playerCenterX = PL.x + PL_COX + PL.w / 2;
   var playerCenterY = PL.y + PL_COY + PL.h / 2;
@@ -125,6 +58,7 @@ function updateBats() {
   if (!MAP.bats) return;
 
   MAP.bats.forEach(function (bat) {
+    if (bat.dead) return; 
     bat.x += bat.vx;
     bat.frame += 0.2;
     bat.y = bat.baseY + Math.sin(bat.frame) * 18;
@@ -145,6 +79,7 @@ function drawBats() {
   if (!MAP.bats) return;
 
   MAP.bats.forEach(function (bat) {
+    if (bat.dead) return;  
     if (bat.x + bat.w < CAM.x - 50 || bat.x > CAM.x + TC.width + 50) return;
 
     TX.save();
@@ -171,3 +106,6 @@ function drawBatImage(x, y, bat) {
     TX.fillRect(x, y + 16, bat.w, 8);
   }
 }
+
+
+
