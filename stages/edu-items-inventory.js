@@ -1,73 +1,9 @@
 (function () {
   var STORAGE_KEY = "minos_edu_demo_inventory_v2";
   var MAX_ITEMS = 5;
-  var QUESTIONS = [
-    {
-      q: "What does HTML stand for?",
-      choices: [
-        "HyperText Markup Language",
-        "HighText Machine Language",
-        "Hyper Tool Multi Language",
-      ],
-      answer: 0,
-    },
-    { q: "What is 12 ÷ 3?", choices: ["3", "4", "5"], answer: 1 },
-    {
-      q: "What is the capital of the Philippines?",
-      choices: ["Cebu", "Manila", "Davao"],
-      answer: 1,
-    },
-    {
-      q: "Which planet is known as the Red Planet?",
-      choices: ["Venus", "Mars", "Jupiter"],
-      answer: 1,
-    },
-    {
-      q: "Which gas do humans need to breathe?",
-      choices: ["Oxygen", "Helium", "Carbon"],
-      answer: 0,
-    },
-    {
-      q: "Which device is used to point and click?",
-      choices: ["Mouse", "Monitor", "Speaker"],
-      answer: 0,
-    },
-    { q: "What is 9 + 7?", choices: ["15", "16", "17"], answer: 1 },
-    {
-      q: "Which part of a plant absorbs water?",
-      choices: ["Leaf", "Root", "Flower"],
-      answer: 1,
-    },
-  ];
   var lastE = false;
   var itemState = null;
-
-  var STAGE_ITEMS = {
-    1: [
-      { platform: 2, type: "book", icon: "📘", name: "Book" },
-      { platform: 6, type: "feather", icon: "🪶", name: "Feather" },
-      { platform: 11, type: "scroll", icon: "📜", name: "Scroll" },
-      { platform: 15, type: "tablet", icon: "🪨", name: "Tablet" },
-    ],
-    2: [
-      { platform: 1, type: "book", icon: "📘", name: "Book" },
-      { platform: 5, type: "feather", icon: "🪶", name: "Feather" },
-      { platform: 10, type: "scroll", icon: "📜", name: "Scroll" },
-      { platform: 16, type: "tablet", icon: "🪨", name: "Tablet" },
-    ],
-    3: [
-      { platform: 1, type: "book", icon: "📘", name: "Book" },
-      { platform: 4, type: "feather", icon: "🪶", name: "Feather" },
-      { platform: 9, type: "scroll", icon: "📜", name: "Scroll" },
-      { platform: 14, type: "tablet", icon: "🪨", name: "Tablet" },
-    ],
-    4: [
-      { platform: 1, type: "book", icon: "📘", name: "Book" },
-      { platform: 5, type: "feather", icon: "🪶", name: "Feather" },
-      { platform: 12, type: "scroll", icon: "📜", name: "Scroll" },
-      { platform: 18, type: "tablet", icon: "🪨", name: "Tablet" },
-    ],
-  };
+  var selectedSlot = -1;
 
   function getStageNumber() {
     var m = (location.pathname || "").match(/stage(\d+)\.html/i);
@@ -123,16 +59,35 @@
       var slot = document.createElement("div");
       slot.style.width = "36px";
       slot.style.height = "36px";
-      slot.style.border = "1px solid rgba(212,168,67,.45)";
+      slot.style.border =
+        selectedSlot === i && inv[i]
+          ? "2px solid #00e5ff" // cyan = holding
+          : "1px solid rgba(212,168,67,.45)";
       slot.style.borderRadius = "8px";
       slot.style.display = "flex";
       slot.style.alignItems = "center";
       slot.style.justifyContent = "center";
-      slot.style.background = "rgba(24,13,12,.86)";
+      slot.style.background =
+        selectedSlot === i && inv[i]
+          ? "rgba(0,180,210,.18)"
+          : "rgba(24,13,12,.86)";
       slot.style.color = "#f0d18a";
       slot.style.fontSize = "18px";
+      slot.style.cursor = inv[i] ? "pointer" : "default";
+      slot.style.transition = "border .15s, background .15s";
       slot.textContent = inv[i] ? inv[i].icon : "";
       slot.title = inv[i] ? inv[i].name : "Empty";
+      (function (idx) {
+        slot.addEventListener("click", function () {
+          if (!loadInventory()[idx]) return;
+          selectedSlot = selectedSlot === idx ? -1 : idx; // toggle
+          updateInventoryUI();
+          var inv2 = loadInventory();
+          if (selectedSlot === idx && inv2[idx]) {
+            showEduBadge("Holding: " + inv2[idx].name);
+          }
+        });
+      })(i);
       ui.appendChild(slot);
     }
   }
@@ -167,8 +122,10 @@
     }
     inv.push({ type: item.type, name: item.name, icon: item.icon });
     saveInventory(inv);
+    var newInv = loadInventory();
+    selectedSlot = newInv.length - 1; // auto-select newly picked item
     updateInventoryUI();
-    showEduBadge(item.name + " added");
+    showEduBadge(item.name + " added!");
     return true;
   }
 
@@ -239,14 +196,11 @@
   function updateItems() {
     var items = getItemsForStage();
     if (!items || !window.PL) return;
-    var eDown = !!(window.KEYS && window.KEYS["KeyE"]);
-    var ePressed = eDown && !lastE;
-    lastE = eDown;
-    if (!ePressed) return;
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
       if (it.collected) continue;
       if (!playerIntersects(it)) continue;
+      // Auto-collect on overlap (no key press needed)
       if (!addItemToInventory(it)) return;
       it.collected = true;
       if (typeof window.spawnGoldPtcls === "function") {
@@ -262,7 +216,7 @@
         }
         showEduBadge("Feather found! +10 stamina");
       } else {
-        askQuestion(it);
+        showEduBadge(it.name + " collected!");
       }
       break;
     }
