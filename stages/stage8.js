@@ -86,6 +86,7 @@ var SPR = {
   swing: null,
   decor: {},
   torch: null,
+  wings: null,
   mapTheme: { map: null, roof: null, fall: null },
 };
 var sprOK = false;
@@ -198,7 +199,10 @@ async function loadSpr() {
   if (typeof SPRITE_SWING_IDLE !== "undefined")
     SPR.swingIdle = await li(SPRITE_SWING_IDLE);
   if (typeof SPRITE_SWING !== "undefined") SPR.swing = await li(SPRITE_SWING);
-  // Armor indicator sprites
+  if (typeof SPRITE_WINGS !== "undefined") {
+    SPR.wings = await li(SPRITE_WINGS);
+    SPR_PATHS.wings = SPRITE_WINGS;
+  }
   if (typeof SPRITE_ARMOR_WITH !== "undefined")
     SPR.armorWith = await li(SPRITE_ARMOR_WITH);
   if (typeof SPRITE_ARMOR_WITHOUT !== "undefined")
@@ -338,6 +342,14 @@ function buildMap() {
     };
   });
 
+  MAP.wing = {
+    x: 7420,
+    y: FLOOR_Y - 64,
+    w: 96,
+    h: 64,
+    collected: false,
+  };
+
   initStage2Doors(loftY, lowerY);
 
   /* ── SPAWN POINT ── */
@@ -470,6 +482,7 @@ var GS = {
   hasGold: false,
   hasArmor: false,
   hasSword: true,
+  hasWing: false,
   nearSword: false,
   nearDroppedItem: false,
   startTime: 0,
@@ -1007,6 +1020,7 @@ function resetToStart() {
   GS.hasGold = false;
   GS.hasArmor = false;
   GS.hasSword = true;
+  GS.hasWing = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -1019,6 +1033,7 @@ function resetToStart() {
   GS.timerSecs = 0;
   spawnPlayer();
   if (MAP.swordItem) MAP.swordItem.collected = false;
+  if (MAP.wing) MAP.wing.collected = false;
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
 
@@ -1116,6 +1131,26 @@ function tutUpdate() {
         spawnGoldPtcls(g.x + g.w / 2, g.y + g.h / 2);
         updateHUD();
       }
+    }
+  }
+
+  /* WING PICKUP */
+  if (MAP.wing && !MAP.wing.collected && !GS.hasWing) {
+    var wg = MAP.wing;
+    var pxWing = PL.x + PL_COX + PL.w / 2;
+    var pyWing = PL.y + PL_COY + PL.h / 2;
+    var wingCX = wg.x + wg.w / 2;
+    var wingCY = wg.y + wg.h / 2;
+
+    if (
+      Math.abs(pxWing - wingCX) < 75 &&
+      Math.abs(pyWing - wingCY) < 75 &&
+      (JP["KeyE"] || KEYS["KeyE"])
+    ) {
+      MAP.wing.collected = true;
+      GS.hasWing = true;
+      showBadge("Wings collected!");
+      updateHUD();
     }
   }
 
@@ -1491,6 +1526,7 @@ function tutDraw() {
   drawHammer();
   drawGold();
   drawPots();
+  drawWing();
   drawThrowFx();
   drawDroppedItems();
   drawSwordItem();
@@ -1704,6 +1740,32 @@ function drawDecorLayer(list) {
     TX.drawImage(img, item.x, item.y, item.w, item.h);
     TX.restore();
   });
+}
+
+function drawWing() {
+  var wing = MAP.wing;
+  var img = SPR.wings;
+  if (!wing || wing.collected || !img) return;
+  if (wing.x + wing.w < CAM.x - 40 || wing.x > CAM.x + TC.width + 40) return;
+
+  TX.save();
+  TX.globalAlpha = 0.95;
+  TX.drawImage(img, wing.x, wing.y, wing.w, wing.h);
+
+  var px = PL.x + PL_COX + PL.w / 2;
+  var py = PL.y + PL_COY + PL.h / 2;
+  var wingCX = wing.x + wing.w / 2;
+  var wingCY = wing.y + wing.h / 2;
+
+  if (Math.abs(px - wingCX) < 90 && Math.abs(py - wingCY) < 90) {
+    TX.fillStyle = "rgba(255,255,180,1)";
+    TX.font = "bold 10px Cinzel,serif";
+    TX.textAlign = "center";
+    TX.fillText("[E] Pick up", wingCX, wing.y - 8);
+    TX.textAlign = "left";
+  }
+
+  TX.restore();
 }
 
 function drawObstacle() {
@@ -2587,6 +2649,14 @@ function updateHUD() {
       src: SPR_PATHS.gold || SPR_PATHS.pot || null,
       emoji: "🧵",
       key: "gold",
+    });
+
+  if (GS.hasWing)
+    items.push({
+      label: "Wings",
+      src: SPR_PATHS.wings || null,
+      emoji: "W",
+      key: "wings",
     });
 
   invBox.innerHTML = "";
