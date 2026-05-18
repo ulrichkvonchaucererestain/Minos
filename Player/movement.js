@@ -1,3 +1,70 @@
+var PLAYER_WALK_AUDIO = null;
+var PLAYER_JUMP_AUDIO = null;
+
+function getPlayerSound(kind) {
+  var src = null;
+
+  if (kind === "walk") {
+    src =
+      typeof SPRITE_WALK !== "undefined"
+        ? SPRITE_WALK
+        : typeof SPRITE_MUSIC_WALK !== "undefined"
+          ? SPRITE_MUSIC_WALK
+          : null;
+  }
+
+  if (kind === "jump") {
+    src =
+      typeof SPRITE_JUMP !== "undefined"
+        ? SPRITE_JUMP
+        : typeof SPRITE_MUSIC_JUMP !== "undefined"
+          ? SPRITE_MUSIC_JUMP
+          : null;
+  }
+
+  if (!src) return null;
+
+  if (kind === "walk" && !PLAYER_WALK_AUDIO) {
+    PLAYER_WALK_AUDIO = new Audio(src);
+    PLAYER_WALK_AUDIO.loop = true;
+    PLAYER_WALK_AUDIO.volume = 0.45;
+  }
+
+  if (kind === "jump" && !PLAYER_JUMP_AUDIO) {
+    PLAYER_JUMP_AUDIO = new Audio(src);
+    PLAYER_JUMP_AUDIO.volume = 0.7;
+  }
+
+  return kind === "walk" ? PLAYER_WALK_AUDIO : PLAYER_JUMP_AUDIO;
+}
+
+function playPlayerJumpSound() {
+  var audio = getPlayerSound("jump");
+  if (!audio) return;
+
+  audio.currentTime = 0;
+  audio.play().catch(function () {});
+}
+
+function updatePlayerWalkSound() {
+  var audio = getPlayerSound("walk");
+  if (!audio) return;
+
+  var shouldPlay =
+    PL.moving &&
+    PL.grounded &&
+    !PL.dashing &&
+    Math.abs(PL.vx) > 0.1 &&
+    !(typeof GS !== "undefined" && (GS.dead || GS.paused || GS.won));
+
+  if (shouldPlay) {
+    if (audio.paused) audio.play().catch(function () {});
+  } else {
+    audio.pause();
+    audio.currentTime = 0;
+  }
+}
+
 function updatePlayerMovement() {
   /* ── INPUT ── */
   var canSpr = PL.stamina > STAM_MIN;
@@ -27,12 +94,13 @@ function updatePlayerMovement() {
   var cap = PX * (PL.sprinting ? SPR_MULT : 1) * 4;
   PL.vx = Math.max(-cap, Math.min(cap, PL.vx));
 
-  // Jump
+  // Talon
   if ((JP["KeyW"] || JP["Space"] || JP["ArrowUp"]) && PL.grounded) {
     PL.vy = JUMP_V;
     PL.grounded = false;
     PL.frame = 0;
     PL.atick = 0;
+    playPlayerJumpSound();
     JP["KeyW"] = JP["Space"] = JP["ArrowUp"] = false;
   }
 
@@ -115,4 +183,6 @@ function updatePlayerMovement() {
     PL.x = WORLD - PL.sw;
     PL.vx = 0;
   }
+
+  updatePlayerWalkSound();
 }

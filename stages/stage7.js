@@ -210,14 +210,11 @@ async function loadSpr() {
   for (var i = 0; i < decorKeys.length; i++) {
     SPR.decor[decorKeys[i]] = await li(DECOR_PATHS[decorKeys[i]]);
   }
-  var selectedTheme = getSelectedMapTheme();
-  var mapDataUrl = MAP_THEME_ASSETS ? MAP_THEME_ASSETS[selectedTheme] : null;
-  if (mapDataUrl) {
-    SPR.mapTheme.map = await li(mapDataUrl);
-    // No separate roof/fall images — the sprite map is one image
-    SPR.mapTheme.roof = null;
-    SPR.mapTheme.fall = null;
-  }
+  var randomMapSprite = getRandomMapSprite();
+
+  SPR.mapTheme.map = randomMapSprite ? await li(randomMapSprite) : null;
+  SPR.mapTheme.roof = null;
+  SPR.mapTheme.fall = null;
   sprOK = true;
 }
 
@@ -1447,8 +1444,6 @@ function tutDraw() {
   TX.translate(-CAM.x, -CAM.y);
 
   drawBG(W, H);
-  drawChamberDepth(H);
-  drawDecorLayer(MAP.decorBack);
   drawPlatforms();
   drawObstacle();
   drawPlates();
@@ -1477,129 +1472,15 @@ function tutDraw() {
 }
 
 function drawBG(W, H) {
-  var th = { color: "#3a2a1a", accentColor: "#d4a843" };
-  GS.flicker = Math.sin(Date.now() * 0.003) * 0.06 + Math.random() * 0.03;
-  var g = TX.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#050309");
-  g.addColorStop(0.56, "#0a0608");
-  g.addColorStop(1, "#040203");
-  TX.fillStyle = g;
+  TX.fillStyle = "#000";
   TX.fillRect(0, 0, WORLD, H);
+
   if (SPR.mapTheme.map) {
     TX.save();
-    TX.globalAlpha = 0.7;
+    TX.globalAlpha = 1;
     TX.drawImage(SPR.mapTheme.map, 0, 0, WORLD, H);
     TX.restore();
   }
-  if (SPR.mapTheme.roof) {
-    TX.save();
-    TX.globalAlpha = 0.3;
-    TX.drawImage(SPR.mapTheme.roof, 0, 0, WORLD, H * 0.18);
-    TX.restore();
-  }
-  var haze = TX.createRadialGradient(
-    CAM.x + W * 0.5,
-    H * 0.18,
-    10,
-    CAM.x + W * 0.5,
-    H * 0.42,
-    W * 0.7,
-  );
-  haze.addColorStop(0, "rgba(214,187,128,0.11)");
-  haze.addColorStop(1, "transparent");
-  TX.fillStyle = haze;
-  TX.fillRect(CAM.x, 0, W, H);
-  TX.fillStyle = th.color + "12";
-  TX.fillRect(0, 0, WORLD, H);
-  TX.strokeStyle = "rgba(20,12,28,.5)";
-  TX.lineWidth = 1;
-  var bw = 80,
-    bh = 50,
-    ox = (GS.bgX * 0.2) % bw;
-  for (var bx = ox + CAM.x - bw; bx < CAM.x + W + bw; bx += bw)
-    for (var by = 0; by < H; by += bh)
-      TX.strokeRect(
-        bx + (Math.floor(by / bh) % 2) * bw * 0.5 - bw * 0.25,
-        by,
-        bw,
-        bh,
-      );
-  for (var col = 0; col < WORLD; col += 340) {
-    if (col < CAM.x - 220 || col > CAM.x + W + 220) continue;
-    TX.fillStyle = "rgba(255,255,255,0.015)";
-    TX.fillRect(col, H * 0.12, 185, H * 0.48);
-    TX.fillStyle = "rgba(0,0,0,0.16)";
-    TX.fillRect(col + 10, H * 0.12, 14, H * 0.48);
-  }
-  // Torches
-  for (var tx = 300; tx < WORLD; tx += 600) {
-    var ty = H * 0.28,
-      inten = 0.1 + GS.flicker * 0.5;
-    if (tx < CAM.x - 150 || tx > CAM.x + W + 150) continue;
-    var tg = TX.createRadialGradient(tx, ty - 16, 0, tx, ty - 12, 126);
-    tg.addColorStop(0, "rgba(255,214,122," + (0.22 + inten * 0.55) + ")");
-    tg.addColorStop(0.34, "rgba(214,104,32," + (0.12 + inten * 0.25) + ")");
-    tg.addColorStop(1, "transparent");
-    TX.fillStyle = tg;
-    TX.fillRect(0, 0, WORLD, H);
-
-    var torch = SPR.torch;
-    var torchW = 34;
-    var torchH = 34;
-    var torchBaseY = ty - 6;
-    if (torch) {
-      TX.drawImage(
-        torch,
-        tx - torchW * 0.5,
-        torchBaseY - torchH,
-        torchW,
-        torchH,
-      );
-    }
-
-    var emberGlow = TX.createRadialGradient(
-      tx,
-      torchBaseY - 28,
-      0,
-      tx,
-      torchBaseY - 28,
-      34,
-    );
-    emberGlow.addColorStop(0, "rgba(255,240,184,.48)");
-    emberGlow.addColorStop(0.3, "rgba(255,170,70,.26)");
-    emberGlow.addColorStop(1, "transparent");
-    TX.fillStyle = emberGlow;
-    TX.fillRect(tx - 34, torchBaseY - 64, 68, 68);
-
-    var flameWobble = Math.sin(Date.now() * 0.007 + tx * 0.015) * 4;
-    TX.save();
-    TX.globalCompositeOperation = "screen";
-    TX.fillStyle = "rgba(255,164,63,.88)";
-    TX.beginPath();
-    TX.moveTo(tx, torchBaseY - 45 - flameWobble * 0.12);
-    TX.quadraticCurveTo(tx + 10, torchBaseY - 30, tx, torchBaseY - 12);
-    TX.quadraticCurveTo(
-      tx - 12,
-      torchBaseY - 30,
-      tx,
-      torchBaseY - 45 - flameWobble * 0.12,
-    );
-    TX.fill();
-    TX.fillStyle = "rgba(255,241,190,.96)";
-    TX.beginPath();
-    TX.moveTo(tx, torchBaseY - 38 - flameWobble * 0.08);
-    TX.quadraticCurveTo(tx + 5, torchBaseY - 28, tx, torchBaseY - 18);
-    TX.quadraticCurveTo(
-      tx - 6,
-      torchBaseY - 28,
-      tx,
-      torchBaseY - 38 - flameWobble * 0.08,
-    );
-    TX.fill();
-    TX.restore();
-  }
-  TX.fillStyle = "rgba(0,0,0,.18)";
-  TX.fillRect(0, H * 0.72, WORLD, H * 0.28);
 }
 
 function drawChamberDepth(H) {
