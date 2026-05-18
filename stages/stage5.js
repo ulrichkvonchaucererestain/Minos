@@ -316,29 +316,8 @@ function buildMap() {
   /* ── DROPPED SWORD ITEM ── */
   MAP.swordItem = null;
 
-  /* ── POTS (3 random, one has the gold thread) ── */
-  MAP.gold = null; // gold thread is now inside a pot, not floating
-
-  var potPositions = [
-    { x: 920, y: mezzY - 68 }, // near early platform jar decor
-    { x: 5185, y: lowerY - 72 }, // mid-map lower section
-    { x: 7430, y: FLOOR_Y - 72 }, // near end corridor
-  ];
-  var goldPotIndex = Math.floor(Math.random() * 3);
-
-  MAP.pots = potPositions.map(function (pos, i) {
-    return {
-      x: pos.x,
-      y: pos.y,
-      w: 52,
-      h: 68,
-      hasGold: i === goldPotIndex,
-      broken: false,
-      breakTimer: 0, // counts up after breaking for shatter anim
-    };
-  });
-
   initStage2Doors(loftY, lowerY);
+  initStage2Pots(mezzY, lowerY, loftY, galleryY, FLOOR_Y);
 
   /* ── SPAWN POINT ── */
   MAP.spawn = {
@@ -1022,15 +1001,8 @@ function resetToStart() {
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
 
-  // Re-randomize which pot has the gold
-  if (MAP.pots) {
-    var newGoldPot = Math.floor(Math.random() * MAP.pots.length);
-    MAP.pots.forEach(function (pot, i) {
-      pot.hasGold = i === newGoldPot;
-      pot.broken = false;
-      pot.breakTimer = 0;
-    });
-  }
+  //Kapalitan ng Pots
+  resetStage2Pots();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1123,12 +1095,7 @@ function tutUpdate() {
   handleThrowInput();
   updateThrowFx();
 
-  /* ── POT BREAK TIMER ── */
-  if (MAP.pots) {
-    MAP.pots.forEach(function (pot) {
-      if (pot.broken) pot.breakTimer++;
-    });
-  }
+  updateStage2Pots();
 
   updateStage2Doors();
 
@@ -2046,45 +2013,6 @@ function drawGold() {
   TX.fillText("Golden Thread", gx, g.y + bob - 26);
   TX.fillText("[E] Pick up", gx, g.y + bob - 14);
   TX.textAlign = "left";
-}
-
-function drawPots() {
-  if (!MAP.pots) return;
-  MAP.pots.forEach(function (pot) {
-    if (pot.x + pot.w < CAM.x - 60 || pot.x > CAM.x + TC.width + 60) return;
-    if (pot.broken) return; // don't draw after shattering
-
-    TX.save();
-
-    var potImg = SPR.pot;
-    if (potImg && potImg.complete && potImg.naturalWidth) {
-      TX.drawImage(potImg, pot.x, pot.y, pot.w, pot.h);
-    } else {
-      // Fallback drawn pot
-      TX.fillStyle = "#8B6955";
-      TX.beginPath();
-      TX.ellipse(
-        pot.x + pot.w / 2,
-        pot.y + pot.h * 0.72,
-        pot.w * 0.42,
-        pot.h * 0.28,
-        0,
-        0,
-        Math.PI * 2,
-      );
-      TX.fill();
-      TX.fillStyle = "#A0785A";
-      TX.fillRect(
-        pot.x + pot.w * 0.18,
-        pot.y + pot.h * 0.1,
-        pot.w * 0.64,
-        pot.h * 0.65,
-      );
-      TX.fillStyle = "#C4A882";
-      TX.fillRect(pot.x + pot.w * 0.14, pot.y + pot.h * 0.08, pot.w * 0.72, 8);
-    }
-    TX.restore();
-  });
 }
 
 function drawDoors() {

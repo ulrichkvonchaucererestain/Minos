@@ -1,13 +1,33 @@
-function initStage2Doors(loftY, lowerY) {
+function getStage2DoorPlatformY(doorX, doorW, doorH) {
+  if (!MAP.platforms) return FLOOR_Y - doorH;
+
+  for (var i = 0; i < MAP.platforms.length; i++) {
+    var platform = MAP.platforms[i];
+
+    var doorFitsOnPlatform =
+      doorX >= platform.x && doorX + doorW <= platform.x + platform.w;
+
+    if (doorFitsOnPlatform) {
+      return platform.y - doorH;
+    }
+  }
+
+  return FLOOR_Y - doorH;
+}
+
+function initStage2Doors() {
   var dW = 118;
   var dH = 154;
-  var doorY = FLOOR_Y - dH;
   var correctDoorIndex = Math.floor(Math.random() * 3);
+
+  var door1X = 2460;
+  var door2X = 5120;
+  var door3X = 7800;
 
   MAP.doors = [
     {
-      x: 2400,
-      y: loftY - dH,
+      x: door1X,
+      y: getStage2DoorPlatformY(door1X, dW, dH),
       w: dW,
       h: dH,
       correct: correctDoorIndex === 0,
@@ -16,8 +36,8 @@ function initStage2Doors(loftY, lowerY) {
       hint: "The true path lies where shadows gather near the climb.",
     },
     {
-      x: 5200,
-      y: lowerY - dH,
+      x: door2X,
+      y: getStage2DoorPlatformY(door2X, dW, dH),
       w: dW,
       h: dH,
       correct: correctDoorIndex === 1,
@@ -26,8 +46,8 @@ function initStage2Doors(loftY, lowerY) {
       hint: "Seek the threshold where the bones whisper warnings.",
     },
     {
-      x: 7800,
-      y: doorY,
+      x: door3X,
+      y: getStage2DoorPlatformY(door3X, dW, dH),
       w: dW,
       h: dH,
       correct: correctDoorIndex === 2,
@@ -76,13 +96,6 @@ function updateStage2Doors() {
       GS.activeDoorIndex = i;
 
       if (JP["KeyE"]) {
-        if (!GS.hasGold) {
-          showBadge("Locked! Find the Golden Thread first...");
-          JP["KeyE"] = false;
-          checkDroppedItemPickup();
-          return;
-        }
-
         if (door.fake) {
           wrongDoor();
         } else {
@@ -196,7 +209,7 @@ function drawDoors() {
   MAP.doors.forEach(function (door, i) {
     if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
 
-    var lit = door.correct && GS.hasGold;
+    var lit = door.correct;
     var pulse = lit ? 0.7 + 0.3 * Math.sin(Date.now() * 0.004) : 1;
 
     TX.save();
@@ -330,14 +343,11 @@ function drawDoors() {
 
     if (GS.activeDoorIndex === i) {
       TX.fillStyle = "rgba(255,215,0,.95)";
-
-      if (!GS.hasGold) {
-        TX.fillText("NEED KEY", door.x + door.w / 2, door.y - 8);
-      } else if (door.attempted) {
+      if (door.attempted) {
         TX.fillText("[E] RETRY", door.x + door.w / 2, door.y - 8);
       } else {
         TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
-      }
+      } 
     }
 
     TX.textAlign = "left";

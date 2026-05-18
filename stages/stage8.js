@@ -86,7 +86,6 @@ var SPR = {
   swing: null,
   decor: {},
   torch: null,
-  wings: null,
   mapTheme: { map: null, roof: null, fall: null },
 };
 var sprOK = false;
@@ -199,10 +198,7 @@ async function loadSpr() {
   if (typeof SPRITE_SWING_IDLE !== "undefined")
     SPR.swingIdle = await li(SPRITE_SWING_IDLE);
   if (typeof SPRITE_SWING !== "undefined") SPR.swing = await li(SPRITE_SWING);
-  if (typeof SPRITE_WINGS !== "undefined") {
-    SPR.wings = await li(SPRITE_WINGS);
-    SPR_PATHS.wings = SPRITE_WINGS;
-  }
+  // Armor indicator sprites
   if (typeof SPRITE_ARMOR_WITH !== "undefined")
     SPR.armorWith = await li(SPRITE_ARMOR_WITH);
   if (typeof SPRITE_ARMOR_WITHOUT !== "undefined")
@@ -320,37 +316,8 @@ function buildMap() {
   /* ── DROPPED SWORD ITEM ── */
   MAP.swordItem = null;
 
-  /* ── POTS (3 random, one has the gold thread) ── */
-  MAP.gold = null; // gold thread is now inside a pot, not floating
-
-  var potPositions = [
-    { x: 920, y: mezzY - 68 }, // near early platform jar decor
-    { x: 5185, y: lowerY - 72 }, // mid-map lower section
-    { x: 7430, y: FLOOR_Y - 72 }, // near end corridor
-  ];
-  var goldPotIndex = Math.floor(Math.random() * 3);
-
-  MAP.pots = potPositions.map(function (pos, i) {
-    return {
-      x: pos.x,
-      y: pos.y,
-      w: 52,
-      h: 68,
-      hasGold: i === goldPotIndex,
-      broken: false,
-      breakTimer: 0, // counts up after breaking for shatter anim
-    };
-  });
-
-  MAP.wing = {
-    x: 7420,
-    y: FLOOR_Y - 64,
-    w: 96,
-    h: 64,
-    collected: false,
-  };
-
   initStage2Doors(loftY, lowerY);
+  initStage2Pots(mezzY, lowerY, loftY, galleryY, FLOOR_Y);
 
   /* ── SPAWN POINT ── */
   MAP.spawn = {
@@ -482,7 +449,6 @@ var GS = {
   hasGold: false,
   hasArmor: false,
   hasSword: true,
-  hasWing: false,
   nearSword: false,
   nearDroppedItem: false,
   startTime: 0,
@@ -1020,7 +986,6 @@ function resetToStart() {
   GS.hasGold = false;
   GS.hasArmor = false;
   GS.hasSword = true;
-  GS.hasWing = false;
   GS.activeDoorIndex = -1;
   GS.dead = false;
   GS.won = false;
@@ -1033,19 +998,11 @@ function resetToStart() {
   GS.timerSecs = 0;
   spawnPlayer();
   if (MAP.swordItem) MAP.swordItem.collected = false;
-  if (MAP.wing) MAP.wing.collected = false;
   hideScreen("screen-dead");
   hideScreen("screen-wrong");
 
-  // Re-randomize which pot has the gold
-  if (MAP.pots) {
-    var newGoldPot = Math.floor(Math.random() * MAP.pots.length);
-    MAP.pots.forEach(function (pot, i) {
-      pot.hasGold = i === newGoldPot;
-      pot.broken = false;
-      pot.breakTimer = 0;
-    });
-  }
+  //Kapalitan ng Pots
+  resetStage2Pots();
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1134,36 +1091,11 @@ function tutUpdate() {
     }
   }
 
-  /* WING PICKUP */
-  if (MAP.wing && !MAP.wing.collected && !GS.hasWing) {
-    var wg = MAP.wing;
-    var pxWing = PL.x + PL_COX + PL.w / 2;
-    var pyWing = PL.y + PL_COY + PL.h / 2;
-    var wingCX = wg.x + wg.w / 2;
-    var wingCY = wg.y + wg.h / 2;
-
-    if (
-      Math.abs(pxWing - wingCX) < 75 &&
-      Math.abs(pyWing - wingCY) < 75 &&
-      (JP["KeyE"] || KEYS["KeyE"])
-    ) {
-      MAP.wing.collected = true;
-      GS.hasWing = true;
-      showBadge("Wings collected!");
-      updateHUD();
-    }
-  }
-
   updateSwordSwing();
   handleThrowInput();
   updateThrowFx();
 
-  /* ── POT BREAK TIMER ── */
-  if (MAP.pots) {
-    MAP.pots.forEach(function (pot) {
-      if (pot.broken) pot.breakTimer++;
-    });
-  }
+  updateStage2Pots();
 
   updateStage2Doors();
 
@@ -1526,7 +1458,6 @@ function tutDraw() {
   drawHammer();
   drawGold();
   drawPots();
-  drawWing();
   drawThrowFx();
   drawDroppedItems();
   drawSwordItem();
@@ -1740,32 +1671,6 @@ function drawDecorLayer(list) {
     TX.drawImage(img, item.x, item.y, item.w, item.h);
     TX.restore();
   });
-}
-
-function drawWing() {
-  var wing = MAP.wing;
-  var img = SPR.wings;
-  if (!wing || wing.collected || !img) return;
-  if (wing.x + wing.w < CAM.x - 40 || wing.x > CAM.x + TC.width + 40) return;
-
-  TX.save();
-  TX.globalAlpha = 0.95;
-  TX.drawImage(img, wing.x, wing.y, wing.w, wing.h);
-
-  var px = PL.x + PL_COX + PL.w / 2;
-  var py = PL.y + PL_COY + PL.h / 2;
-  var wingCX = wing.x + wing.w / 2;
-  var wingCY = wing.y + wing.h / 2;
-
-  if (Math.abs(px - wingCX) < 90 && Math.abs(py - wingCY) < 90) {
-    TX.fillStyle = "rgba(255,255,180,1)";
-    TX.font = "bold 10px Cinzel,serif";
-    TX.textAlign = "center";
-    TX.fillText("[E] Pick up", wingCX, wing.y - 8);
-    TX.textAlign = "left";
-  }
-
-  TX.restore();
 }
 
 function drawObstacle() {
@@ -2108,45 +2013,6 @@ function drawGold() {
   TX.fillText("Golden Thread", gx, g.y + bob - 26);
   TX.fillText("[E] Pick up", gx, g.y + bob - 14);
   TX.textAlign = "left";
-}
-
-function drawPots() {
-  if (!MAP.pots) return;
-  MAP.pots.forEach(function (pot) {
-    if (pot.x + pot.w < CAM.x - 60 || pot.x > CAM.x + TC.width + 60) return;
-    if (pot.broken) return; // don't draw after shattering
-
-    TX.save();
-
-    var potImg = SPR.pot;
-    if (potImg && potImg.complete && potImg.naturalWidth) {
-      TX.drawImage(potImg, pot.x, pot.y, pot.w, pot.h);
-    } else {
-      // Fallback drawn pot
-      TX.fillStyle = "#8B6955";
-      TX.beginPath();
-      TX.ellipse(
-        pot.x + pot.w / 2,
-        pot.y + pot.h * 0.72,
-        pot.w * 0.42,
-        pot.h * 0.28,
-        0,
-        0,
-        Math.PI * 2,
-      );
-      TX.fill();
-      TX.fillStyle = "#A0785A";
-      TX.fillRect(
-        pot.x + pot.w * 0.18,
-        pot.y + pot.h * 0.1,
-        pot.w * 0.64,
-        pot.h * 0.65,
-      );
-      TX.fillStyle = "#C4A882";
-      TX.fillRect(pot.x + pot.w * 0.14, pot.y + pot.h * 0.08, pot.w * 0.72, 8);
-    }
-    TX.restore();
-  });
 }
 
 function drawDoors() {
@@ -2649,14 +2515,6 @@ function updateHUD() {
       src: SPR_PATHS.gold || SPR_PATHS.pot || null,
       emoji: "🧵",
       key: "gold",
-    });
-
-  if (GS.hasWing)
-    items.push({
-      label: "Wings",
-      src: SPR_PATHS.wings || null,
-      emoji: "W",
-      key: "wings",
     });
 
   invBox.innerHTML = "";
