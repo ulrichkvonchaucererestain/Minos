@@ -1296,8 +1296,8 @@ function updateDeathFx() {
   }
 
   if (fx.t > 42) {
-    GS.lives = 3;
-    resetToStart();
+    markPlayerDeathForNextMap();
+    window.location.href = "../index.html";
   }
 }
 

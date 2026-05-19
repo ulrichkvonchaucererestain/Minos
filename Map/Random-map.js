@@ -1,4 +1,14 @@
-var LAST_RANDOM_MAP_INDEX = -1;
+var MINOS_MAP_DEATH_COUNT_KEY = "minos-map-death-count";
+
+function getMapDeathCount() {
+  var saved = parseInt(localStorage.getItem(MINOS_MAP_DEATH_COUNT_KEY), 10);
+  return isNaN(saved) ? 0 : saved;
+}
+
+function markPlayerDeathForNextMap() {
+  var nextCount = Math.min(getMapDeathCount() + 1, 2);
+  localStorage.setItem(MINOS_MAP_DEATH_COUNT_KEY, String(nextCount));
+}
 
 function getRandomMapSprite() {
   var maps = [
@@ -7,32 +17,14 @@ function getRandomMapSprite() {
     typeof SPRITE_MAP3 !== "undefined" ? SPRITE_MAP3 : null,
   ];
 
-  var choices = maps
-    .map(function (sprite, index) {
-      return { sprite: sprite, index: index };
-    })
-    .filter(function (map) {
-      return map.sprite && map.index !== LAST_RANDOM_MAP_INDEX;
-    });
+  var deathCount = getMapDeathCount();
+  var selected = maps[deathCount] || maps[0] || maps[1] || maps[2];
 
-  if (choices.length === 0) {
-    choices = maps
-      .map(function (sprite, index) {
-        return { sprite: sprite, index: index };
-      })
-      .filter(function (map) {
-        return map.sprite;
-      });
-  }
-
-  if (choices.length === 0) {
+  if (!selected) {
     console.error("No SPRITE_MAP found. Check map.js script order.");
     return null;
   }
 
-  var selected = choices[Math.floor(Math.random() * choices.length)];
-  LAST_RANDOM_MAP_INDEX = selected.index;
-
-  console.log("Using map sprite:", LAST_RANDOM_MAP_INDEX + 1);
-  return selected.sprite;
+  console.log("Using map sprite:", "SPRITE_MAP" + (deathCount + 1));
+  return selected;
 }
