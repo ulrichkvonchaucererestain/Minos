@@ -282,6 +282,68 @@ window.addEventListener("keyup", function (e) {
 ═══════════════════════════════════════════════════════════════════ */
 var MAP = {}; // rebuilt in buildMap()
 
+var TILE = 48;
+/* ── SPIKE CONSTANTS ── */
+var SPIKE_HEIGHT = 32; // Match your spike.png height
+var SPIKE_WIDTH = 32; // Match your spike.png width
+var FLOOR_Y;
+var _generatedPlatforms = null;
+
+function buildPlatforms() {
+  FLOOR_Y = Math.round(TC.height * 0.8);
+  PL_COX = Math.round((PL.sw - PL.w) / 2);
+  PL_COY = PL.sh - PL.h;
+
+  var ph = TILE * 1.5;
+  var mezzY = FLOOR_Y - TILE * 0.7;
+  var loftY = FLOOR_Y - TILE * 1.75;
+  var galleryY = FLOOR_Y - TILE * 0.2;
+  var lowerY = FLOOR_Y + TILE * 0.2;
+  var rise1Y = FLOOR_Y + TILE * 2.2;
+  var rise2Y = FLOOR_Y + TILE * 1.2;
+  var rise3Y = FLOOR_Y + TILE * 0.2;
+
+  MAP.platforms = [
+    { x: 0, y: FLOOR_Y, w: 500, h: ph },
+    { x: 750, y: galleryY, w: 240, h: TILE },
+    { x: 1050, y: lowerY, w: 160, h: TILE },
+    { x: 1330, y: galleryY, w: 200, h: TILE },
+    { x: 1650, y: lowerY, w: 150, h: TILE },
+    { x: 1920, y: mezzY, w: 180, h: TILE },
+    { x: 2220, y: lowerY, w: 140, h: TILE },
+    { x: 2420, y: galleryY, w: 200, h: TILE },
+    { x: 2760, y: lowerY, w: 200, h: TILE },
+    { x: 3080, y: mezzY, w: 170, h: TILE },
+    { x: 3380, y: galleryY, w: 150, h: TILE },
+    { x: 3650, y: lowerY, w: 180, h: TILE },
+    { x: 3950, y: mezzY, w: 160, h: TILE },
+    { x: 4240, y: galleryY, w: 170, h: TILE },
+    { x: 4530, y: lowerY, w: 150, h: TILE },
+    { x: 4800, y: mezzY, w: 180, h: TILE },
+    { x: 5100, y: galleryY, w: 160, h: TILE },
+    { x: 5400, y: lowerY, w: 170, h: TILE },
+    { x: 5700, y: mezzY, w: 150, h: TILE },
+    { x: 5980, y: galleryY, w: 180, h: TILE },
+    { x: 6280, y: lowerY, w: 160, h: TILE },
+    { x: 6560, y: mezzY, w: 170, h: TILE },
+    { x: 7280, y: FLOOR_Y, w: 1090, h: ph },
+  ];
+
+  MAP._ph = ph;
+  MAP._mezzY = mezzY;
+  MAP._loftY = loftY;
+  MAP._galleryY = galleryY;
+  MAP._lowerY = lowerY;
+  MAP._rise1Y = rise1Y;
+  MAP._rise2Y = rise2Y;
+  MAP._rise3Y = rise3Y;
+}
+
+var STAGE_SPIKE_LAYOUT = [
+  { x: 3000, yKey: "_loftY", w: 96, triggerX: 2870 },
+  { x: 4510, yKey: "_lowerY", w: 64, triggerX: 4420 },
+];
+
 function buildMap() {
   buildPlatforms(); // sets FLOOR_Y, PL_COX, PL_COY, MAP.platforms + MAP._*
 

@@ -1,8 +1,22 @@
 const STORAGE_KEY = "minos-campaign-progress";
-const progressServicePromise = import("./progress-service.js").catch((error) => {
-  console.warn("Firebase progress service unavailable.", error);
-  return null;
-});
+const progressServicePromise = import("./progress-service.js").catch(
+  (error) => {
+    console.warn("Firebase progress service unavailable.", error);
+    return null;
+  },
+);
+
+const mainBgMusic = new Audio(SPRITE_MAINBG);
+mainBgMusic.loop = true;
+mainBgMusic.volume = 0.45;
+mainBgMusic.preload = "auto";
+
+function playMainBgMusic() {
+  mainBgMusic.play().catch(() => {
+    document.addEventListener("click", playMainBgMusic, { once: true });
+    document.addEventListener("keydown", playMainBgMusic, { once: true });
+  });
+}
 
 const STAGE_DATA = [
   {
@@ -174,17 +188,25 @@ async function setupAccountMenu() {
 
   loginButton.textContent = user.displayName || user.email || "Account";
   loginButton.title = user.email || "";
-  loginButton.addEventListener("click", (event) => {
-    event.stopImmediatePropagation();
-    openAccountModal(user);
-  }, true);
+  loginButton.addEventListener(
+    "click",
+    (event) => {
+      event.stopImmediatePropagation();
+      openAccountModal(user);
+    },
+    true,
+  );
 
   signupButton.textContent = "Log Out";
-  signupButton.addEventListener("click", async (event) => {
-    event.stopImmediatePropagation();
-    await service.logout();
-    window.location.reload();
-  }, true);
+  signupButton.addEventListener(
+    "click",
+    async (event) => {
+      event.stopImmediatePropagation();
+      await service.logout();
+      window.location.reload();
+    },
+    true,
+  );
 }
 
 async function openAccountModal(user) {
@@ -356,6 +378,8 @@ document.addEventListener("keydown", (event) => {
     closeAccountModal();
   }
 });
+
+window.addEventListener("load", playMainBgMusic);
 
 renderCards();
 setupAccountMenu();
