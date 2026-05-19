@@ -328,7 +328,7 @@ function buildPlatforms() {
     { x: 6560, y: mezzY, w: 170, h: TILE },
     { x: 6900, y: lowerY, w: 200, h: TILE },
     { x: 7150, y: mezzY, w: 120, h: TILE },
-    { x: 7280, y: FLOOR_Y, w: 1200, h: ph },
+    { x: 7500, y: FLOOR_Y, w: 600, h: TILE },
   ];
 
   MAP._ph = ph;
