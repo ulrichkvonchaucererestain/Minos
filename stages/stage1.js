@@ -275,6 +275,32 @@ window.addEventListener("keyup", function (e) {
   KEYS[e.code] = false;
 });
 
+var JUMPSCARE_SFX = null;
+
+function initJumpscareSfx() {
+  if (JUMPSCARE_SFX || typeof SPRITE_MUSIC_JUMPSCARE === "undefined") return;
+
+  JUMPSCARE_SFX = new Audio(SPRITE_MUSIC_JUMPSCARE);
+  JUMPSCARE_SFX.volume = 1;
+  JUMPSCARE_SFX.preload = "auto";
+}
+
+function unlockJumpscareSfx() {
+  initJumpscareSfx();
+  if (!JUMPSCARE_SFX) return;
+
+  JUMPSCARE_SFX.muted = true;
+  JUMPSCARE_SFX.play().then(function () {
+    JUMPSCARE_SFX.pause();
+    JUMPSCARE_SFX.currentTime = 0;
+    JUMPSCARE_SFX.muted = false;
+  }).catch(function () {});
+}
+
+window.addEventListener("keydown", unlockJumpscareSfx, { once: true });
+window.addEventListener("pointerdown", unlockJumpscareSfx, { once: true });
+window.addEventListener("touchstart", unlockJumpscareSfx, { once: true });
+
 /* ═══════════════════════════════════════════════════════════════════
    MAP DATA
    All x/y are world-space pixels.
@@ -1577,14 +1603,6 @@ function tutUpdate() {
     ) {
       GS.activeDoorIndex = i;
       if (JP["KeyE"]) {
-        if (!GS.hasGold) {
-          showBadge
-          JP["KeyE"] = false;
-          /* ── DROPPED ITEM PICKUP ── */
-          checkDroppedItemPickup();
-          return;
-        }
-
         if (door.fake) {
           // Wrong door — jumpscare + reset
           wrongDoor();
@@ -1808,6 +1826,14 @@ function wrongDoor() {
   GS.jumpscareActive = true;
   GS.paused = true;
 
+  var jumpscareSfx = null;
+  if (typeof SPRITE_MUSIC_JUMPSCARE !== "undefined") {
+    jumpscareSfx = new Audio(SPRITE_MUSIC_JUMPSCARE);
+    jumpscareSfx.volume = 1;
+    jumpscareSfx.currentTime = 0;
+    jumpscareSfx.play().catch(function () {});
+  }
+
   // Build jumpscare overlay
   var overlay = document.createElement("div");
   overlay.id = "mino-jumpscare";
@@ -1836,9 +1862,9 @@ function wrongDoor() {
     "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
-  // Use SPRITE_MINO if available, otherwise a red fallback
-  if (typeof SPRITE_MINO !== "undefined") {
-    img.src = SPRITE_MINO;
+  // Use jumpscare image if available, otherwise a red fallback
+  if (typeof SPRITE_JUMPSCARE !== "undefined") {
+    img.src = SPRITE_JUMPSCARE;
   } else {
     // Fallback: red screen with text
     overlay.style.background = "#cc0000";
@@ -1891,6 +1917,10 @@ function wrongDoor() {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
     setTimeout(function () {
+      if (jumpscareSfx) {
+        jumpscareSfx.pause();
+        jumpscareSfx.currentTime = 0;
+      }
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
