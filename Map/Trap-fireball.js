@@ -1,11 +1,15 @@
 function initStage2FireballTrap() {
+  var fireballStart = MAP.platformById.fireballStart;
+  var fireballEnd = MAP.platformById.fireballEnd;
+
   MAP.fireballLauncher = {
-    x: 5230,
-    rangeW: 1540,
+    x: fireballStart.x + 160,
+    rangeW: fireballEnd.x + fireballEnd.w - (fireballStart.x + 160),
     intervalFrames: 60,
     timer: 60,
     triggered: false,
-    plateX: 5230,
+    plateX: fireballStart.x + 160,
+    plateY: fireballStart.y,
     plateW: 120,
     speed: Math.max(4, Math.round(TC.height / (1.3 * 60))),
   };
@@ -21,7 +25,7 @@ function updateStage2FireballTrap() {
   var plFeetX = PL.x + PL_COX;
   var plFeetX2 = plFeetX + PL.w;
   var plFeetY = PL.y + PL_COY + PL.h;
-  var onFloor = PL.grounded && plFeetY >= FLOOR_Y - 4;
+  var onFloor = PL.grounded && Math.abs(plFeetY - launcher.plateY) <= 8;
 
   var onPlate =
     plFeetX2 > launcher.plateX &&

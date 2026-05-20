@@ -300,24 +300,38 @@ function buildPlatforms() {
   var rise3Y = FLOOR_Y + TILE * 0.2;
 
   MAP.platforms = [
-    { x: 0, y: FLOOR_Y, w: 640, h: ph },
-    { x: 790, y: mezzY, w: 260, h: TILE },
-    { x: 1160, y: loftY, w: 300, h: TILE },
-    { x: 1580, y: galleryY, w: 280, h: TILE },
-    { x: 1985, y: loftY, w: 300, h: TILE },
-    { x: 2405, y: mezzY, w: 240, h: TILE },
-    { x: 2760, y: loftY, w: 420, h: TILE },
-    { x: 3330, y: FLOOR_Y, w: 290, h: ph },
-    { x: 3820, y: lowerY, w: 430, h: ph },
-    { x: 4380, y: lowerY, w: 320, h: ph },
-    { x: 4850, y: lowerY, w: 430, h: ph },
-    { x: 5420, y: rise1Y, w: 220, h: TILE },
-    { x: 5710, y: rise2Y, w: 200, h: TILE },
-    { x: 6000, y: rise3Y, w: 260, h: TILE },
-    { x: 6350, y: loftY, w: 390, h: TILE },
-    { x: 6890, y: mezzY, w: 260, h: TILE },
-    { x: 7280, y: FLOOR_Y, w: 1090, h: ph },
+    { id: "startFloor", x: 0, y: FLOOR_Y, w: 720, h: ph },
+
+    { id: "step1", x: 860, y: mezzY, w: 260, h: TILE },
+    { id: "step2", x: 1220, y: loftY, w: 280, h: TILE },
+    { id: "highGallery", x: 1600, y: galleryY, w: 340, h: TILE },
+    { id: "dropBridge", x: 2080, y: loftY, w: 360, h: TILE },
+
+    { id: "spikeLoft", x: 2620, y: mezzY, w: 520, h: TILE },
+    { id: "shaftTop", x: 3340, y: FLOOR_Y, w: 320, h: ph },
+
+    { id: "lowerLanding", x: 3860, y: lowerY, w: 460, h: ph },
+    { id: "spikeLower", x: 4480, y: lowerY, w: 420, h: ph },
+    { id: "fireballStart", x: 5120, y: lowerY, w: 460, h: ph },
+
+    { id: "rise1", x: 5750, y: rise1Y, w: 240, h: TILE },
+    { id: "rise2", x: 6080, y: rise2Y, w: 240, h: TILE },
+    { id: "rise3", x: 6420, y: rise3Y, w: 280, h: TILE },
+
+    { id: "fireballEnd", x: 6840, y: mezzY, w: 360, h: TILE },
+    { id: "finalBridge", x: 7350, y: FLOOR_Y, w: 360, h: ph },
+    { id: "finalFloor", x: 7840, y: FLOOR_Y, w: 560, h: ph },
   ];
+
+  MAP.platformById = {};
+  MAP.platforms.forEach(function (platform) {
+    MAP.platformById[platform.id] = platform;
+  });
+
+  MAP.platformById = {};
+  MAP.platforms.forEach(function (platform) {
+    MAP.platformById[platform.id] = platform;
+  });
 
   MAP._ph = ph;
   MAP._mezzY = mezzY;
@@ -327,6 +341,134 @@ function buildPlatforms() {
   MAP._rise1Y = rise1Y;
   MAP._rise2Y = rise2Y;
   MAP._rise3Y = rise3Y;
+}
+
+function getStage4DoorPlatform(slot) {
+  if (MAP.platformById) {
+    if (slot === 0 && MAP.platformById.mezz2) return MAP.platformById.mezz2;
+    if (slot === 1 && MAP.platformById.fireballStart)
+      return MAP.platformById.fireballStart;
+    if (slot === 2 && MAP.platformById.finalFloor)
+      return MAP.platformById.finalFloor;
+  }
+
+  // Fallback for the original stage4 platform array.
+  if (MAP.platforms) {
+    if (slot === 0) return MAP.platforms[5]; // x 2405, mezz platform
+    if (slot === 1) return MAP.platforms[10]; // x 4850, lower platform
+    if (slot === 2) return MAP.platforms[16]; // x 7280, final floor
+  }
+
+  return null;
+}
+
+function placeStage4DoorOnPlatform(slot, doorW, doorH) {
+  var platform = getStage4DoorPlatform(slot);
+
+  if (!platform) {
+    return {
+      x: 2400 + slot * 2600,
+      y: FLOOR_Y - doorH,
+    };
+  }
+
+  return {
+    x: platform.x + (platform.w - doorW) / 2,
+    y: platform.y - doorH,
+  };
+}
+
+function initStage2Doors() {
+  var dW = 118;
+  var dH = 154;
+  var correctDoorIndex = Math.floor(Math.random() * 3);
+
+  var door1 = placeStage4DoorOnPlatform(0, dW, dH);
+  var door2 = placeStage4DoorOnPlatform(1, dW, dH);
+  var door3 = placeStage4DoorOnPlatform(2, dW, dH);
+
+  MAP.doors = [
+    {
+      x: door1.x,
+      y: door1.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 0,
+      fake: correctDoorIndex !== 0,
+      label: correctDoorIndex === 0 ? "???" : "DOOR I",
+      hint: "The true path lies where shadows gather near the climb.",
+    },
+    {
+      x: door2.x,
+      y: door2.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 1,
+      fake: correctDoorIndex !== 1,
+      label: correctDoorIndex === 1 ? "???" : "DOOR II",
+      hint: "Seek the threshold where the bones whisper warnings.",
+    },
+    {
+      x: door3.x,
+      y: door3.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 2,
+      fake: correctDoorIndex !== 2,
+      label: correctDoorIndex === 2 ? "???" : "DOOR III",
+      hint: "The exit breathes where the thread of gold was spun.",
+    },
+  ];
+
+  MAP.correctDoorIndex = correctDoorIndex;
+
+  MAP.doors.forEach(function (door) {
+    door.attempted = false;
+  });
+
+  MAP.doorFrameRect = null;
+}
+
+function resetStage2Doors() {
+  if (!MAP.doors || MAP.doors.length !== 3) return;
+
+  var newCorrect = Math.floor(Math.random() * 3);
+  MAP.correctDoorIndex = newCorrect;
+
+  MAP.doors.forEach(function (door, i) {
+    door.correct = i === newCorrect;
+    door.fake = i !== newCorrect;
+    door.label = i === newCorrect ? "???" : "DOOR " + ["I", "II", "III"][i];
+    door.attempted = false;
+  });
+}
+
+function updateStage2Doors() {
+  GS.activeDoorIndex = -1;
+
+  MAP.doors.forEach(function (door, i) {
+    var px7 = PL.x + PL_COX;
+    var py7 = PL.y + PL_COY;
+
+    if (
+      px7 < door.x + door.w + 10 &&
+      px7 + PL.w > door.x - 10 &&
+      py7 + PL.h > door.y &&
+      py7 < door.y + door.h
+    ) {
+      GS.activeDoorIndex = i;
+
+      if (JP["KeyE"]) {
+        if (door.fake) {
+          wrongDoor();
+        } else {
+          showQuizModal(i);
+        }
+
+        JP["KeyE"] = false;
+      }
+    }
+  });
 }
 
 function buildMap() {
@@ -360,7 +502,7 @@ function buildMap() {
   /* ── DROPPED SWORD ITEM ── */
   MAP.swordItem = null;
 
-  initStage2Doors(loftY, lowerY);
+    initStage2Doors();
   initStage2Pots(mezzY, lowerY, loftY, galleryY, FLOOR_Y);
 
   /* ── SPAWN POINT ── */
@@ -483,6 +625,32 @@ function buildMap() {
     { x: 6510, y: 120, w: 24, h: FLOOR_Y - 26, alpha: 0.11 },
     { x: 8010, y: 120, w: 24, h: FLOOR_Y - 24, alpha: 0.13 },
   ];
+}
+
+function initStage2SpikeTraps() {
+  var spikeLoft = MAP.platformById.spikeLoft;
+  var spikeLower = MAP.platformById.spikeLower;
+
+  MAP.spikes = [
+    {
+      x: spikeLoft.x + 300,
+      y: spikeLoft.y,
+      w: 110,
+      triggerX: spikeLoft.x + 120,
+      active: false,
+      riseTimer: 0,
+    },
+    {
+      x: spikeLower.x + 220,
+      y: spikeLower.y,
+      w: 96,
+      triggerX: spikeLower.x + 80,
+      active: false,
+      riseTimer: 0,
+    },
+  ];
+
+  MAP.readySpike = null;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1432,7 +1600,7 @@ function wrongDoor() {
     img.style.transform = "scale(1.22)";
   }, 60);
 
-  // Fade out and reset after the scare
+  // Fade out and redirect to main menu after the scare
   setTimeout(function () {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
@@ -1440,9 +1608,7 @@ function wrongDoor() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
-      GS.lives = 3;
-      resetToStart();
-      showBadge("✕ Wrong door! Start again...");
+      window.location.href = "../index.html";
     }, 380);
   }, 1100);
 }

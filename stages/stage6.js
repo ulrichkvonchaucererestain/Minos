@@ -77,10 +77,7 @@ var SPR = {
   hammerRight: [],
   gold: null,
   spike: null,
-  pot: null,
-  spike: null,
   fireball: null,
-  sword: null,
   sword: null,
   swingIdle: null,
   swing: null,
@@ -100,7 +97,7 @@ var HAMMER_LEFT_PATHS = [
 ];
 var HAMMER_RIGHT_PATHS = [
   "../hammer_animation_swing_to_the_right1.png",
-  "../hammer_aniamtion_swing_to_the_right2.png",
+  "../hammer_animation_swing_to_the_right2.png",
   "../hammer_animation_swing_to_the_right3.png",
   "../hammer_animation_swing_to_the_right4.png",
   "../hammer_animation_swing_to_the_right5.png",
@@ -285,7 +282,7 @@ var MAP = {}; // rebuilt in buildMap()
 var TILE = 48;
 var FLOOR_Y;
 
-function buildPlatforms() {
+function buildStage6Platforms() {
   FLOOR_Y = Math.round(TC.height * 0.8);
   PL_COX = Math.round((PL.sw - PL.w) / 2);
   PL_COY = PL.sh - PL.h;
@@ -300,24 +297,28 @@ function buildPlatforms() {
   var rise3Y = FLOOR_Y + TILE * 0.2;
 
   MAP.platforms = [
-    { x: 0, y: FLOOR_Y, w: 640, h: ph },
-    { x: 790, y: mezzY, w: 260, h: TILE },
-    { x: 1160, y: loftY, w: 300, h: TILE },
-    { x: 1580, y: galleryY, w: 280, h: TILE },
-    { x: 1985, y: loftY, w: 300, h: TILE },
-    { x: 2405, y: mezzY, w: 240, h: TILE },
-    { x: 2760, y: loftY, w: 420, h: TILE },
-    { x: 3330, y: FLOOR_Y, w: 290, h: ph },
-    { x: 3820, y: lowerY, w: 430, h: ph },
-    { x: 4380, y: lowerY, w: 320, h: ph },
-    { x: 4850, y: lowerY, w: 430, h: ph },
-    { x: 5420, y: rise1Y, w: 220, h: TILE },
-    { x: 5710, y: rise2Y, w: 200, h: TILE },
-    { x: 6000, y: rise3Y, w: 260, h: TILE },
-    { x: 6350, y: loftY, w: 390, h: TILE },
-    { x: 6890, y: mezzY, w: 260, h: TILE },
-    { x: 7280, y: FLOOR_Y, w: 1090, h: ph },
+    { id: "startFloor", x: 0, y: FLOOR_Y, w: 760, h: ph },
+    { id: "lowHopA", x: 900, y: mezzY, w: 210, h: TILE },
+    { id: "dropShelfA", x: 1260, y: FLOOR_Y, w: 260, h: ph },
+    { id: "highDoorA", x: 1690, y: galleryY, w: 380, h: TILE },
+    { id: "thinBridgeA", x: 2260, y: loftY, w: 220, h: TILE },
+    { id: "spikeBridge", x: 2720, y: mezzY, w: 560, h: TILE },
+    { id: "shaftTop", x: 3520, y: FLOOR_Y, w: 320, h: ph },
+    { id: "lowerSafeA", x: 4080, y: lowerY, w: 420, h: ph },
+    { id: "lowerDoorB", x: 4680, y: lowerY, w: 500, h: ph },
+    { id: "spikeLower", x: 5440, y: lowerY, w: 430, h: ph },
+    { id: "stairA", x: 6060, y: rise1Y, w: 220, h: TILE },
+    { id: "stairB", x: 6400, y: rise2Y, w: 220, h: TILE },
+    { id: "stairC", x: 6750, y: rise3Y, w: 250, h: TILE },
+    { id: "fireballStart", x: 7120, y: mezzY, w: 360, h: TILE },
+    { id: "fireballEnd", x: 7590, y: loftY, w: 340, h: TILE },
+    { id: "finalDoorC", x: 8050, y: FLOOR_Y, w: 360, h: ph },
   ];
+
+  MAP.platformById = {};
+  MAP.platforms.forEach(function (platform) {
+    MAP.platformById[platform.id] = platform;
+  });
 
   MAP._ph = ph;
   MAP._mezzY = mezzY;
@@ -327,6 +328,344 @@ function buildPlatforms() {
   MAP._rise1Y = rise1Y;
   MAP._rise2Y = rise2Y;
   MAP._rise3Y = rise3Y;
+}
+
+var buildPlatforms = buildStage6Platforms;
+
+window.addEventListener("load", function () {
+  buildPlatforms = buildStage6Platforms;
+});
+
+function centerStage6ObjectOnPlatform(platformId, objectW, objectH) {
+  var platform = MAP.platformById && MAP.platformById[platformId];
+  if (!platform) return { x: 2400, y: FLOOR_Y - objectH };
+
+  return {
+    x: platform.x + (platform.w - objectW) / 2,
+    y: platform.y - objectH,
+  };
+}
+
+function initStage2Doors() {
+  var dW = 118;
+  var dH = 154;
+  var correctDoorIndex = Math.floor(Math.random() * 3);
+
+  var door1 = centerStage6ObjectOnPlatform("doorPlatform1", dW, dH);
+  var door2 = centerStage6ObjectOnPlatform("doorPlatform2", dW, dH);
+  var door3 = centerStage6ObjectOnPlatform("doorPlatform3", dW, dH);
+
+  MAP.doors = [
+    {
+      x: door1.x,
+      y: door1.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 0,
+      fake: correctDoorIndex !== 0,
+      label: correctDoorIndex === 0 ? "???" : "DOOR I",
+      hint: "The first answer waits on the highest gallery.",
+    },
+    {
+      x: door2.x,
+      y: door2.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 1,
+      fake: correctDoorIndex !== 1,
+      label: correctDoorIndex === 1 ? "???" : "DOOR II",
+      hint: "The second answer rests in the lower chamber.",
+    },
+    {
+      x: door3.x,
+      y: door3.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 2,
+      fake: correctDoorIndex !== 2,
+      label: correctDoorIndex === 2 ? "???" : "DOOR III",
+      hint: "The final answer stands near the last floor.",
+    },
+  ];
+
+  MAP.correctDoorIndex = correctDoorIndex;
+  MAP.doors.forEach(function (door) {
+    door.attempted = false;
+  });
+  MAP.doorFrameRect = null;
+}
+
+function resetStage2Doors() {
+  if (!MAP.doors || MAP.doors.length !== 3) return;
+
+  var newCorrect = Math.floor(Math.random() * 3);
+  MAP.correctDoorIndex = newCorrect;
+
+  MAP.doors.forEach(function (door, i) {
+    door.correct = i === newCorrect;
+    door.fake = i !== newCorrect;
+    door.label = i === newCorrect ? "???" : "DOOR " + ["I", "II", "III"][i];
+    door.attempted = false;
+  });
+}
+
+function updateStage2Doors() {
+  GS.activeDoorIndex = -1;
+
+  MAP.doors.forEach(function (door, i) {
+    var px7 = PL.x + PL_COX;
+    var py7 = PL.y + PL_COY;
+
+    if (
+      px7 < door.x + door.w + 10 &&
+      px7 + PL.w > door.x - 10 &&
+      py7 + PL.h > door.y &&
+      py7 < door.y + door.h
+    ) {
+      GS.activeDoorIndex = i;
+
+      if (JP["KeyE"]) {
+        if (door.fake) wrongDoor();
+        else showQuizModal(i);
+
+        JP["KeyE"] = false;
+      }
+    }
+  });
+}
+
+function initStage2SpikeTraps() {
+  var spikeBridge = MAP.platformById.spikeBridge;
+  var spikeLower = MAP.platformById.spikeLower;
+
+  MAP.spikes = [
+    {
+      x: spikeBridge.x + 310,
+      y: spikeBridge.y,
+      w: 115,
+      triggerX: spikeBridge.x + 120,
+      active: false,
+      riseTimer: 0,
+    },
+    {
+      x: spikeLower.x + 210,
+      y: spikeLower.y,
+      w: 105,
+      triggerX: spikeLower.x + 70,
+      active: false,
+      riseTimer: 0,
+    },
+  ];
+
+  MAP.readySpike = null;
+}
+
+function initStage2FireballTrap() {
+  var fireballStart = MAP.platformById.fireballStart;
+  var fireballEnd = MAP.platformById.fireballEnd;
+
+  MAP.fireballLauncher = {
+    x: fireballStart.x + 70,
+    rangeW: fireballEnd.x + fireballEnd.w - (fireballStart.x + 70),
+    intervalFrames: 56,
+    timer: 56,
+    triggered: false,
+    plateX: fireballStart.x + 85,
+    plateY: fireballStart.y,
+    plateW: 130,
+    speed: Math.max(4, Math.round(TC.height / (1.25 * 60))),
+  };
+
+  GS.fireballs = [];
+}
+
+function updateStage2FireballTrap() {
+  if (!MAP.fireballLauncher) return;
+  if (!GS.fireballs) GS.fireballs = [];
+
+  var launcher = MAP.fireballLauncher;
+  var plFeetX = PL.x + PL_COX;
+  var plFeetX2 = plFeetX + PL.w;
+  var plFeetY = PL.y + PL_COY + PL.h;
+  var onFloor = PL.grounded && Math.abs(plFeetY - launcher.plateY) <= 8;
+
+  var onPlate =
+    plFeetX2 > launcher.plateX &&
+    plFeetX < launcher.plateX + launcher.plateW &&
+    onFloor;
+
+  if (onPlate && !launcher.triggered) launcher.triggered = true;
+
+  if (launcher.triggered) {
+    launcher.timer++;
+
+    if (launcher.timer >= launcher.intervalFrames) {
+      launcher.timer = 0;
+      GS.fireballs.push({
+        x: launcher.x + Math.random() * launcher.rangeW - 24,
+        y: -48,
+        vx: 0,
+        vy: launcher.speed,
+        w: 48,
+        h: 48,
+      });
+    }
+  }
+
+  for (var i = GS.fireballs.length - 1; i >= 0; i--) {
+    var fb = GS.fireballs[i];
+    fb.y += fb.vy;
+
+    if (fb.y > TC.height + 80) {
+      GS.fireballs.splice(i, 1);
+      continue;
+    }
+
+    if (PL.iframes <= 0) {
+      var px = PL.x + PL_COX;
+      var py = PL.y + PL_COY;
+
+      if (
+        px < fb.x + fb.w &&
+        px + PL.w > fb.x &&
+        py < fb.y + fb.h &&
+        py + PL.h > fb.y
+      ) {
+        takeDamage("fireball");
+        GS.fireballs.splice(i, 1);
+      }
+    }
+  }
+}
+
+function stage6PlatformPoint(platformId, objectW, objectH, offsetX) {
+  var platform = MAP.platformById && MAP.platformById[platformId];
+  if (!platform) return { x: 2400, y: FLOOR_Y - objectH };
+
+  return {
+    x: platform.x + (offsetX == null ? (platform.w - objectW) / 2 : offsetX),
+    y: platform.y - objectH,
+  };
+}
+
+function initStage2Doors() {
+  var dW = 118;
+  var dH = 154;
+  var correctDoorIndex = Math.floor(Math.random() * 3);
+
+  var door1 = stage6PlatformPoint("highDoorA", dW, dH);
+  var door2 = stage6PlatformPoint("lowerDoorB", dW, dH);
+  var door3 = stage6PlatformPoint("finalDoorC", dW, dH);
+
+  MAP.doors = [
+    {
+      x: door1.x,
+      y: door1.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 0,
+      fake: correctDoorIndex !== 0,
+      label: correctDoorIndex === 0 ? "???" : "DOOR I",
+      hint: "The answer waits on the high broken shelf.",
+    },
+    {
+      x: door2.x,
+      y: door2.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 1,
+      fake: correctDoorIndex !== 1,
+      label: correctDoorIndex === 1 ? "???" : "DOOR II",
+      hint: "The answer rests in the lower chamber.",
+    },
+    {
+      x: door3.x,
+      y: door3.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 2,
+      fake: correctDoorIndex !== 2,
+      label: correctDoorIndex === 2 ? "???" : "DOOR III",
+      hint: "The answer stands near the last floor.",
+    },
+  ];
+
+  MAP.correctDoorIndex = correctDoorIndex;
+  MAP.doors.forEach(function (door) {
+    door.attempted = false;
+  });
+  MAP.doorFrameRect = null;
+}
+
+function initStage2SpikeTraps() {
+  var spikeBridge = MAP.platformById.spikeBridge;
+  var spikeLower = MAP.platformById.spikeLower;
+
+  MAP.spikes = [
+    {
+      x: spikeBridge.x + 320,
+      y: spikeBridge.y,
+      w: 120,
+      triggerX: spikeBridge.x + 130,
+      active: false,
+      riseTimer: 0,
+    },
+    {
+      x: spikeLower.x + 210,
+      y: spikeLower.y,
+      w: 110,
+      triggerX: spikeLower.x + 70,
+      active: false,
+      riseTimer: 0,
+    },
+  ];
+
+  MAP.readySpike = null;
+}
+
+function initStage2FireballTrap() {
+  var fireballStart = MAP.platformById.fireballStart;
+  var fireballEnd = MAP.platformById.fireballEnd;
+
+  MAP.fireballLauncher = {
+    x: fireballStart.x + 70,
+    rangeW: fireballEnd.x + fireballEnd.w - (fireballStart.x + 70),
+    intervalFrames: 56,
+    timer: 56,
+    triggered: false,
+    plateX: fireballStart.x + 85,
+    plateY: fireballStart.y,
+    plateW: 130,
+    speed: Math.max(4, Math.round(TC.height / (1.25 * 60))),
+  };
+
+  GS.fireballs = [];
+}
+
+function initStage2Pots() {
+  var potW = typeof STAGE2_POT_W !== "undefined" ? STAGE2_POT_W : 52;
+  var potH = typeof STAGE2_POT_H !== "undefined" ? STAGE2_POT_H : 68;
+
+  var selected = [
+    stage6PlatformPoint("lowHopA", potW, potH, 80),
+    stage6PlatformPoint("lowerSafeA", potW, potH, 260),
+    stage6PlatformPoint("stairB", potW, potH, 90),
+  ];
+
+  var goldPotIndex = Math.floor(Math.random() * selected.length);
+
+  MAP.gold = null;
+  MAP.pots = selected.map(function (pos, i) {
+    return {
+      x: pos.x,
+      y: pos.y,
+      w: potW,
+      h: potH,
+      hasGold: i === goldPotIndex,
+      broken: false,
+      breakTimer: 0,
+    };
+  });
 }
 
 function buildMap() {
@@ -349,7 +688,7 @@ function buildMap() {
 
   /* ── SHAFT ── */
   MAP.shaft = {
-    x: 3470,
+    x: MAP.platformById.shaftTop.x + MAP.platformById.shaftTop.w,
     y: FLOOR_Y + ph,
     w: 180,
     bottom: lowerY,
@@ -360,7 +699,7 @@ function buildMap() {
   /* ── DROPPED SWORD ITEM ── */
   MAP.swordItem = null;
 
-  initStage2Doors(loftY, lowerY);
+  initStage2Doors();
   initStage2Pots(mezzY, lowerY, loftY, galleryY, FLOOR_Y);
 
   /* ── SPAWN POINT ── */
@@ -1432,7 +1771,7 @@ function wrongDoor() {
     img.style.transform = "scale(1.22)";
   }, 60);
 
-  // Fade out and reset after the scare
+  // Fade out and redirect to main menu after the scare
   setTimeout(function () {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
@@ -1440,9 +1779,7 @@ function wrongDoor() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
-      GS.lives = 3;
-      resetToStart();
-      showBadge("✕ Wrong door! Start again...");
+      window.location.href = "../index.html";
     }, 380);
   }, 1100);
 }
@@ -1491,6 +1828,8 @@ function tutDraw() {
   TX.translate(-CAM.x, -CAM.y);
 
   drawBG(W, H);
+  drawChamberDepth(H);
+  drawDecorLayer(MAP.decorBack);
   drawPlatforms();
   drawObstacle();
   drawPlates();
@@ -2539,7 +2878,7 @@ function showScreen(id) {
     window.__minosStageSaved = true;
     import("../progress-service.js")
       .then(function (service) {
-        return service.markStageComplete(2);
+        return service.markStageComplete(6);
       })
       .catch(function (error) {
         console.warn("Firebase stage progress save failed.", error);

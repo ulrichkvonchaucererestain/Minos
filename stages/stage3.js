@@ -1530,7 +1530,7 @@ function wrongDoor() {
     img.style.transform = "scale(1.22)";
   }, 60);
 
-  // Fade out and reset after the scare
+  // Fade out and redirect to main menu after the scare
   setTimeout(function () {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
@@ -1538,9 +1538,7 @@ function wrongDoor() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
-      GS.lives = 3;
-      resetToStart();
-      showBadge("✕ Wrong door! Start again...");
+      window.location.href = "../index.html";
     }, 380);
   }, 1100);
 }

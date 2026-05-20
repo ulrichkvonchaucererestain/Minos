@@ -300,24 +300,32 @@ function buildPlatforms() {
   var rise3Y = FLOOR_Y + TILE * 0.2;
 
   MAP.platforms = [
-    { x: 0, y: FLOOR_Y, w: 640, h: ph },
-    { x: 790, y: mezzY, w: 260, h: TILE },
-    { x: 1160, y: loftY, w: 300, h: TILE },
-    { x: 1580, y: galleryY, w: 280, h: TILE },
-    { x: 1985, y: loftY, w: 300, h: TILE },
-    { x: 2405, y: mezzY, w: 240, h: TILE },
-    { x: 2760, y: loftY, w: 420, h: TILE },
-    { x: 3330, y: FLOOR_Y, w: 290, h: ph },
-    { x: 3820, y: lowerY, w: 430, h: ph },
-    { x: 4380, y: lowerY, w: 320, h: ph },
-    { x: 4850, y: lowerY, w: 430, h: ph },
-    { x: 5420, y: rise1Y, w: 220, h: TILE },
-    { x: 5710, y: rise2Y, w: 200, h: TILE },
-    { x: 6000, y: rise3Y, w: 260, h: TILE },
-    { x: 6350, y: loftY, w: 390, h: TILE },
-    { x: 6890, y: mezzY, w: 260, h: TILE },
-    { x: 7280, y: FLOOR_Y, w: 1090, h: ph },
+    { id: "startFloor", x: 0, y: FLOOR_Y, w: 700, h: ph },
+    { id: "lowStep1", x: 860, y: mezzY, w: 260, h: TILE },
+    { id: "highStep1", x: 1240, y: loftY, w: 280, h: TILE },
+    { id: "doorPlatform1", x: 1650, y: galleryY, w: 360, h: TILE },
+    { id: "dropStep", x: 2160, y: loftY, w: 300, h: TILE },
+
+    { id: "spikeLoft", x: 2620, y: mezzY, w: 560, h: TILE },
+    { id: "shaftTop", x: 3360, y: FLOOR_Y, w: 340, h: ph },
+
+    { id: "lowerLanding", x: 3920, y: lowerY, w: 440, h: ph },
+    { id: "spikeLower", x: 4560, y: lowerY, w: 460, h: ph },
+    { id: "doorPlatform2", x: 5200, y: lowerY, w: 460, h: ph },
+
+    { id: "rise1", x: 5840, y: rise1Y, w: 240, h: TILE },
+    { id: "rise2", x: 6180, y: rise2Y, w: 240, h: TILE },
+    { id: "rise3", x: 6520, y: rise3Y, w: 280, h: TILE },
+
+    { id: "fireballStart", x: 6900, y: mezzY, w: 360, h: TILE },
+    { id: "fireballEnd", x: 7380, y: loftY, w: 360, h: TILE },
+    { id: "doorPlatform3", x: 7850, y: FLOOR_Y, w: 520, h: ph },
   ];
+
+  MAP.platformById = {};
+  MAP.platforms.forEach(function (platform) {
+    MAP.platformById[platform.id] = platform;
+  });
 
   MAP._ph = ph;
   MAP._mezzY = mezzY;
@@ -327,6 +335,221 @@ function buildPlatforms() {
   MAP._rise1Y = rise1Y;
   MAP._rise2Y = rise2Y;
   MAP._rise3Y = rise3Y;
+}
+function centerStage5ObjectOnPlatform(platformId, objectW, objectH) {
+  var platform = MAP.platformById && MAP.platformById[platformId];
+
+  if (!platform) {
+    return {
+      x: 2400,
+      y: FLOOR_Y - objectH,
+    };
+  }
+
+  return {
+    x: platform.x + (platform.w - objectW) / 2,
+    y: platform.y - objectH,
+  };
+}
+
+function initStage2Doors() {
+  var dW = 118;
+  var dH = 154;
+  var correctDoorIndex = Math.floor(Math.random() * 3);
+
+  var door1 = centerStage5ObjectOnPlatform("doorPlatform1", dW, dH);
+  var door2 = centerStage5ObjectOnPlatform("doorPlatform2", dW, dH);
+  var door3 = centerStage5ObjectOnPlatform("doorPlatform3", dW, dH);
+
+  MAP.doors = [
+    {
+      x: door1.x,
+      y: door1.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 0,
+      fake: correctDoorIndex !== 0,
+      label: correctDoorIndex === 0 ? "???" : "DOOR I",
+      hint: "The first answer waits above the broken climb.",
+    },
+    {
+      x: door2.x,
+      y: door2.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 1,
+      fake: correctDoorIndex !== 1,
+      label: correctDoorIndex === 1 ? "???" : "DOOR II",
+      hint: "The second answer rests in the lower passage.",
+    },
+    {
+      x: door3.x,
+      y: door3.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 2,
+      fake: correctDoorIndex !== 2,
+      label: correctDoorIndex === 2 ? "???" : "DOOR III",
+      hint: "The final answer stands near the exit floor.",
+    },
+  ];
+
+  MAP.correctDoorIndex = correctDoorIndex;
+
+  MAP.doors.forEach(function (door) {
+    door.attempted = false;
+  });
+
+  MAP.doorFrameRect = null;
+}
+
+function resetStage2Doors() {
+  if (!MAP.doors || MAP.doors.length !== 3) return;
+
+  var newCorrect = Math.floor(Math.random() * 3);
+  MAP.correctDoorIndex = newCorrect;
+
+  MAP.doors.forEach(function (door, i) {
+    door.correct = i === newCorrect;
+    door.fake = i !== newCorrect;
+    door.label = i === newCorrect ? "???" : "DOOR " + ["I", "II", "III"][i];
+    door.attempted = false;
+  });
+}
+
+function updateStage2Doors() {
+  GS.activeDoorIndex = -1;
+
+  MAP.doors.forEach(function (door, i) {
+    var px7 = PL.x + PL_COX;
+    var py7 = PL.y + PL_COY;
+
+    if (
+      px7 < door.x + door.w + 10 &&
+      px7 + PL.w > door.x - 10 &&
+      py7 + PL.h > door.y &&
+      py7 < door.y + door.h
+    ) {
+      GS.activeDoorIndex = i;
+
+      if (JP["KeyE"]) {
+        if (door.fake) {
+          wrongDoor();
+        } else {
+          showQuizModal(i);
+        }
+
+        JP["KeyE"] = false;
+      }
+    }
+  });
+}
+
+function initStage2SpikeTraps() {
+  var spikeLoft = MAP.platformById.spikeLoft;
+  var spikeLower = MAP.platformById.spikeLower;
+
+  MAP.spikes = [
+    {
+      x: spikeLoft.x + 330,
+      y: spikeLoft.y,
+      w: 110,
+      triggerX: spikeLoft.x + 130,
+      active: false,
+      riseTimer: 0,
+    },
+    {
+      x: spikeLower.x + 250,
+      y: spikeLower.y,
+      w: 100,
+      triggerX: spikeLower.x + 90,
+      active: false,
+      riseTimer: 0,
+    },
+  ];
+
+  MAP.readySpike = null;
+}
+
+function initStage2FireballTrap() {
+  var fireballStart = MAP.platformById.fireballStart;
+  var fireballEnd = MAP.platformById.fireballEnd;
+
+  MAP.fireballLauncher = {
+    x: fireballStart.x + 80,
+    rangeW: fireballEnd.x + fireballEnd.w - (fireballStart.x + 80),
+    intervalFrames: 60,
+    timer: 60,
+    triggered: false,
+    plateX: fireballStart.x + 90,
+    plateY: fireballStart.y,
+    plateW: 130,
+    speed: Math.max(4, Math.round(TC.height / (1.3 * 60))),
+  };
+
+  GS.fireballs = [];
+}
+
+function updateStage2FireballTrap() {
+  if (!MAP.fireballLauncher) return;
+  if (!GS.fireballs) GS.fireballs = [];
+
+  var launcher = MAP.fireballLauncher;
+  var plFeetX = PL.x + PL_COX;
+  var plFeetX2 = plFeetX + PL.w;
+  var plFeetY = PL.y + PL_COY + PL.h;
+  var onFloor = PL.grounded && Math.abs(plFeetY - launcher.plateY) <= 8;
+
+  var onPlate =
+    plFeetX2 > launcher.plateX &&
+    plFeetX < launcher.plateX + launcher.plateW &&
+    onFloor;
+
+  if (onPlate && !launcher.triggered) {
+    launcher.triggered = true;
+  }
+
+  if (launcher.triggered) {
+    launcher.timer++;
+
+    if (launcher.timer >= launcher.intervalFrames) {
+      launcher.timer = 0;
+
+      GS.fireballs.push({
+        x: launcher.x + Math.random() * launcher.rangeW - 24,
+        y: -48,
+        vx: 0,
+        vy: launcher.speed,
+        w: 48,
+        h: 48,
+      });
+    }
+  }
+
+  for (var i = GS.fireballs.length - 1; i >= 0; i--) {
+    var fb = GS.fireballs[i];
+    fb.y += fb.vy;
+
+    if (fb.y > FLOOR_Y + 60) {
+      GS.fireballs.splice(i, 1);
+      continue;
+    }
+
+    if (PL.iframes <= 0) {
+      var px = PL.x + PL_COX;
+      var py = PL.y + PL_COY;
+
+      if (
+        px < fb.x + fb.w &&
+        px + PL.w > fb.x &&
+        py < fb.y + fb.h &&
+        py + PL.h > fb.y
+      ) {
+        takeDamage("fireball");
+        GS.fireballs.splice(i, 1);
+      }
+    }
+  }
 }
 
 function buildMap() {
@@ -360,7 +583,7 @@ function buildMap() {
   /* ── DROPPED SWORD ITEM ── */
   MAP.swordItem = null;
 
-  initStage2Doors(loftY, lowerY);
+    initStage2Doors();
   initStage2Pots(mezzY, lowerY, loftY, galleryY, FLOOR_Y);
 
   /* ── SPAWN POINT ── */
@@ -1432,7 +1655,7 @@ function wrongDoor() {
     img.style.transform = "scale(1.22)";
   }, 60);
 
-  // Fade out and reset after the scare
+  // Fade out and redirect to main menu after the scare
   setTimeout(function () {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
@@ -1440,9 +1663,7 @@ function wrongDoor() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
-      GS.lives = 3;
-      resetToStart();
-      showBadge("✕ Wrong door! Start again...");
+      window.location.href = "../index.html";
     }, 380);
   }, 1100);
 }

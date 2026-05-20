@@ -285,7 +285,7 @@ var MAP = {}; // rebuilt in buildMap()
 var TILE = 48;
 var FLOOR_Y;
 
-function buildPlatforms() {
+function buildStage8Platforms() {
   FLOOR_Y = Math.round(TC.height * 0.8);
   PL_COX = Math.round((PL.sw - PL.w) / 2);
   PL_COY = PL.sh - PL.h;
@@ -300,24 +300,28 @@ function buildPlatforms() {
   var rise3Y = FLOOR_Y + TILE * 0.2;
 
   MAP.platforms = [
-    { x: 0, y: FLOOR_Y, w: 640, h: ph },
-    { x: 790, y: mezzY, w: 260, h: TILE },
-    { x: 1160, y: loftY, w: 300, h: TILE },
-    { x: 1580, y: galleryY, w: 280, h: TILE },
-    { x: 1985, y: loftY, w: 300, h: TILE },
-    { x: 2405, y: mezzY, w: 240, h: TILE },
-    { x: 2760, y: loftY, w: 420, h: TILE },
-    { x: 3330, y: FLOOR_Y, w: 290, h: ph },
-    { x: 3820, y: lowerY, w: 430, h: ph },
-    { x: 4380, y: lowerY, w: 320, h: ph },
-    { x: 4850, y: lowerY, w: 430, h: ph },
-    { x: 5420, y: rise1Y, w: 220, h: TILE },
-    { x: 5710, y: rise2Y, w: 200, h: TILE },
-    { x: 6000, y: rise3Y, w: 260, h: TILE },
-    { x: 6350, y: loftY, w: 390, h: TILE },
-    { x: 6890, y: mezzY, w: 260, h: TILE },
-    { x: 7280, y: FLOOR_Y, w: 1090, h: ph },
+    { id: "startFloor", x: 0, y: FLOOR_Y, w: 720, h: ph },
+    { id: "towerStep1", x: 880, y: rise3Y, w: 220, h: TILE },
+    { id: "towerStep2", x: 1220, y: loftY, w: 240, h: TILE },
+    { id: "doorPlatform1", x: 1600, y: galleryY, w: 360, h: TILE },
+    { id: "fallShelf", x: 2180, y: FLOOR_Y, w: 300, h: ph },
+    { id: "spikeUpper", x: 2760, y: mezzY, w: 560, h: TILE },
+    { id: "shaftTop", x: 3560, y: FLOOR_Y, w: 330, h: ph },
+    { id: "lowerPocket", x: 4140, y: lowerY, w: 410, h: ph },
+    { id: "doorPlatform2", x: 4740, y: lowerY, w: 500, h: ph },
+    { id: "spikeLower", x: 5520, y: lowerY, w: 440, h: ph },
+    { id: "recoveryStep1", x: 6160, y: rise1Y, w: 220, h: TILE },
+    { id: "recoveryStep2", x: 6500, y: rise2Y, w: 230, h: TILE },
+    { id: "recoveryStep3", x: 6840, y: rise3Y, w: 260, h: TILE },
+    { id: "fireballStart", x: 7240, y: mezzY, w: 370, h: TILE },
+    { id: "fireballEnd", x: 7750, y: galleryY, w: 330, h: TILE },
+    { id: "doorPlatform3", x: 8180, y: FLOOR_Y, w: 260, h: ph },
   ];
+
+  MAP.platformById = {};
+  MAP.platforms.forEach(function (platform) {
+    MAP.platformById[platform.id] = platform;
+  });
 
   MAP._ph = ph;
   MAP._mezzY = mezzY;
@@ -327,6 +331,142 @@ function buildPlatforms() {
   MAP._rise1Y = rise1Y;
   MAP._rise2Y = rise2Y;
   MAP._rise3Y = rise3Y;
+}
+
+var buildPlatforms = buildStage8Platforms;
+
+window.addEventListener("load", function () {
+  buildPlatforms = buildStage8Platforms;
+});
+
+function stage8PlatformPoint(platformId, objectW, objectH, offsetX) {
+  var platform = MAP.platformById && MAP.platformById[platformId];
+  if (!platform) return { x: 2400, y: FLOOR_Y - objectH };
+
+  return {
+    x: platform.x + (offsetX == null ? (platform.w - objectW) / 2 : offsetX),
+    y: platform.y - objectH,
+  };
+}
+
+function initStage2Doors() {
+  var dW = 118;
+  var dH = 154;
+  var correctDoorIndex = Math.floor(Math.random() * 3);
+
+  var door1 = stage8PlatformPoint("doorPlatform1", dW, dH);
+  var door2 = stage8PlatformPoint("doorPlatform2", dW, dH);
+  var door3 = stage8PlatformPoint("doorPlatform3", dW, dH);
+
+  MAP.doors = [
+    {
+      x: door1.x,
+      y: door1.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 0,
+      fake: correctDoorIndex !== 0,
+      label: correctDoorIndex === 0 ? "???" : "DOOR I",
+      hint: "The first door watches the tower path.",
+    },
+    {
+      x: door2.x,
+      y: door2.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 1,
+      fake: correctDoorIndex !== 1,
+      label: correctDoorIndex === 1 ? "???" : "DOOR II",
+      hint: "The second door waits in the lower pocket.",
+    },
+    {
+      x: door3.x,
+      y: door3.y,
+      w: dW,
+      h: dH,
+      correct: correctDoorIndex === 2,
+      fake: correctDoorIndex !== 2,
+      label: correctDoorIndex === 2 ? "???" : "DOOR III",
+      hint: "The final door stands at the far edge.",
+    },
+  ];
+
+  MAP.correctDoorIndex = correctDoorIndex;
+  MAP.doors.forEach(function (door) {
+    door.attempted = false;
+  });
+  MAP.doorFrameRect = null;
+}
+
+function initStage2SpikeTraps() {
+  var spikeUpper = MAP.platformById.spikeUpper;
+  var spikeLower = MAP.platformById.spikeLower;
+
+  MAP.spikes = [
+    {
+      x: spikeUpper.x + 320,
+      y: spikeUpper.y,
+      w: 120,
+      triggerX: spikeUpper.x + 120,
+      active: false,
+      riseTimer: 0,
+    },
+    {
+      x: spikeLower.x + 220,
+      y: spikeLower.y,
+      w: 110,
+      triggerX: spikeLower.x + 70,
+      active: false,
+      riseTimer: 0,
+    },
+  ];
+
+  MAP.readySpike = null;
+}
+
+function initStage2FireballTrap() {
+  var fireballStart = MAP.platformById.fireballStart;
+  var fireballEnd = MAP.platformById.fireballEnd;
+
+  MAP.fireballLauncher = {
+    x: fireballStart.x + 70,
+    rangeW: fireballEnd.x + fireballEnd.w - (fireballStart.x + 70),
+    intervalFrames: 52,
+    timer: 52,
+    triggered: false,
+    plateX: fireballStart.x + 85,
+    plateY: fireballStart.y,
+    plateW: 130,
+    speed: Math.max(4, Math.round(TC.height / (1.2 * 60))),
+  };
+
+  GS.fireballs = [];
+}
+
+function initStage2Pots() {
+  var potW = typeof STAGE2_POT_W !== "undefined" ? STAGE2_POT_W : 52;
+  var potH = typeof STAGE2_POT_H !== "undefined" ? STAGE2_POT_H : 68;
+
+  var selected = [
+    stage8PlatformPoint("towerStep2", potW, potH, 90),
+    stage8PlatformPoint("lowerPocket", potW, potH, 260),
+    stage8PlatformPoint("recoveryStep2", potW, potH, 90),
+  ];
+
+  var goldPotIndex = Math.floor(Math.random() * selected.length);
+
+  MAP.gold = null;
+  MAP.pots = selected.map(function (pos, i) {
+    return {
+      x: pos.x,
+      y: pos.y,
+      w: potW,
+      h: potH,
+      hasGold: i === goldPotIndex,
+      broken: false,
+      breakTimer: 0,
+    };
+  });
 }
 
 function buildMap() {
@@ -349,7 +489,7 @@ function buildMap() {
 
   /* ── SHAFT ── */
   MAP.shaft = {
-    x: 3470,
+    x: MAP.platformById.shaftTop.x + MAP.platformById.shaftTop.w,
     y: FLOOR_Y + ph,
     w: 180,
     bottom: lowerY,
@@ -360,9 +500,8 @@ function buildMap() {
   /* ── DROPPED SWORD ITEM ── */
   MAP.swordItem = null;
 
-  initStage2Doors(loftY, lowerY);
-  initStage2Pots(mezzY, lowerY, loftY, galleryY, FLOOR_Y);
-
+  initStage2Doors();
+  initStage2Pots();
   /* ── SPAWN POINT ── */
   MAP.spawn = {
     x: 230,
@@ -1432,7 +1571,7 @@ function wrongDoor() {
     img.style.transform = "scale(1.22)";
   }, 60);
 
-  // Fade out and reset after the scare
+  // Fade out and redirect to main menu after the scare
   setTimeout(function () {
     overlay.style.transition = "opacity 0.35s";
     overlay.style.opacity = "0";
@@ -1440,9 +1579,7 @@ function wrongDoor() {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       GS.jumpscareActive = false;
       GS.paused = false;
-      GS.lives = 3;
-      resetToStart();
-      showBadge("✕ Wrong door! Start again...");
+      window.location.href = "../index.html";
     }, 380);
   }, 1100);
 }
