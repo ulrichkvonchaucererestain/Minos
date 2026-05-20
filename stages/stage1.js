@@ -1578,7 +1578,7 @@ function tutUpdate() {
       GS.activeDoorIndex = i;
       if (JP["KeyE"]) {
         if (!GS.hasGold) {
-          showBadge("🔒 Locked! Find the Golden Thread first...");
+          showBadge
           JP["KeyE"] = false;
           /* ── DROPPED ITEM PICKUP ── */
           checkDroppedItemPickup();
