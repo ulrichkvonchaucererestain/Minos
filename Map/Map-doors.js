@@ -67,7 +67,10 @@ function initStage2Doors() {
 }
 
 function resetStage2Doors() {
-  if (!MAP.doors || MAP.doors.length !== 3) return;
+  if (!MAP.doors || MAP.doors.length !== 3) {
+    initStage2Doors();
+    return;
+  }
 
   var newCorrect = Math.floor(Math.random() * 3);
   MAP.correctDoorIndex = newCorrect;
@@ -209,7 +212,7 @@ function drawDoors() {
   MAP.doors.forEach(function (door, i) {
     if (door.x + door.w < CAM.x - 20 || door.x > CAM.x + TC.width + 20) return;
 
-    var lit = door.correct;
+    var lit = door.correct && GS.hasGold;
     var pulse = lit ? 0.7 + 0.3 * Math.sin(Date.now() * 0.004) : 1;
 
     TX.save();
@@ -347,7 +350,7 @@ function drawDoors() {
         TX.fillText("[E] RETRY", door.x + door.w / 2, door.y - 8);
       } else {
         TX.fillText("[E] ENTER", door.x + door.w / 2, door.y - 8);
-      } 
+      }
     }
 
     TX.textAlign = "left";

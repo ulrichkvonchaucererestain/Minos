@@ -290,11 +290,13 @@ function unlockJumpscareSfx() {
   if (!JUMPSCARE_SFX) return;
 
   JUMPSCARE_SFX.muted = true;
-  JUMPSCARE_SFX.play().then(function () {
-    JUMPSCARE_SFX.pause();
-    JUMPSCARE_SFX.currentTime = 0;
-    JUMPSCARE_SFX.muted = false;
-  }).catch(function () {});
+  JUMPSCARE_SFX.play()
+    .then(function () {
+      JUMPSCARE_SFX.pause();
+      JUMPSCARE_SFX.currentTime = 0;
+      JUMPSCARE_SFX.muted = false;
+    })
+    .catch(function () {});
 }
 
 window.addEventListener("keydown", unlockJumpscareSfx, { once: true });
@@ -1253,11 +1255,16 @@ function spawnPlayer() {
 
 function resetToStart() {
   loadSpr();
-  // Reset all traps
-  // Re-randomize correct door on reset
+  // Re-randomize correct door on reset, but never pick the same door twice
   if (MAP.doors && MAP.doors.length === 3) {
-    var newCorrect = Math.floor(Math.random() * 3);
+    var oldCorrect = MAP.correctDoorIndex;
+    var choices = [0, 1, 2].filter(function (i) {
+      return i !== oldCorrect;
+    });
+
+    var newCorrect = choices[Math.floor(Math.random() * choices.length)];
     MAP.correctDoorIndex = newCorrect;
+
     MAP.doors.forEach(function (d, i) {
       d.correct = i === newCorrect;
       d.fake = i !== newCorrect;

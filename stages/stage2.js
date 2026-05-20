@@ -245,6 +245,34 @@ function getCanvasRenderScale() {
   return isMobileViewport() ? 1.14 : 1;
 }
 
+var JUMPSCARE_SFX = null;
+
+function initJumpscareSfx() {
+  if (JUMPSCARE_SFX || typeof SPRITE_MUSIC_JUMPSCARE === "undefined") return;
+
+  JUMPSCARE_SFX = new Audio(SPRITE_MUSIC_JUMPSCARE);
+  JUMPSCARE_SFX.volume = 1;
+  JUMPSCARE_SFX.preload = "auto";
+}
+
+function unlockJumpscareSfx() {
+  initJumpscareSfx();
+  if (!JUMPSCARE_SFX) return;
+
+  JUMPSCARE_SFX.muted = true;
+  JUMPSCARE_SFX.play()
+    .then(function () {
+      JUMPSCARE_SFX.pause();
+      JUMPSCARE_SFX.currentTime = 0;
+      JUMPSCARE_SFX.muted = false;
+    })
+    .catch(function () {});
+}
+
+window.addEventListener("keydown", unlockJumpscareSfx, { once: true });
+window.addEventListener("pointerdown", unlockJumpscareSfx, { once: true });
+window.addEventListener("touchstart", unlockJumpscareSfx, { once: true });
+
 /* ── KEYS ─────────────────────────────────────────────────────────── */
 var KEYS = {},
   JP = {};
@@ -318,6 +346,12 @@ function buildPlatforms() {
     { x: 6890, y: mezzY, w: 260, h: TILE },
     { x: 7280, y: FLOOR_Y, w: 1090, h: ph },
   ];
+
+  var fireballPlatform = MAP.platforms[MAP.platforms.length - 1];
+  MAP.platformById = {
+    fireballStart: fireballPlatform,
+    fireballEnd: fireballPlatform,
+  };
 
   MAP._ph = ph;
   MAP._mezzY = mezzY;
@@ -1348,11 +1382,45 @@ function updateDeathFx() {
   }
 }
 
+function updateStage2Doors() {
+  GS.activeDoorIndex = -1;
+
+  MAP.doors.forEach(function (door, i) {
+    var px7 = PL.x + PL_COX;
+    var py7 = PL.y + PL_COY;
+
+    if (
+      px7 < door.x + door.w + 10 &&
+      px7 + PL.w > door.x - 10 &&
+      py7 + PL.h > door.y &&
+      py7 < door.y + door.h
+    ) {
+      GS.activeDoorIndex = i;
+
+      if (JP["KeyE"]) {
+        showQuizModal(i);
+        JP["KeyE"] = false;
+      }
+    }
+  });
+}
+
 function wrongDoor() {
   // Prevent re-triggering while jumpscare is active
   if (GS.jumpscareActive) return;
   GS.jumpscareActive = true;
   GS.paused = true;
+
+  initJumpscareSfx();
+
+  var jumpscareSfx = JUMPSCARE_SFX;
+  if (jumpscareSfx) {
+    jumpscareSfx.pause();
+    jumpscareSfx.currentTime = 0;
+    jumpscareSfx.muted = false;
+    jumpscareSfx.volume = 1;
+    jumpscareSfx.play().catch(function () {});
+  }
 
   // Build jumpscare overlay
   var overlay = document.createElement("div");
@@ -1382,9 +1450,9 @@ function wrongDoor() {
     "filter:brightness(1.3) contrast(1.4)",
   ].join(";");
 
-  // Use SPRITE_MINO if available, otherwise a red fallback
-  if (typeof SPRITE_MINO !== "undefined") {
-    img.src = SPRITE_MINO;
+  // Use jumpscare image if available, otherwise a red fallback
+  if (typeof SPRITE_JUMPSCARE !== "undefined") {
+    img.src = SPRITE_JUMPSCARE;
   } else {
     // Fallback: red screen with text
     overlay.style.background = "#cc0000";
@@ -1438,6 +1506,10 @@ function wrongDoor() {
     overlay.style.opacity = "0";
     setTimeout(function () {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      if (jumpscareSfx) {
+        jumpscareSfx.pause();
+        jumpscareSfx.currentTime = 0;
+      }
       GS.jumpscareActive = false;
       GS.paused = false;
       window.location.href = "../index.html";
@@ -2061,7 +2133,7 @@ function drawDoors() {
       }
     }
     // Labels
-    TX.fillStyle = door.correct ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
+    TX.fillStyle = lit ? "rgba(255,215,0,.9)" : "rgba(212,168,67,.4)";
     TX.font = "9px Cinzel,serif";
     TX.textAlign = "center";
     TX.fillText(
