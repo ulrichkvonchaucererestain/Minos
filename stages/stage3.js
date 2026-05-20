@@ -400,6 +400,11 @@ function buildMap() {
 
   MAP.readySpike = null;
 
+  MAP.platformById = {
+    fireballStart: getPlatformAtX(7500),
+    fireballEnd: getPlatformAtX(8100),
+  };
+
   initStage2FireballTrap();
 
   /* ── SHAFT ── */
